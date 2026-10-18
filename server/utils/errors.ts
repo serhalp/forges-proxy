@@ -12,17 +12,10 @@ export function errorResponse(error: unknown): Response {
     console.error(error)
     return json(500, { name: "InternalError", message: "Internal error" })
   }
-  // `url` and the upstream `body` are left out: either can carry details of private data.
-  const body = {
-    name: error.name,
-    message: error.message,
-    forge: error.forge,
-    instance: error.instance,
-    ...(error instanceof ForgeApiError ? { status: error.status } : {}),
-    ...(error instanceof RateLimitedError
-      ? { resetAt: error.resetAt, secondary: error.secondary }
-      : {}),
-  }
+  // Every field the error class sets, so clients can rebuild it, except `url` and the upstream `body`: either can
+  // carry details of private data.
+  const { url: _url, body: _body, ...fields } = error as ForgeError & { body?: string }
+  const body = { ...fields, name: error.name, message: error.message }
   if (error instanceof RateLimitedError) {
     const retryAfter = error.resetAt
       ? Math.max(0, Math.ceil((error.resetAt.getTime() - Date.now()) / 1000))

@@ -11,6 +11,7 @@ export default defineHandler(() => {
     providers: useForges().providers.map((provider) => ({
       forge: provider.forge,
       instance: provider.instance,
+      baseUrl: provider.baseUrl,
       authKind: provider.authKind,
       capabilities: provider.capabilities,
     })),

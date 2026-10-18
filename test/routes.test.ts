@@ -1,8 +1,8 @@
 import assert from "node:assert/strict"
-import { afterEach, beforeEach, describe, it, mock } from "node:test"
+import { describe, it } from "node:test"
 import { createForges, RateLimitedError } from "forges"
 import { fake } from "forges/fake"
-import { H3 } from "nitro/h3"
+import { createProxy, env } from "./support/proxy.ts"
 
 const factory = fake({
   seed: {
@@ -13,17 +13,7 @@ const factory = fake({
   },
 })
 const forges = createForges([factory])
-mock.module(new URL("../server/utils/forges.ts", import.meta.url).href, {
-  exports: {
-    useForges: () => forges,
-    skippedProviders: () => [{ forge: "GITLAB", suffix: "", reason: "needs TOKEN" }],
-  },
-})
-
-const { default: auth } = await import("#server/middleware/auth.ts")
-const { default: index } = await import("#server/routes/v1/index.get.ts")
-const { default: verb } = await import("#server/routes/v1/[forge]/[instance]/[verb].ts")
-const app = new H3().use(auth).get("/v1", index).all("/v1/:forge/:instance/:verb", verb)
+const app = await createProxy(forges)
 
 const repo = { forge: "fake", instance: "fake.test", owner: "acme", name: "widgets" }
 const issue = { forge: "fake", instance: "fake.test", repo, kind: "issue", number: "1" }
@@ -55,13 +45,6 @@ const write = (name: string, args: unknown[], headers?: HeadersInit) =>
 
 async function errorOf(response: Response): Promise<{ name: string; message: string }> {
   return ((await response.json()) as { error: { name: string; message: string } }).error
-}
-
-function env(vars: Record<string, string>): void {
-  beforeEach(() => Object.assign(process.env, vars))
-  afterEach(() => {
-    for (const key of Object.keys(vars)) delete process.env[key]
-  })
 }
 
 describe("configuration", () => {

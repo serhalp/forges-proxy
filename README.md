@@ -28,3 +28,22 @@ Arguments are positional, as the `ForgeProvider` method takes them. Listings are
 curl -G localhost:3000/v1/github/github.com/repos.get \
   --data-urlencode 'args=[{"forge":"github","instance":"github.com","owner":"danielroe","name":"forges"}]'
 ```
+
+## Client
+
+`client/remote.ts` turns the proxy back into `forges` providers, so code written against `forges` works unchanged:
+
+```ts
+import { createForges } from "forges"
+import { connect } from "#client/remote.ts"
+
+const forges = createForges(await connect({ url: "https://forges.example.com", secret }))
+const repo = await forges.repos.get({
+  forge: "github",
+  instance: "github.com",
+  owner: "danielroe",
+  name: "forges",
+})
+```
+
+Every verb is present. Listings iterate through the proxy's `*Page` verbs, errors come back as the same classes, and verbs the proxy doesn't route reject with `UnsupportedOperationError` (and `can()` says so).

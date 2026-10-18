@@ -49,7 +49,8 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - [ ] Shared store for the upstream cache (Nitro storage or Cache API) so serverless instances share it
 - [ ] Webhook receiver → `affectedKeys()` → tag purge
 - [ ] Operations manifest → OpenAPI → Scalar
-- [ ] `remote()` provider
+- [x] `connect()` client (`client/remote.ts`): one `ForgeProvider` per proxied forge
+- [ ] Package the client (here or as `forges/remote`); report `rateLimits()` and `refreshCapabilities()` through the proxy
 
 ## Parked
 
@@ -61,3 +62,5 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - Error messages embed the upstream URL (e.g. `NotFoundError`), so leaving out `error.url` doesn't keep it private.
 - Wire format today: positional `args` (a JSON array), `Uint8Array` as base64 with `encoding: 'binary'` left as is, `raw` dropped unless `?raw=1`, `undefined` results as 204.
 - Upstream cache, verified live: GitHub answers revalidation with a real 304, but an _anonymous_ 304 still costs a request (53 → 52). GitHub documents 304s as free only for authenticated requests, so the public instance should run with a public-read token, not anonymous.
+- Client: iterables split their arguments with a heuristic (a trailing object without `forge` is the options), since refs always name their forge. The operations manifest would replace it.
+- Errors now cross the wire with every field their class sets (except `url` and `body`), and the client rebuilds the class with `Reflect.construct` instead of per-class constructors.
