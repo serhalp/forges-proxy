@@ -8,4 +8,4 @@ Refer to `node_modules/nitro/dist/docs/README.md` when working on server (your k
 
 ## Conventions
 
-- Path alias `~/*` (tsconfig), use explicit `.ts` extensions
+- Import local modules with the `#*` alias from `package.json` `imports` (e.g. `#server/utils/forges.ts`), which Node, TypeScript and Nitro all resolve natively; use explicit `.ts` extensions

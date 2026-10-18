@@ -1,5 +1,6 @@
 {
-  "name": "nitro-starter",
+  "name": "forges-proxy",
+  "private": true,
   "type": "module",
   "imports": {
     "#*": "./*"
@@ -8,13 +9,29 @@
     "build": "nitro build",
     "dev": "nitro dev",
     "preview": "nitro preview",
+    "typecheck": "tsc --noEmit",
     "format": "oxfmt",
-    "format:check": "oxfmt --check"
+    "format:check": "oxfmt --check",
+    "test": "node --experimental-test-module-mocks --test \"test/**/*.test.ts\"",
+    "test:coverage": "node --experimental-test-module-mocks --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test-coverage-exclude=\"../forges/**\" --test \"test/**/*.test.ts\""
+  },
+  "dependencies": {
+    "forges": "link:../forges"
   },
   "devDependencies": {
-    "@types/node": "latest",
-    "nitro": "latest",
+    "@types/node": "26.6.5",
+    "nitro": "3.0.260903-beta",
     "oxfmt": "0.73.0",
-    "typescript": "latest"
+    "typescript": "7.0.2"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "26.11.1",
+      "onFail": "download"
+    }
+  },
+  "engines": {
+    "node": ">=26"
   }
 }
