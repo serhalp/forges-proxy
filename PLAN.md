@@ -45,7 +45,8 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - [ ] Generate `isr` route rules per verb; tags from refs
 - [ ] `/v1/_all/...` registry fan-out
 - [ ] SSE for `sources.subscribe`
-- [ ] Upstream ETag fetch cache on Nitro storage
+- [x] Upstream ETag fetch cache (`server/utils/upstream-cache.ts`), in-memory LRU store
+- [ ] Shared store for the upstream cache (Nitro storage or Cache API) so serverless instances share it
 - [ ] Webhook receiver → `affectedKeys()` → tag purge
 - [ ] Operations manifest → OpenAPI → Scalar
 - [ ] `remote()` provider
@@ -59,3 +60,4 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - `DATE_FIELDS` / `reviveDates` cover output models only. Input options have `since`, `until`, `createdAfter`, `before`; the proxy revives those itself (`server/utils/wire.ts`).
 - Error messages embed the upstream URL (e.g. `NotFoundError`), so leaving out `error.url` doesn't keep it private.
 - Wire format today: positional `args` (a JSON array), `Uint8Array` as base64 with `encoding: 'binary'` left as is, `raw` dropped unless `?raw=1`, `undefined` results as 204.
+- Upstream cache, verified live: GitHub answers revalidation with a real 304, but an _anonymous_ 304 still costs a request (53 → 52). GitHub documents 304s as free only for authenticated requests, so the public instance should run with a public-read token, not anonymous.

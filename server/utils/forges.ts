@@ -1,12 +1,13 @@
 import type { Forges } from "forges"
 import process from "node:process"
 import { forgesFromEnv, providersFromEnv } from "forges/env"
+import { cachingFetch } from "#server/utils/upstream-cache.ts"
 
 let forges: Forges | undefined
 
 /** Providers from `FORGES_<KIND>_<FIELD>[_<SUFFIX>]` variables; see `providersFromEnv()`. */
 export function useForges(): Forges {
-  return (forges ??= forgesFromEnv(process.env))
+  return (forges ??= forgesFromEnv(process.env, { fetch: cachingFetch(globalThis.fetch) }))
 }
 
 /** Provider sets in the environment that could not be configured, by forge and reason only. */
