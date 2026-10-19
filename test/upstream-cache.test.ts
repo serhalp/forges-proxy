@@ -1,7 +1,13 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { github } from "forges"
-import { cachingFetch, memoryStore } from "#server/utils/upstream-cache.ts"
+import type { StoredResponse, UpstreamStore } from "#server/utils/upstream-cache.ts"
+import {
+  cacheApiStore,
+  cachingFetch,
+  memoryStore,
+  upstreamScope,
+} from "#server/utils/upstream-cache.ts"
 
 interface Sent {
   url: string
@@ -226,5 +232,112 @@ describe("memoryStore", () => {
     assert.ok(store.get("a"))
     assert.equal(store.get("b"), undefined)
     assert.ok(store.get("c"))
+  })
+})
+
+describe("upstreamScope", () => {
+  /** A memory store that also records the tags of each write. */
+  function taggedStore() {
+    const memory = memoryStore()
+    const writes: Array<{ key: string; tags?: string[] }> = []
+    const store: UpstreamStore = {
+      get: (key) => memory.get(key),
+      set: (key, value, tags) => {
+        writes.push({ key, tags })
+        return memory.set(key, value)
+      },
+    }
+    return { store, writes }
+  }
+
+  it("holds writes until commit, which tags them", async () => {
+    const forge = upstream()
+    const { store, writes } = taggedStore()
+    const fetch = cachingFetch(forge.fetch, { store })
+    const scope = upstreamScope()
+    await scope.run(async () => {
+      await fetch(url)
+      assert.equal(writes.length, 0)
+      // Within the scope, the pending entry already answers.
+      await fetch(url)
+    })
+    assert.equal(forge.sent.length, 1)
+    await scope.commit(["github:github.com/acme/widgets"])
+    assert.deepEqual(
+      writes.map(({ tags }) => tags),
+      [["github:github.com/acme/widgets"]],
+    )
+    assert.deepEqual(scope.outcomes, ["fetched", "fresh"])
+  })
+
+  it("records revalidations", async () => {
+    const forge = upstream()
+    const time = clock()
+    const fetch = cachingFetch(forge.fetch, { now: time.now })
+    await fetch(url)
+    time.advance(61)
+    const scope = upstreamScope()
+    await scope.run(() => fetch(url))
+    assert.deepEqual(scope.outcomes, ["revalidated"])
+  })
+
+  it("writes straight through outside a scope", async () => {
+    const { store, writes } = taggedStore()
+    await cachingFetch(upstream().fetch, { store })(url)
+    assert.deepEqual(
+      writes.map(({ tags }) => tags),
+      [undefined],
+    )
+  })
+})
+
+/** Enough of a `Cache` for the store: responses by URL. */
+function stubCache() {
+  const responses = new Map<string, Response>()
+  const cache = {
+    match: async (url: string) => responses.get(url)?.clone(),
+    put: async (url: string, response: Response) => void responses.set(url, response),
+  } as unknown as Cache
+  return { cache, responses }
+}
+
+describe("cacheApiStore", () => {
+  const entry: StoredResponse = {
+    status: 200,
+    headers: [
+      ["etag", '"v1"'],
+      ["cache-control", "private, max-age=60"],
+    ],
+    body: new TextEncoder().encode('{"ok":true}'),
+    storedAt: 1234,
+    maxAge: 60,
+  }
+
+  it("round-trips an entry", async () => {
+    const { cache } = stubCache()
+    const store = cacheApiStore(async () => cache)
+    await store.set("key", entry, ["a", "b"])
+    assert.deepEqual(await store.get("key"), entry)
+    assert.equal(await store.get("other"), undefined)
+  })
+
+  it("stores what the platform will keep, tagged for purges", async () => {
+    const { cache, responses } = stubCache()
+    await cacheApiStore(async () => cache).set("key", entry, ["a", "b"])
+    const [stored] = [...responses.values()]
+    // The upstream `private` would make the platform refuse it.
+    assert.match(stored!.headers.get("cache-control")!, /^public, max-age=\d+$/)
+    assert.equal(stored!.headers.get("netlify-cache-tag"), "a,b")
+    assert.equal(stored!.headers.get("cache-tag"), "a,b")
+  })
+
+  it("backs cachingFetch", async () => {
+    const forge = upstream()
+    const { cache } = stubCache()
+    const fetch = cachingFetch(forge.fetch, { store: cacheApiStore(async () => cache) })
+    await fetch(url)
+    const response = await fetch(url)
+    assert.equal(forge.sent.length, 1)
+    assert.deepEqual(await response.json(), { version: 1, url })
   })
 })

@@ -5,6 +5,7 @@ import { cacheHeaders } from "#server/utils/cache.ts"
 import { errorResponse, proxyError } from "#server/utils/errors.ts"
 import { useForges } from "#server/utils/forges.ts"
 import { responseTags } from "#server/utils/tags.ts"
+import { upstreamScope } from "#server/utils/upstream-cache.ts"
 import { callVerb, VERBS } from "#server/utils/verbs.ts"
 import { reviveArgs, serialise } from "#server/utils/wire.ts"
 
@@ -54,9 +55,10 @@ export default defineHandler(async (event) => {
     }
   }
 
+  const upstream = upstreamScope()
   let result: unknown
   try {
-    result = await callVerb(provider, name, args)
+    result = await upstream.run(async () => callVerb(provider, name, args))
   } catch (error) {
     return errorResponse(error)
   }
@@ -66,7 +68,12 @@ export default defineHandler(async (event) => {
     args,
     result instanceof ReadableStream ? undefined : result,
   )
-  const headers = cacheHeaders(verb, mode, tags)
+  // Upstream entries carry the response's tags, so a webhook purge reaches them along with the CDN's copy.
+  await upstream.commit(tags)
+  const headers = {
+    ...cacheHeaders(verb, mode, tags),
+    ...(upstream.outcomes.length ? { "x-upstream-cache": upstream.outcomes.join(", ") } : {}),
+  }
   if (result instanceof ReadableStream) {
     return new Response(result, {
       headers: { "content-type": "application/octet-stream", ...headers },

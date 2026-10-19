@@ -44,7 +44,7 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - [ ] Pass the request signal through to verbs (needs to know which arg is `options`; manifest)
 - [ ] SSE for `sources.subscribe`
 - [x] Upstream ETag fetch cache (`server/utils/upstream-cache.ts`), in-memory LRU store
-- [ ] Shared store for the upstream cache (Nitro storage or Cache API) so serverless instances share it
+- [x] Shared store for the upstream cache: the Cache API where the platform has one (Netlify, Cloudflare), shared per region and tagged like the response; memory elsewhere. `x-upstream-cache` reports what it did per request.
 - [x] Cache tags (`Cache-Tag`, `Netlify-Cache-Tag`) on public reads; `POST /webhooks/:forge/:instance` purges them (Netlify or Cloudflare) and expires the upstream cache
 - [ ] Finer tags (per thread, per release) so an active repo doesn't purge all of its entries on every event
 - [ ] Operations manifest → OpenAPI → Scalar
@@ -66,3 +66,4 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - Dropped the generated `isr` route rules: the handler already sets `Netlify-CDN-Cache-Control` per response and never on errors, which the preset's `isr` handling can't do (it overwrites and applies to every status).
 - Tags are per repository, by both `repoKey` forms (path and `externalId`), since request refs usually lack the id that webhook refs carry and `repoKey` prefers it. Worth considering in `forges`: a helper that returns every key of a ref, for caches to index by.
 - A webhook expires the whole upstream cache (not just the affected repos, whose entries are keyed by request hash), so a CDN refill can't come from an upstream copy the proxy still holds as fresh. Revalidations are 304s, so it's cheap.
+- Upstream entries in the Cache API carry the proxy response's tags (writes wait until the verb returns, so tags include repos in the result), so a webhook purge deletes them in every region along with the CDN copy. Verified live on Netlify: after a purge the next read fetched; 20 concurrent reads across instances were all fresh. A purge deletes rather than marks stale, so the next read is a full request rather than a 304. Netlify allows 20 cache writes per invocation; a verb that fans out further stores only the first 20. `expire()` and the per-credential write timestamps are still per instance.

@@ -1,9 +1,12 @@
 import type { Forges } from "forges"
 import process from "node:process"
 import { forgesFromEnv, providersFromEnv } from "forges/env"
-import { cachingFetch } from "#server/utils/upstream-cache.ts"
+import { cacheApiStore, cachingFetch } from "#server/utils/upstream-cache.ts"
 
-const upstream = cachingFetch(globalThis.fetch)
+// The Cache API, where the platform has one, shares upstream responses between instances; otherwise memory.
+const upstream = cachingFetch(globalThis.fetch, {
+  ...(globalThis.caches ? { store: cacheApiStore(() => caches.open("upstream")) } : {}),
+})
 let forges: Forges | undefined
 
 /** Providers from `FORGES_<KIND>_<FIELD>[_<SUFFIX>]` variables; see `providersFromEnv()`. */

@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks"
 import type { FetchLike } from "forges"
 import { sha256Hex } from "forges/kit"
 
@@ -14,7 +15,41 @@ export interface StoredResponse {
 
 export interface UpstreamStore {
   get: (key: string) => StoredResponse | undefined | Promise<StoredResponse | undefined>
-  set: (key: string, value: StoredResponse) => void | Promise<void>
+  /** `tags` are those of the proxy response the entry served, so that a purge by tag reaches the entry too. */
+  set: (key: string, value: StoredResponse, tags?: string[]) => void | Promise<void>
+}
+
+/** What the cache did for one upstream request: served it `fresh`, `revalidated` it with a 304, or `fetched` it. */
+export type UpstreamOutcome = "fresh" | "revalidated" | "fetched"
+
+/**
+ * The upstream requests of one proxy request. Writes wait for `commit()`, which knows the response's tags, and
+ * `outcomes` records what the cache did for each request.
+ */
+export interface UpstreamScope {
+  run: <T>(fn: () => Promise<T>) => Promise<T>
+  commit: (tags: string[]) => Promise<void>
+  readonly outcomes: UpstreamOutcome[]
+}
+
+interface ScopeState {
+  pending: Map<string, { store: UpstreamStore; entry: StoredResponse }>
+  outcomes: UpstreamOutcome[]
+}
+
+const scopes = new AsyncLocalStorage<ScopeState>()
+
+export function upstreamScope(): UpstreamScope {
+  const state: ScopeState = { pending: new Map(), outcomes: [] }
+  return {
+    run: (fn) => scopes.run(state, fn),
+    async commit(tags) {
+      const writes = [...state.pending]
+      state.pending.clear()
+      await Promise.all(writes.map(([key, { store, entry }]) => store.set(key, entry, tags)))
+    },
+    outcomes: state.outcomes,
+  }
 }
 
 export interface UpstreamCacheOptions {
@@ -46,6 +81,16 @@ export function cachingFetch(fetch: FetchLike, options: UpstreamCacheOptions = {
   // A write may change anything its credential reads, so later reads revalidate instead of trusting `max-age`.
   const lastWrite = new Map<string, number>()
   let expiredAt = -Infinity
+  const get = (key: string) => scopes.getStore()?.pending.get(key)?.entry ?? store.get(key)
+  const set = async (key: string, entry: StoredResponse) => {
+    const scope = scopes.getStore()
+    if (scope) {
+      scope.pending.set(key, { store, entry })
+    } else {
+      await store.set(key, entry)
+    }
+  }
+  const record = (outcome: UpstreamOutcome) => scopes.getStore()?.outcomes.push(outcome)
 
   const cached: FetchLike = async (input, init = {}) => {
     const headers = new Headers(init.headers)
@@ -62,13 +107,14 @@ export function cachingFetch(fetch: FetchLike, options: UpstreamCacheOptions = {
     }
 
     const key = await sha256Hex(JSON.stringify([input, [...headers]]))
-    const stored = await store.get(key)
+    const stored = await get(key)
     if (
       stored &&
       stored.maxAge > 0 &&
       now() - stored.storedAt < stored.maxAge * 1000 &&
       stored.storedAt > Math.max(expiredAt, lastWrite.get(credential) ?? -Infinity)
     ) {
+      record("fresh")
       return toResponse(stored, { withoutRateLimit: true })
     }
 
@@ -82,9 +128,11 @@ export function cachingFetch(fetch: FetchLike, options: UpstreamCacheOptions = {
         storedAt: now(),
         maxAge: maxAgeOf(response.headers) ?? stored.maxAge,
       }
-      await store.set(key, refreshed)
+      await set(key, refreshed)
+      record("revalidated")
       return toResponse(refreshed)
     }
+    record("fetched")
     if (!isStorable(response, maxBodyBytes)) {
       return response
     }
@@ -97,7 +145,7 @@ export function cachingFetch(fetch: FetchLike, options: UpstreamCacheOptions = {
       maxAge: maxAgeOf(response.headers) ?? 0,
     }
     if (body.byteLength <= maxBodyBytes) {
-      await store.set(key, entry)
+      await set(key, entry)
     }
     return toResponse(entry)
   }
@@ -199,6 +247,46 @@ export function memoryStore(maxBytes = 64 * 1024 * 1024): UpstreamStore {
         entries.delete(oldest)
         bytes -= sizeOf(entry)
       }
+    },
+  }
+}
+
+// Long enough to keep validators around well past upstream `max-age`; a redeploy clears the store on Netlify anyway.
+const RETENTION_SECONDS = 24 * 60 * 60
+const ENTRY_URL = "https://upstream.forges-proxy.invalid/"
+
+/**
+ * A store on the Cache API (`caches`), as Netlify Functions and Cloudflare Workers provide it: shared by every instance
+ * in a region, and purged along with the CDN by the proxy response's cache tags. The entry's own status, headers and
+ * timestamps travel in the body, since the platform reads the stored response's headers as its own instructions.
+ */
+export function cacheApiStore(open: () => Promise<Cache>): UpstreamStore {
+  const encoder = new TextEncoder()
+  return {
+    async get(key) {
+      const response = await (await open()).match(ENTRY_URL + key)
+      if (!response) {
+        return undefined
+      }
+      const bytes = new Uint8Array(await response.arrayBuffer())
+      const length = new DataView(bytes.buffer, bytes.byteOffset).getUint32(0)
+      const meta = JSON.parse(new TextDecoder().decode(bytes.subarray(4, 4 + length)))
+      return { ...meta, body: bytes.slice(4 + length) } as StoredResponse
+    },
+    async set(key, { body, ...meta }, tags = []) {
+      const json = encoder.encode(JSON.stringify(meta))
+      const bytes = new Uint8Array(4 + json.byteLength + body.byteLength)
+      new DataView(bytes.buffer).setUint32(0, json.byteLength)
+      bytes.set(json, 4)
+      bytes.set(body, 4 + json.byteLength)
+      const headers: Record<string, string> = {
+        "content-type": "application/octet-stream",
+        "cache-control": `public, max-age=${RETENTION_SECONDS}`,
+      }
+      if (tags.length) {
+        headers["cache-tag"] = headers["netlify-cache-tag"] = tags.join(",")
+      }
+      await (await open()).put(ENTRY_URL + key, new Response(bytes, { headers }))
     },
   }
 }

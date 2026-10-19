@@ -57,3 +57,7 @@ Point a forge's webhook at `/webhooks/:forge/:instance` and set the provider's `
 - Cloudflare: set `CLOUDFLARE_ZONE_ID` and `CLOUDFLARE_API_TOKEN`.
 
 Elsewhere, entries expire by age (60 seconds, then served stale for up to 10 minutes while they refresh).
+
+## Upstream cache
+
+The proxy keeps upstream JSON responses and revalidates them with their `etag`, so a CDN miss usually costs a `304` (free on GitHub's rate limit for authenticated requests) or nothing. Where the platform has the Cache API (Netlify, Cloudflare), the entries are shared by every instance in a region and purged by the same webhooks; elsewhere they're in memory. Each response's `x-upstream-cache` header lists what happened to its upstream requests: `fresh`, `revalidated` or `fetched`.
