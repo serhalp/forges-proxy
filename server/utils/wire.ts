@@ -2,7 +2,12 @@ import { DATE_FIELDS } from "forges"
 import { fromBase64, toBase64 } from "forges/kit"
 
 // `DATE_FIELDS` only covers output models; these are the `Date` fields of input options.
-const INPUT_DATE_FIELDS = new Set(["since", "until", "createdAfter", "before"])
+export const INPUT_DATE_FIELDS: ReadonlySet<string> = new Set([
+  "since",
+  "until",
+  "createdAfter",
+  "before",
+])
 
 /** Revives ISO strings into `Date`s in call arguments, for every output and input date field, and decodes bytes. */
 export function reviveArgs(value: unknown): unknown {

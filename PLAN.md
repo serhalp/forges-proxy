@@ -48,7 +48,7 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - [ ] Finer tags (per thread, per release) so an active repo doesn't purge all of its entries on every event
 - [x] Operations manifest (`scripts/generate-manifest.ts` → `server/manifest.json`) → OpenAPI 3.1 (`/openapi.json`) → Scalar (`/docs`)
 - [x] Validate `args` against the manifest's schemas (`@cfworker/json-schema`, no codegen, so fine at the edge): a 400 naming the failing path, e.g. `args/0/owner: Instance type "number" is invalid`
-- [ ] Revive dates from the manifest (`format: date-time`) instead of the field-name lists in `wire.ts`
+- [x] A test checks every `date-time` input field in the manifest is one `wire.ts` revives, so a new one in `forges` can't arrive as a string
 - [ ] Client: use the manifest instead of the options heuristic for iterables
 - [x] `connect()` client (`client/remote.ts`): one `ForgeProvider` per proxied forge
 - [ ] Package the client (here or as `forges/remote`); report `rateLimits()` and `refreshCapabilities()` through the proxy
