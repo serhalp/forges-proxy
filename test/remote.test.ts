@@ -102,6 +102,17 @@ describe("remote provider", () => {
     assert.deepEqual(file.content, new Uint8Array([0, 255, 1]))
   })
 
+  it("writes file bytes as bytes", async () => {
+    const { fake } = await remote("s3cret")
+    const bytes = new Uint8Array([9, 0, 200])
+    await fake.contents.commitFiles(repo, {
+      branch: "main",
+      message: "Add bytes",
+      changes: [{ path: "data.bin", content: bytes }],
+    })
+    assert.deepEqual((await direct.contents.file(repo, "data.bin")).content, bytes)
+  })
+
   it("streams job logs", async () => {
     const { fake } = await remote("s3cret")
     const [run] = (await fake.ci.runsPage(repo)).items

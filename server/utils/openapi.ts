@@ -1,6 +1,6 @@
 import type { AccessMode } from "#server/utils/access.ts"
 import type { ManifestVerb, Schema } from "#server/utils/manifest.ts"
-import { manifest } from "#server/utils/manifest.ts"
+import { argsSchema, manifest } from "#server/utils/manifest.ts"
 
 const ERROR: Schema = {
   type: "object",
@@ -120,20 +120,6 @@ function operation(name: string, verb: ManifestVerb): Record<string, unknown> {
 /** The positional arguments, by name, for viewers that don't render `prefixItems`. */
 function signature(verb: ManifestVerb): string {
   return `\`[${verb.params.map((param) => `${param.name}${param.optional ? "?" : ""}`).join(", ")}]\``
-}
-
-/** The positional arguments as a tuple; trailing optional ones may be left out. */
-function argsSchema(verb: ManifestVerb): Schema {
-  return {
-    type: "array",
-    prefixItems: verb.params.map((param) => ({
-      title: `${param.name}${param.optional ? "?" : ""}`,
-      ...(param.description ? { description: param.description } : {}),
-      ...param.schema,
-    })),
-    minItems: verb.params.filter((param) => !param.optional).length,
-    maxItems: verb.params.length,
-  }
 }
 
 function responses(verb: ManifestVerb): Record<string, unknown> {

@@ -29,3 +29,20 @@ export interface Manifest {
 }
 
 export const manifest = generated as Manifest
+
+/**
+ * The positional arguments as a tuple. Trailing optional ones may be left out, and any optional one may be `null`,
+ * which is how JSON carries an `undefined` that a later argument follows.
+ */
+export function argsSchema(verb: ManifestVerb): Schema {
+  return {
+    type: "array",
+    prefixItems: verb.params.map((param) => ({
+      title: `${param.name}${param.optional ? "?" : ""}`,
+      ...(param.description ? { description: param.description } : {}),
+      ...(param.optional ? { anyOf: [param.schema, { type: "null" }] } : param.schema),
+    })),
+    minItems: verb.params.filter((param) => !param.optional).length,
+    maxItems: verb.params.length,
+  }
+}

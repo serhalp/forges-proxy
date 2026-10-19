@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@cfworker/json-schema':
+        specifier: 4.1.1
+        version: 4.1.1
       '@netlify/functions':
         specifier: 6.0.1
         version: 6.0.1
@@ -38,6 +41,9 @@ importers:
         version: typescript@5.9.3
 
 packages:
+
+  '@cfworker/json-schema@4.1.1':
+    resolution: {integrity: sha512-gAmrUZSGtKc3AiBL71iNWxDsyUC5uMaKKGdvzYsBoTW/xi42JQHl7eKV2OYzCUqvc+D2RCcf7EXY2iCyFIk6og==}
 
   '@netlify/functions@6.0.1':
     resolution: {integrity: sha512-QapLxXrSBxy+boLOAYUt7R47P5Zyn2XDMe16AaUHJILzAwTbAQIWy20ynXoLuh11JrsqX02qaKaj0/ppou3E/g==}
@@ -694,6 +700,8 @@ packages:
     resolution: {integrity: sha512-4rDO/NjgnkbVvWAPpxugX7YI/xVpC74NLrmAbH6I0D4hcSVq/1m5q2pSfQjP/ABs+7EsRtP/ZjyYMD9bEBgeTw==}
 
 snapshots:
+
+  '@cfworker/json-schema@4.1.1': {}
 
   '@netlify/functions@6.0.1':
     dependencies:

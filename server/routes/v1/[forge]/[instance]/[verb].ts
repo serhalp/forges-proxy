@@ -6,6 +6,7 @@ import { errorResponse, proxyError } from "#server/utils/errors.ts"
 import { useForges } from "#server/utils/forges.ts"
 import { responseTags } from "#server/utils/tags.ts"
 import { upstreamScope } from "#server/utils/upstream-cache.ts"
+import { argsProblem } from "#server/utils/validate.ts"
 import { callVerb, VERBS, withSignal } from "#server/utils/verbs.ts"
 import { reviveArgs, serialise } from "#server/utils/wire.ts"
 
@@ -34,12 +35,18 @@ export default defineHandler(async (event) => {
   }
 
   const query = getQuery(event)
-  const args = reviveArgs(
-    verb.write ? ((await readBody<{ args?: unknown }>(event))?.args ?? []) : parseArgs(query.args),
-  )
-  if (!Array.isArray(args)) {
+  const wire = verb.write
+    ? ((await readBody<{ args?: unknown }>(event))?.args ?? [])
+    : parseArgs(query.args)
+  if (!Array.isArray(wire)) {
     return proxyError(400, "`args` must be a JSON array")
   }
+  const problem = argsProblem(name, wire)
+  if (problem) {
+    return proxyError(400, problem)
+  }
+  // JSON has no `undefined`, so a skipped optional argument arrives as `null`.
+  const args = reviveArgs(wire.map((arg) => arg ?? undefined)) as unknown[]
   // A ref for another forge would be sent to this provider's host anyway; reject it rather than guess.
   for (const arg of args) {
     if (

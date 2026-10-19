@@ -24,7 +24,7 @@ pnpm dev
 - `GET /v1/:forge/:instance/:verb?args=<json array>`: a read, e.g. `repos.get`, `threads.listPage`.
 - `POST /v1/:forge/:instance/:verb` with `{ "args": [...] }`: a write.
 
-Arguments are positional, as the `ForgeProvider` method takes them. Listings are exposed as their `*Page` verb; pass `cursor` back to read the next page.
+Arguments are positional, as the `ForgeProvider` method takes them, and are validated against the verb's signature (see `/docs`). Pass `null` for a skipped optional argument. Bytes travel as `{ "$bytes": "<base64>" }` in both directions. Listings are exposed as their `*Page` verb; pass `cursor` back to read the next page.
 
 ```sh
 curl -G localhost:3000/v1/github/github.com/repos.get \

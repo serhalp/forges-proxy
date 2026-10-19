@@ -9,7 +9,7 @@ import type {
   Page,
 } from "forges"
 import * as forges from "forges"
-import { CAPABILITY_TABLE, forgeIterable, fromBase64, iteratePages } from "forges/kit"
+import { CAPABILITY_TABLE, forgeIterable, fromBase64, iteratePages, toBase64 } from "forges/kit"
 
 export interface RemoteOptions {
   /** The proxy's origin, such as `https://forges.example.com`. */
@@ -106,12 +106,12 @@ function remoteProvider(
     )
     const write = writes.get(verb)
     if (!write) {
-      url.searchParams.set("args", JSON.stringify(sent))
+      url.searchParams.set("args", JSON.stringify(sent, encodeBytes))
     }
     const response = await options.fetch(url.href, {
       method: write ? "POST" : "GET",
       headers: write ? { ...options.headers, "content-type": "application/json" } : options.headers,
-      ...(write ? { body: JSON.stringify({ args: sent }) } : {}),
+      ...(write ? { body: JSON.stringify({ args: sent }, encodeBytes) } : {}),
       signal,
     })
     if (!response.ok) {
@@ -123,7 +123,7 @@ function remoteProvider(
     if (response.headers.get("content-type") === "application/octet-stream") {
       return response.body
     }
-    return decodeBytes(verb, sent, forges.reviveDates(await response.json()))
+    return decodeBytes(forges.reviveDates(await response.json()))
   }
 
   const namespaces: Record<string, Record<string, unknown>> = {}
@@ -200,21 +200,24 @@ function isOptions(value: unknown): value is Record<string, unknown> {
   )
 }
 
-/** The proxy sends bytes as base64; these verbs resolve with them. */
-function decodeBytes(verb: string, args: unknown[], value: unknown): unknown {
-  if (verb === "contents.file") {
-    const file = value as { encoding: string; content: string | Uint8Array }
-    return file.encoding === "binary" && typeof file.content === "string"
-      ? { ...file, content: fromBase64(file.content) }
-      : file
+/** Bytes cross the wire as `{ "$bytes": "<base64>" }`, both ways. */
+function encodeBytes(_key: string, value: unknown): unknown {
+  return value instanceof Uint8Array ? { $bytes: toBase64(value) } : value
+}
+
+// After `reviveDates`, which would take a `Uint8Array` apart.
+function decodeBytes(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(decodeBytes)
   }
-  if (
-    verb === "releases.downloadAsset" &&
-    (args[1] as { as?: string } | undefined)?.as === "binary"
-  ) {
-    return fromBase64(value as string)
+  if (!value || typeof value !== "object" || value instanceof Date) {
+    return value
   }
-  return value
+  const { $bytes } = value as { $bytes?: unknown }
+  if (typeof $bytes === "string" && Object.keys(value).length === 1) {
+    return fromBase64($bytes)
+  }
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, decodeBytes(item)]))
 }
 
 /** Rebuilds the error class the proxy reports, with its fields, without running its constructor. */

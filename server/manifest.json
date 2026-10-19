@@ -2756,9 +2756,18 @@
             "description": "The bytes, as `application/octet-stream`."
           },
           {
-            "type": "string",
-            "contentEncoding": "base64",
-            "description": "Bytes, base64-encoded."
+            "type": "object",
+            "properties": {
+              "$bytes": {
+                "type": "string",
+                "contentEncoding": "base64"
+              }
+            },
+            "required": [
+              "$bytes"
+            ],
+            "additionalProperties": false,
+            "description": "Bytes, as `{ \"$bytes\": \"<base64>\" }`."
           },
           {
             "type": "string"
@@ -4708,9 +4717,18 @@
               "type": "string"
             },
             {
-              "type": "string",
-              "contentEncoding": "base64",
-              "description": "Bytes, base64-encoded."
+              "type": "object",
+              "properties": {
+                "$bytes": {
+                  "type": "string",
+                  "contentEncoding": "base64"
+                }
+              },
+              "required": [
+                "$bytes"
+              ],
+              "additionalProperties": false,
+              "description": "Bytes, as `{ \"$bytes\": \"<base64>\" }`."
             },
             {
               "type": "null"
@@ -4767,9 +4785,18 @@
               "const": "binary"
             },
             "content": {
-              "type": "string",
-              "contentEncoding": "base64",
-              "description": "Bytes, base64-encoded."
+              "type": "object",
+              "properties": {
+                "$bytes": {
+                  "type": "string",
+                  "contentEncoding": "base64"
+                }
+              },
+              "required": [
+                "$bytes"
+              ],
+              "additionalProperties": false,
+              "description": "Bytes, as `{ \"$bytes\": \"<base64>\" }`."
             },
             "path": {
               "type": "string",

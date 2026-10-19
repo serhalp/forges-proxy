@@ -173,6 +173,26 @@ describe("dispatch", () => {
     }
   })
 
+  it("400s for args that don't fit the verb's signature, naming where", async () => {
+    const cases: Array<[unknown[], string]> = [
+      [[], "args: Array has too few items"],
+      [[{ ...repo, owner: 3 }], "args/0/owner:"],
+      [[repo, {}, {}], "args: Array has too many items"],
+    ]
+    for (const [args, message] of cases) {
+      const response = await read("repos.get", args, authorization)
+      assert.equal(response.status, 400)
+      assert.ok((await errorOf(response)).message.startsWith(message), message)
+    }
+    const since = await read("search.threadsPage", [{ repo, since: "yesterday" }], authorization)
+    assert.match((await errorOf(since)).message, /^args\/0\/since: .*date-time/)
+  })
+
+  it("takes null for a skipped optional argument", async () => {
+    const response = await read("contents.file", [repo, "README.md", null], authorization)
+    assert.equal(response.status, 200)
+  })
+
   it("400s for a ref to another forge", async () => {
     const response = await read(
       "repos.get",
@@ -182,11 +202,11 @@ describe("dispatch", () => {
     assert.equal(response.status, 400)
   })
 
-  it("sends file bytes as base64", async () => {
+  it("sends file bytes tagged as base64", async () => {
     const response = await read("contents.file", [repo, "README.md"], authorization)
-    const file = (await response.json()) as { encoding: string; content: string }
+    const file = (await response.json()) as { encoding: string; content: { $bytes: string } }
     assert.equal(file.encoding, "binary")
-    assert.equal(Buffer.from(file.content, "base64").toString(), "hi")
+    assert.equal(Buffer.from(file.content.$bytes, "base64").toString(), "hi")
   })
 
   it("answers 204 for a verb that resolves with nothing", async () => {

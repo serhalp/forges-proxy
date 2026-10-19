@@ -31,9 +31,11 @@ const LIB_TYPES = new Set([
   "Uint8Array",
 ])
 const BYTES: Schema = {
-  type: "string",
-  contentEncoding: "base64",
-  description: "Bytes, base64-encoded.",
+  type: "object",
+  properties: { $bytes: { type: "string", contentEncoding: "base64" } },
+  required: ["$bytes"],
+  additionalProperties: false,
+  description: 'Bytes, as `{ "$bytes": "<base64>" }`.',
 }
 
 interface Signature {

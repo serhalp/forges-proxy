@@ -17,6 +17,7 @@
     "manifest": "node scripts/generate-manifest.ts"
   },
   "dependencies": {
+    "@cfworker/json-schema": "4.1.1",
     "@netlify/functions": "6.0.1",
     "forges": "link:../forges"
   },

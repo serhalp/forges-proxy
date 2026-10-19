@@ -13,6 +13,15 @@ describe("reviveArgs", () => {
     assert.deepEqual(options.nested.before, new Date("2026-03-01T00:00:00Z"))
   })
 
+  it("decodes tagged bytes, and only those", () => {
+    const [change, other] = reviveArgs([
+      { path: "a.bin", content: { $bytes: "AP8B" } },
+      { $bytes: "AP8B", extra: 1 },
+    ]) as [{ content: Uint8Array }, unknown]
+    assert.deepEqual(change.content, new Uint8Array([0, 255, 1]))
+    assert.deepEqual(other, { $bytes: "AP8B", extra: 1 })
+  })
+
   it("leaves other strings, invalid dates and forge payloads alone", () => {
     const args = [
       { title: "2026-01-01", since: "not a date", raw: { createdAt: "2026-01-01T00:00:00Z" } },
@@ -27,7 +36,7 @@ describe("serialise", () => {
       { encoding: "binary", content: new TextEncoder().encode("hi") },
       { raw: false },
     )
-    assert.deepEqual(JSON.parse(json), { encoding: "binary", content: "aGk=" })
+    assert.deepEqual(JSON.parse(json), { encoding: "binary", content: { $bytes: "aGk=" } })
   })
 
   it("drops raw payloads unless asked for", () => {
