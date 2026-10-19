@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { createForges } from "forges"
 import { fake } from "forges/fake"
-import { callVerb, VERBS } from "#server/utils/verbs.ts"
+import { callVerb, VERBS, withSignal } from "#server/utils/verbs.ts"
 
 describe("VERBS", () => {
   it("leaves out verbs with no safe HTTP form", () => {
@@ -38,5 +38,29 @@ describe("callVerb", () => {
       description: string
     }
     assert.equal(repo.description, "Widgets")
+  })
+})
+
+describe("withSignal", () => {
+  const signal = new AbortController().signal
+  const repo = { forge: "fake", instance: "fake.test", owner: "acme", name: "widgets" }
+
+  it("adds the signal to the options, wherever they sit", () => {
+    assert.deepEqual(withSignal("repos.get", [repo, { licence: true }], signal), [
+      repo,
+      { licence: true, signal },
+    ])
+    assert.deepEqual(withSignal("repos.get", [repo], signal), [repo, { signal }])
+    assert.deepEqual(withSignal("contents.compare", [repo, "a"], signal), [
+      repo,
+      "a",
+      undefined,
+      { signal },
+    ])
+  })
+
+  it("leaves arguments it can't add to alone", () => {
+    assert.deepEqual(withSignal("repos.get", [repo, "nope"], signal), [repo, "nope"])
+    assert.deepEqual(withSignal("no.verb", [repo], signal), [repo])
   })
 })

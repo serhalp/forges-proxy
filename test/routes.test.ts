@@ -219,6 +219,17 @@ describe("dispatch", () => {
     assert.equal(await search(new Date(Date.now() + 86_400_000)), 0)
   })
 
+  it("passes the request's signal to the verb", async (t) => {
+    const get = t.mock.method(forges.providers[0]!.repos, "get")
+    const controller = new AbortController()
+    const url = new URL("/v1/fake/fake.test/repos.get", "http://proxy.test")
+    url.searchParams.set("args", JSON.stringify([repo]))
+    await app.fetch(new Request(url, { headers: authorization, signal: controller.signal }))
+    const { signal } = get.mock.calls[0]!.arguments[1] as { signal: AbortSignal }
+    controller.abort()
+    assert.equal(signal.aborted, true)
+  })
+
   it("maps forge errors", async () => {
     factory.failNext(
       "repos.get",

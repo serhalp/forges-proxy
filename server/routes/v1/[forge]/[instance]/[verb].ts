@@ -6,7 +6,7 @@ import { errorResponse, proxyError } from "#server/utils/errors.ts"
 import { useForges } from "#server/utils/forges.ts"
 import { responseTags } from "#server/utils/tags.ts"
 import { upstreamScope } from "#server/utils/upstream-cache.ts"
-import { callVerb, VERBS } from "#server/utils/verbs.ts"
+import { callVerb, VERBS, withSignal } from "#server/utils/verbs.ts"
 import { reviveArgs, serialise } from "#server/utils/wire.ts"
 
 /**
@@ -58,7 +58,9 @@ export default defineHandler(async (event) => {
   const upstream = upstreamScope()
   let result: unknown
   try {
-    result = await upstream.run(async () => callVerb(provider, name, args))
+    result = await upstream.run(async () =>
+      callVerb(provider, name, withSignal(name, args, event.req.signal)),
+    )
   } catch (error) {
     return errorResponse(error)
   }

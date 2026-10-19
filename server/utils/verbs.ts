@@ -1,5 +1,6 @@
 import type { ForgeProvider } from "forges"
 import { CAPABILITY_TABLE } from "forges/kit"
+import { manifest } from "#server/utils/manifest.ts"
 
 export interface VerbInfo {
   /** Changes state on the forge: POST only, never cached. */
@@ -38,4 +39,16 @@ type Namespaces = Record<string, Record<string, (...args: unknown[]) => unknown>
 export function callVerb(provider: ForgeProvider, verb: string, args: unknown[]): unknown {
   const [namespace, name] = verb.split(".") as [string, string]
   return (provider as unknown as Namespaces)[namespace]![name]!(...args)
+}
+
+/** `args` with `signal` in the verb's options, so that a dropped request stops its upstream requests. */
+export function withSignal(verb: string, args: unknown[], signal: AbortSignal): unknown[] {
+  const index = manifest.verbs[verb]?.params.findIndex((param) => param.options) ?? -1
+  const options = args[index]
+  if (index < 0 || (options !== undefined && (typeof options !== "object" || options === null))) {
+    return args
+  }
+  return Array.from({ length: Math.max(args.length, index + 1) }, (_, at) =>
+    at === index ? { ...options, signal } : args[at],
+  )
 }

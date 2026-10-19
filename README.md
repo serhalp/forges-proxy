@@ -19,6 +19,7 @@ pnpm dev
 ```
 
 - `GET /v1`: configured providers, their capabilities, and the routed verbs.
+- `GET /docs`: API reference (Scalar), from `GET /openapi.json` (OpenAPI 3.1).
 - `GET /v1/status`: each provider's rate-limit budgets, as the server instance that answers last saw them.
 - `GET /v1/:forge/:instance/:verb?args=<json array>`: a read, e.g. `repos.get`, `threads.listPage`.
 - `POST /v1/:forge/:instance/:verb` with `{ "args": [...] }`: a write.
@@ -61,3 +62,13 @@ Elsewhere, entries expire by age (60 seconds, then served stale for up to 10 min
 ## Upstream cache
 
 The proxy keeps upstream JSON responses and revalidates them with their `etag`, so a CDN miss usually costs a `304` (free on GitHub's rate limit for authenticated requests) or nothing. Where the platform has the Cache API (Netlify, Cloudflare), the entries are shared by every instance in a region and purged by the same webhooks; elsewhere they're in memory. Each response's `x-upstream-cache` header lists what happened to its upstream requests: `fresh`, `revalidated` or `fetched`.
+
+## Operations manifest
+
+`server/manifest.json` describes every routed verb: its parameters, result and docs, with JSON Schemas read from the `forges` types. The OpenAPI document is built from it, and the proxy uses it to pass each request's abort signal into the verb's options. Regenerate it after changing `forges`:
+
+```sh
+pnpm manifest
+```
+
+A test fails while it's stale.

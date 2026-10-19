@@ -28,9 +28,8 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 
 ## Open questions
 
-- Operations manifest (verb → param names and schemas → return schema). Not needed for the dispatcher; needed for OpenAPI, validation, Hey API and MCP. `schemas.json` only covers output models: no input types, no `Page<T>`, no verb signatures. Plan: build-time TS compiler script in this repo, upstream later.
-- Wire encoding: error round-trip (`ForgeError` name + context), `Uint8Array` in `FileContent`, stripping `raw` by default.
-- `remote()` client provider implementing `ForgeProvider` over this protocol (for npmx).
+- What else to build on the manifest: Hey API client generation, an MCP server (read verbs as tools), argument validation.
+- Whether the manifest and `connect()` move into `forges` (e.g. `forges/remote`), where the types live.
 
 ## TODO
 
@@ -41,13 +40,15 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - [x] `GET /v1`: providers, capabilities, routed verbs
 - [x] Tests: `node:test` (Node 26) with `forges/fake` behind `mock.module`; unit + route tests
 - [x] `GET /v1/status` with `rateLimits()` (per server instance)
-- [ ] Pass the request signal through to verbs (needs to know which arg is `options`; manifest)
+- [x] Pass the request signal through to verbs, into the options parameter the manifest names
 - [ ] SSE for `sources.subscribe`
 - [x] Upstream ETag fetch cache (`server/utils/upstream-cache.ts`), in-memory LRU store
 - [x] Shared store for the upstream cache: the Cache API where the platform has one (Netlify, Cloudflare), shared per region and tagged like the response; memory elsewhere. `x-upstream-cache` reports what it did per request.
 - [x] Cache tags (`Cache-Tag`, `Netlify-Cache-Tag`) on public reads; `POST /webhooks/:forge/:instance` purges them (Netlify or Cloudflare) and expires the upstream cache
 - [ ] Finer tags (per thread, per release) so an active repo doesn't purge all of its entries on every event
-- [ ] Operations manifest → OpenAPI → Scalar
+- [x] Operations manifest (`scripts/generate-manifest.ts` → `server/manifest.json`) → OpenAPI 3.1 (`/openapi.json`) → Scalar (`/docs`)
+- [ ] Validate `args` against the manifest's schemas (400 with the failing path instead of whatever the provider does with a bad shape)
+- [ ] Client: use the manifest instead of the options heuristic for iterables
 - [x] `connect()` client (`client/remote.ts`): one `ForgeProvider` per proxied forge
 - [ ] Package the client (here or as `forges/remote`); report `rateLimits()` and `refreshCapabilities()` through the proxy
 
@@ -67,3 +68,5 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - Tags are per repository, by both `repoKey` forms (path and `externalId`), since request refs usually lack the id that webhook refs carry and `repoKey` prefers it. Worth considering in `forges`: a helper that returns every key of a ref, for caches to index by.
 - A webhook expires the whole upstream cache (not just the affected repos, whose entries are keyed by request hash), so a CDN refill can't come from an upstream copy the proxy still holds as fresh. Revalidations are 304s, so it's cheap.
 - Upstream entries in the Cache API carry the proxy response's tags (writes wait until the verb returns, so tags include repos in the result), so a webhook purge deletes them in every region along with the CDN copy. Verified live on Netlify: after a purge the next read fetched; 20 concurrent reads across instances were all fresh. A purge deletes rather than marks stale, so the next read is a full request rather than a 304. Netlify allows 20 cache writes per invocation; a verb that fans out further stores only the first 20. `expire()` and the per-credential write timestamps are still per instance.
+- Manifest: `ts-json-schema-generator` can't evaluate `Parameters<>`/`ReturnType<>`, so the script reads each verb's signature with the TypeScript checker (TS 5.9 as `typescript-5`; the root TS 7 has no compiler API) and generates schemas for the declared parameter and result types. Overloads (`releases.downloadAsset`) become unions. `ReadableStream<Uint8Array>` becomes a binary response, `Uint8Array` a base64 string, and `signal` is dropped. `Page<T>` components are renamed `PageOfT` (OpenAPI names allow no `<>`). Every verb has exactly one parameter carrying `signal`, which is how the manifest marks options. Worth upstreaming: `forges` could publish this next to `schemas.json`.
+- OpenAPI is built at runtime, since it depends on the access mode (public leaves out writes and account verbs and enumerates the configured forges and instances). Scalar doesn't render `prefixItems`, so `args` also carries the signature as text (`[ref, options?]`). Valid per `redocly lint --extends=spec`.
