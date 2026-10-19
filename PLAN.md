@@ -9,7 +9,7 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - **RPC, not REST.** Verbs map 1:1 to the `ForgeProvider` surface:
   - `GET  /v1/:forge/:instance/:verb?input=<json>` for reads (cacheable)
   - `POST /v1/:forge/:instance/:verb` for writes
-  - `/v1/_all/...` for registry-level fan-out (`notifications.list`, `search.*`)
+  - No registry-level fan-out route: `createForges(await connect(...))` fans out on the client, over per-provider pages that each cache on their own. A server-side merged search would need composite cursors and would cache worse.
   - Verb classification (write / account / listing) comes from `CAPABILITY_TABLE`.
   - Expose only `*Page` listings over HTTP; clients rebuild iterables with `iteratePages`.
   - Streams (`ci.log`, `releases.downloadAsset`) pass through; `sources.subscribe` goes over SSE.
@@ -42,7 +42,6 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - [x] Tests: `node:test` (Node 26) with `forges/fake` behind `mock.module`; unit + route tests
 - [x] `GET /v1/status` with `rateLimits()` (per server instance)
 - [ ] Pass the request signal through to verbs (needs to know which arg is `options`; manifest)
-- [ ] `/v1/_all/...` registry fan-out
 - [ ] SSE for `sources.subscribe`
 - [x] Upstream ETag fetch cache (`server/utils/upstream-cache.ts`), in-memory LRU store
 - [ ] Shared store for the upstream cache (Nitro storage or Cache API) so serverless instances share it

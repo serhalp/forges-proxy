@@ -64,6 +64,13 @@ describe("connect", () => {
     const forges = createForges(Object.values(await remote("s3cret")))
     assert.equal((await forges.repos.get(repo)).description, "Widgets")
   })
+
+  it("fans out registry listings over the providers' pages", async () => {
+    const forges = createForges([(await remote("s3cret")).fake])
+    const threads = await Array.fromAsync(forges.search.threads({ repo }))
+    const titles = threads.map((thread) => thread.title)
+    assert.deepEqual(titles.toSorted(), ["One", "Three", "Two"])
+  })
 })
 
 describe("remote provider", () => {
