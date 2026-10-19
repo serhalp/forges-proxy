@@ -46,6 +46,7 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - [x] Shared store for the upstream cache: the Cache API where the platform has one (Netlify, Cloudflare), shared per region and tagged like the response; memory elsewhere. `x-upstream-cache` reports what it did per request.
 - [x] Cache tags (`Cache-Tag`, `Netlify-Cache-Tag`) on public reads; `POST /webhooks/:forge/:instance` purges them (Netlify or Cloudflare) and expires the upstream cache
 - [x] Weak `ETag` on public JSON reads, with a 304 for a matching `If-None-Match` (verified live: Netlify's edge answers revalidations with it)
+- [x] Stale-if-error upstream: a stored response stands in (up to a day past fresh) on 5xx, 429, a rate-limit 403 or a network error, not when the caller aborted
 - [ ] Finer tags (per thread, per release) so an active repo doesn't purge all of its entries on every event
 - [x] Operations manifest (`scripts/generate-manifest.ts` → `server/manifest.json`) → OpenAPI 3.1 (`/openapi.json`) → Scalar (`/docs`)
 - [x] Validate `args` against the manifest's schemas (`@cfworker/json-schema`, no codegen, so fine at the edge): a 400 naming the failing path, e.g. `args/0/owner: Instance type "number" is invalid`

@@ -19,8 +19,11 @@ export interface UpstreamStore {
   set: (key: string, value: StoredResponse, tags?: string[]) => void | Promise<void>
 }
 
-/** What the cache did for one upstream request: served it `fresh`, `revalidated` it with a 304, or `fetched` it. */
-export type UpstreamOutcome = "fresh" | "revalidated" | "fetched"
+/**
+ * What the cache did for one upstream request: served it `fresh`, `revalidated` it with a 304, `fetched` it, or served
+ * it `stale` because upstream was rate-limited or failing.
+ */
+export type UpstreamOutcome = "fresh" | "revalidated" | "fetched" | "stale"
 
 /**
  * The upstream requests of one proxy request. Writes wait for `commit()`, which knows the response's tags, and
@@ -58,6 +61,8 @@ export interface UpstreamCacheOptions {
   now?: () => number
   /** Larger bodies are passed through without being stored. @default 5 MiB */
   maxBodyBytes?: number
+  /** How long past its freshness a response may stand in while upstream is rate-limited or failing. @default 1 day */
+  staleIfErrorSeconds?: number
 }
 
 const CONDITIONAL = ["if-none-match", "if-modified-since", "range"]
@@ -78,6 +83,7 @@ export function cachingFetch(fetch: FetchLike, options: UpstreamCacheOptions = {
   const store = options.store ?? memoryStore()
   const now = options.now ?? Date.now
   const maxBodyBytes = options.maxBodyBytes ?? 5 * 1024 * 1024
+  const staleIfError = (options.staleIfErrorSeconds ?? 24 * 60 * 60) * 1000
   // A write may change anything its credential reads, so later reads revalidate instead of trusting `max-age`.
   const lastWrite = new Map<string, number>()
   let expiredAt = -Infinity
@@ -119,7 +125,24 @@ export function cachingFetch(fetch: FetchLike, options: UpstreamCacheOptions = {
     }
 
     const validated = stored ? addValidators(headers, stored) : false
-    const response = await fetch(input, { ...init, headers })
+    const usable = (entry: StoredResponse | undefined): entry is StoredResponse =>
+      !!entry && now() - entry.storedAt < entry.maxAge * 1000 + staleIfError
+    let response: Response
+    try {
+      response = await fetch(input, { ...init, headers })
+    } catch (error) {
+      if (!usable(stored) || init.signal?.aborted) {
+        throw error
+      }
+      record("stale")
+      return toResponse(stored, { withoutRateLimit: true })
+    }
+    // An old answer beats none, on a public instance especially, where the token's budget is shared.
+    if (usable(stored) && isUnavailable(response)) {
+      await response.body?.cancel()
+      record("stale")
+      return toResponse(stored, { withoutRateLimit: true })
+    }
     if (stored && validated && response.status === 304) {
       await response.body?.cancel()
       const refreshed: StoredResponse = {
@@ -154,6 +177,17 @@ export function cachingFetch(fetch: FetchLike, options: UpstreamCacheOptions = {
       expiredAt = now()
     },
   })
+}
+
+/** Rate-limited (GitHub says so with a 403) or failing. */
+function isUnavailable(response: Response): boolean {
+  return (
+    response.status >= 500 ||
+    response.status === 429 ||
+    (response.status === 403 &&
+      (response.headers.get("x-ratelimit-remaining") === "0" ||
+        response.headers.has("retry-after")))
+  )
 }
 
 function addValidators(headers: Headers, stored: StoredResponse): boolean {

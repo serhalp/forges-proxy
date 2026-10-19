@@ -61,7 +61,7 @@ Elsewhere, entries expire by age (60 seconds, then served stale for up to 10 min
 
 ## Upstream cache
 
-The proxy keeps upstream JSON responses and revalidates them with their `etag`, so a CDN miss usually costs a `304` (free on GitHub's rate limit for authenticated requests) or nothing. Where the platform has the Cache API (Netlify, Cloudflare), the entries are shared by every instance in a region and purged by the same webhooks; elsewhere they're in memory. Each response's `x-upstream-cache` header lists what happened to its upstream requests: `fresh`, `revalidated` or `fetched`.
+The proxy keeps upstream JSON responses and revalidates them with their `etag`, so a CDN miss usually costs a `304` (free on GitHub's rate limit for authenticated requests) or nothing. Where the platform has the Cache API (Netlify, Cloudflare), the entries are shared by every instance in a region and purged by the same webhooks; elsewhere they're in memory. While upstream is rate-limited or failing, a stored response stands in for up to a day past its freshness. Each response's `x-upstream-cache` header lists what happened to its upstream requests: `fresh`, `revalidated`, `fetched` or `stale`.
 
 ## Operations manifest
 

@@ -341,3 +341,64 @@ describe("cacheApiStore", () => {
     assert.deepEqual(await response.json(), { version: 1, url })
   })
 })
+
+describe("stale if error", () => {
+  /** Answers once, then with whatever `fail` says. */
+  function flaky() {
+    let fail: (() => Response | Promise<Response>) | undefined
+    const fetch = async () =>
+      fail
+        ? fail()
+        : new Response('{"ok":true}', {
+            headers: {
+              "content-type": "application/json",
+              "cache-control": "max-age=60",
+              etag: '"v1"',
+              "x-ratelimit-remaining": "10",
+            },
+          })
+    return { fetch, failWith: (next: () => Response | Promise<Response>) => (fail = next) }
+  }
+
+  async function primed(next: () => Response | Promise<Response>, staleFor = 61) {
+    const forge = flaky()
+    const time = clock()
+    const fetch = cachingFetch(forge.fetch, { now: time.now })
+    await fetch(url)
+    time.advance(staleFor)
+    forge.failWith(next)
+    return fetch
+  }
+
+  it("serves the stored response while upstream is failing or rate-limited", async () => {
+    for (const failure of [
+      () => new Response(null, { status: 503 }),
+      () => new Response(null, { status: 429 }),
+      () => new Response(null, { status: 403, headers: { "x-ratelimit-remaining": "0" } }),
+      () => new Response(null, { status: 403, headers: { "retry-after": "60" } }),
+      () => Promise.reject(new TypeError("fetch failed")),
+    ]) {
+      const fetch = await primed(failure)
+      const scope = upstreamScope()
+      const response = await scope.run(() => fetch(url))
+      assert.equal(response.status, 200)
+      assert.deepEqual(await response.json(), { ok: true })
+      assert.equal(response.headers.get("x-ratelimit-remaining"), null)
+      assert.deepEqual(scope.outcomes, ["stale"])
+    }
+  })
+
+  it("passes on a plain 403, which is an answer", async () => {
+    const fetch = await primed(() => new Response(null, { status: 403 }))
+    assert.equal((await fetch(url)).status, 403)
+  })
+
+  it("gives up past the window, or when the caller aborted", async () => {
+    const late = await primed(() => new Response(null, { status: 503 }), 2 * 24 * 60 * 60)
+    assert.equal((await late(url)).status, 503)
+    const controller = new AbortController()
+    controller.abort()
+    const aborted = await primed(() => Promise.reject(controller.signal.reason))
+    await assert.rejects(aborted(url, { signal: controller.signal }), { name: "AbortError" })
+  })
+})
