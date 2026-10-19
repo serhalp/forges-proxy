@@ -81,6 +81,7 @@ describe("private mode", () => {
     assert.equal(response.status, 200)
     assert.equal(response.headers.get("cache-control"), "private, no-store")
     assert.equal(response.headers.get("cdn-cache-control"), null)
+    assert.equal(response.headers.get("etag"), null)
     assert.equal(((await response.json()) as { description: string }).description, "Widgets")
   })
 
@@ -118,6 +119,17 @@ describe("public mode", () => {
       response.headers.get("netlify-cdn-cache-control"),
       "public, max-age=60, stale-while-revalidate=600, durable",
     )
+  })
+
+  it("answers a revalidation with a 304 while the body is unchanged", async () => {
+    const etag = (await read("repos.get", [repo])).headers.get("etag")!
+    assert.match(etag, /^W\/"[0-9a-f]{32}"$/)
+    const revalidated = await read("repos.get", [repo], { "if-none-match": `"x", ${etag}` })
+    assert.equal(revalidated.status, 304)
+    assert.equal(revalidated.headers.get("etag"), etag)
+    assert.ok(revalidated.headers.get("cdn-cache-control"))
+    const other = await read("repos.get", [repo], { "if-none-match": 'W/"stale"' })
+    assert.equal(other.status, 200)
   })
 
   it("does not route writes or account verbs", async () => {

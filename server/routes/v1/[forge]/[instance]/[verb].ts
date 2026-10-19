@@ -1,5 +1,6 @@
 import { defineHandler } from "nitro"
 import { getQuery, readBody } from "nitro/h3"
+import { sha256Hex } from "forges/kit"
 import { accessMode } from "#server/utils/access.ts"
 import { cacheHeaders } from "#server/utils/cache.ts"
 import { errorResponse, proxyError } from "#server/utils/errors.ts"
@@ -91,9 +92,22 @@ export default defineHandler(async (event) => {
   if (result === undefined) {
     return new Response(null, { status: 204, headers })
   }
-  return new Response(serialise(result, { raw: query.raw === "1" }), {
-    headers: { "content-type": "application/json", ...headers },
-  })
+  const body = serialise(result, { raw: query.raw === "1" })
+  if (verb.write || mode === "private") {
+    return new Response(body, { headers: { "content-type": "application/json", ...headers } })
+  }
+  // Lets the CDN and browsers revalidate for a 304 rather than download the body again. Weak, since the CDN may
+  // compress it.
+  const etag = `W/"${(await sha256Hex(body)).slice(0, 32)}"`
+  if (
+    event.req.headers
+      .get("if-none-match")
+      ?.split(/\s*,\s*/)
+      .includes(etag)
+  ) {
+    return new Response(null, { status: 304, headers: { etag, ...headers } })
+  }
+  return new Response(body, { headers: { "content-type": "application/json", etag, ...headers } })
 })
 
 function parseArgs(value: unknown): unknown {
