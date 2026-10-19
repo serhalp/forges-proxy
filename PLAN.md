@@ -40,7 +40,7 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - [x] Proxy access secret (`FORGES_PROXY_SECRET`) or public mode (`FORGES_PROXY_PUBLIC=1`); both or neither is a 503
 - [x] `GET /v1`: providers, capabilities, routed verbs
 - [x] Tests: `node:test` (Node 26) with `forges/fake` behind `mock.module`; unit + route tests
-- [ ] `/status` with `rateLimits()`
+- [x] `GET /v1/status` with `rateLimits()` (per server instance)
 - [ ] Pass the request signal through to verbs (needs to know which arg is `options`; manifest)
 - [ ] `/v1/_all/...` registry fan-out
 - [ ] SSE for `sources.subscribe`

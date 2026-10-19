@@ -19,6 +19,7 @@ pnpm dev
 ```
 
 - `GET /v1`: configured providers, their capabilities, and the routed verbs.
+- `GET /v1/status`: each provider's rate-limit budgets, as the server instance that answers last saw them.
 - `GET /v1/:forge/:instance/:verb?args=<json array>`: a read, e.g. `repos.get`, `threads.listPage`.
 - `POST /v1/:forge/:instance/:verb` with `{ "args": [...] }`: a write.
 
