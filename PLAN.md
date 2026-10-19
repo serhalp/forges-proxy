@@ -2,29 +2,7 @@
 
 Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may move into the forges monorepo later.
 
-## Decisions
-
-- **Single tenant.** Forge credentials come only from the proxy's env, via `providersFromEnv` (`forges/env`). Callers never pass forge tokens.
-- **Proxy access secret** in env for private instances (bearer). A public instance (official deployment) runs public-read tokens with `FORGES_*_READ_ONLY` and doesn't route write verbs.
-- **RPC, not REST.** Verbs map 1:1 to the `ForgeProvider` surface:
-  - `GET  /v1/:forge/:instance/:verb?input=<json>` for reads (cacheable)
-  - `POST /v1/:forge/:instance/:verb` for writes
-  - No registry-level fan-out route: `createForges(await connect(...))` fans out on the client, over per-provider pages that each cache on their own. A server-side merged search would need composite cursors and would cache worse.
-  - Verb classification (write / account / listing) comes from `CAPABILITY_TABLE`.
-  - Expose only `*Page` listings over HTTP; clients rebuild iterables with `iteratePages`.
-  - Streams (`ci.log`, `releases.downloadAsset`) pass through; `sources.subscribe` goes over SSE.
-  - Never expose `provider.request` (accepts absolute URLs, so SSRF) or `installations.provider(s)`.
-- **Nitro v3**, intentionally, beta and all.
-- **HTTP caching first.** Response caching is expressed as headers so the platform CDN does the work (Netlify: `Netlify-CDN-Cache-Control`, `durable`, `Netlify-Cache-Tag`, `Netlify-Vary`). Origin-side storage caching is only a fallback for platforms with no CDN.
-  - Use `defineCachedHandler` with a `storage` chosen by deploy target: a no-op `{ get: () => null, set() {} }` on Netlify or behind Caddy/Varnish, memory or Redis on bare Node. Keeps request narrowing, ETag and coalescing from one code path.
-  - Set the CDN-specific headers ourselves; Nitro leaves a handler-set `cache-control` alone.
-  - Unverified: whether a 304 is sent for `If-None-Match` when nothing is stored.
-  - Netlify preset already maps the `isr` route rule to `Netlify-CDN-Cache-Control: …, durable` (no origin storage). Generate `routeRules` per verb from `CAPABILITY_TABLE` in `nitro.config.ts`. Handler adds `Netlify-Cache-Tag` / `Netlify-Vary` and generic `CDN-Cache-Control`.
-  - Preset gaps (candidates to upstream): sets the CDN header on every status incl. errors (check what Netlify actually stores), overwrites a handler-set `Netlify-CDN-Cache-Control`, fixed 1-year SWR window.
-- **Upstream ETag revalidation** is a separate layer: a `fetch` wrapper passed to every provider. Fresh within upstream `max-age` → serve; stale with an ETag → `If-None-Match` → on 304, serve the stored body (on GitHub a 304 doesn't count against the rate limit). Pays off even when inbound and outbound are 1:1, because a CDN miss re-fetches cheaply; also catches fan-out (checks, emulated `getComment`, tree walks) and sharing between inbound variants.
-  - Store: Cache API where native (Workers, Deno, Netlify); undici cache interceptor or Nitro storage on Node.
-  - Gotchas: Cache API does no HTTP semantics itself; Cloudflare refuses `private` responses (rewrite headers before storing); key on provider identity, not just URL; GraphQL POSTs aren't cacheable; pass through requests that already carry conditional headers (forges' own `cursor.etag`); per location, not global.
-- **Invalidation:** webhooks → `affectedKeys()` → purge cache tags.
+Settled design and decision records are in [ARCHITECTURE.md](ARCHITECTURE.md); this file tracks what's next.
 
 ## Open questions
 
@@ -71,5 +49,6 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - Tags are per repository, by both `repoKey` forms (path and `externalId`), since request refs usually lack the id that webhook refs carry and `repoKey` prefers it. Worth considering in `forges`: a helper that returns every key of a ref, for caches to index by.
 - A webhook expires the whole upstream cache (not just the affected repos, whose entries are keyed by request hash), so a CDN refill can't come from an upstream copy the proxy still holds as fresh. Revalidations are 304s, so it's cheap.
 - Upstream entries in the Cache API carry the proxy response's tags (writes wait until the verb returns, so tags include repos in the result), so a webhook purge deletes them in every region along with the CDN copy. Verified live on Netlify: after a purge the next read fetched; 20 concurrent reads across instances were all fresh. A purge deletes rather than marks stale, so the next read is a full request rather than a 304. Netlify allows 20 cache writes per invocation; a verb that fans out further stores only the first 20. `expire()` and the per-credential write timestamps are still per instance.
-- Manifest: `ts-json-schema-generator` can't evaluate `Parameters<>`/`ReturnType<>`, so the script reads each verb's signature with the TypeScript checker (TS 5.9 as `typescript-5`; the root TS 7 has no compiler API) and generates schemas for the declared parameter and result types. Overloads (`releases.downloadAsset`) become unions. `ReadableStream<Uint8Array>` becomes a binary response, `Uint8Array` a `{ $bytes }` object, and `signal` is dropped. `Page<T>` components are renamed `PageOfT` (OpenAPI names allow no `<>`). Every verb has exactly one parameter carrying `signal`, which is how the manifest marks options. Worth upstreaming: `forges` could publish this next to `schemas.json`.
+- Manifest: `ts-json-schema-generator` can't evaluate `Parameters<>`/`ReturnType<>`, so the script reads each verb's signature with the TypeScript checker (TS 6 as `typescript-6`, matching `forges`; the root TS 7 has no compiler API) and generates schemas for the declared parameter and result types. Overloads (`releases.downloadAsset`) become unions. `ReadableStream<Uint8Array>` becomes a binary response, `Uint8Array` a `{ $bytes }` object, and `signal` is dropped. `Page<T>` components are renamed `PageOfT` (OpenAPI names allow no `<>`). Every verb has exactly one parameter carrying `signal`, which is how the manifest marks options. Worth upstreaming: `forges` could publish this next to `schemas.json`.
 - OpenAPI is built at runtime, since it depends on the access mode (public leaves out writes and account verbs and enumerates the configured forges and instances). Scalar doesn't render `prefixItems`, so `args` also carries the signature as text (`[ref, options?]`). Valid per `redocly lint --extends=spec`.
+- Nitro Netlify preset gaps, candidates to upstream: the `isr` rule sets the CDN header on every status including errors, overwrites a handler-set `Netlify-CDN-Cache-Control`, and has a fixed one-year SWR window.

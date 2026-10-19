@@ -1,6 +1,6 @@
 # forges-proxy
 
-A self-hostable, single-tenant HTTP proxy for [`forges`](https://forges.link): one API and one cache in front of every forge you configure. See [PLAN.md](./PLAN.md) for the design.
+A self-hostable, single-tenant HTTP proxy for [`forges`](https://forges.link): one API and one cache in front of every forge you configure. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the design and [PLAN.md](./PLAN.md) for what's next.
 
 ## Configure
 

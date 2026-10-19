@@ -7,9 +7,9 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import process from "node:process"
-// The root `typescript` is the native port, which has no compiler API yet.
-import ts from "typescript-5"
-import type * as TS from "typescript-5"
+// The root `typescript` is the native port, which has no compiler API.
+import ts from "typescript-6"
+import type * as TS from "typescript-6"
 import { createGenerator } from "ts-json-schema-generator"
 import type { Manifest, ManifestParam, Schema } from "#server/utils/manifest.ts"
 import { VERBS } from "#server/utils/verbs.ts"
