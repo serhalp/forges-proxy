@@ -34,14 +34,20 @@ const BODY_FRAMING = new Set(["content-encoding", "content-length", "transfer-en
  * so that a repeat costs a `304` (free on GitHub's rate limit) or nothing while upstream `max-age` says it's fresh.
  * The key covers every request header, so responses are never shared between credentials or `accept` variants.
  */
-export function cachingFetch(fetch: FetchLike, options: UpstreamCacheOptions = {}): FetchLike {
+export interface CachingFetch extends FetchLike {
+  /** Makes every stored response revalidate before it's served again, as after a webhook says something changed. */
+  expire: () => void
+}
+
+export function cachingFetch(fetch: FetchLike, options: UpstreamCacheOptions = {}): CachingFetch {
   const store = options.store ?? memoryStore()
   const now = options.now ?? Date.now
   const maxBodyBytes = options.maxBodyBytes ?? 5 * 1024 * 1024
   // A write may change anything its credential reads, so later reads revalidate instead of trusting `max-age`.
   const lastWrite = new Map<string, number>()
+  let expiredAt = -Infinity
 
-  return async (input, init = {}) => {
+  const cached: FetchLike = async (input, init = {}) => {
     const headers = new Headers(init.headers)
     const method = (init.method ?? "GET").toUpperCase()
     const credential = await sha256Hex(headers.get("authorization") ?? "")
@@ -61,7 +67,7 @@ export function cachingFetch(fetch: FetchLike, options: UpstreamCacheOptions = {
       stored &&
       stored.maxAge > 0 &&
       now() - stored.storedAt < stored.maxAge * 1000 &&
-      stored.storedAt > (lastWrite.get(credential) ?? -Infinity)
+      stored.storedAt > Math.max(expiredAt, lastWrite.get(credential) ?? -Infinity)
     ) {
       return toResponse(stored, { withoutRateLimit: true })
     }
@@ -95,6 +101,11 @@ export function cachingFetch(fetch: FetchLike, options: UpstreamCacheOptions = {
     }
     return toResponse(entry)
   }
+  return Object.assign(cached, {
+    expire: () => {
+      expiredAt = now()
+    },
+  })
 }
 
 function addValidators(headers: Headers, stored: StoredResponse): boolean {

@@ -42,12 +42,12 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - [x] Tests: `node:test` (Node 26) with `forges/fake` behind `mock.module`; unit + route tests
 - [ ] `/status` with `rateLimits()`
 - [ ] Pass the request signal through to verbs (needs to know which arg is `options`; manifest)
-- [ ] Generate `isr` route rules per verb; tags from refs
 - [ ] `/v1/_all/...` registry fan-out
 - [ ] SSE for `sources.subscribe`
 - [x] Upstream ETag fetch cache (`server/utils/upstream-cache.ts`), in-memory LRU store
 - [ ] Shared store for the upstream cache (Nitro storage or Cache API) so serverless instances share it
-- [ ] Webhook receiver → `affectedKeys()` → tag purge
+- [x] Cache tags (`Cache-Tag`, `Netlify-Cache-Tag`) on public reads; `POST /webhooks/:forge/:instance` purges them (Netlify or Cloudflare) and expires the upstream cache
+- [ ] Finer tags (per thread, per release) so an active repo doesn't purge all of its entries on every event
 - [ ] Operations manifest → OpenAPI → Scalar
 - [x] `connect()` client (`client/remote.ts`): one `ForgeProvider` per proxied forge
 - [ ] Package the client (here or as `forges/remote`); report `rateLimits()` and `refreshCapabilities()` through the proxy
@@ -64,3 +64,6 @@ Self-hostable, single-tenant HTTP service on top of `forges`. Experimental; may 
 - Upstream cache, verified live: GitHub answers revalidation with a real 304, but an _anonymous_ 304 still costs a request (53 → 52). GitHub documents 304s as free only for authenticated requests, so the public instance should run with a public-read token, not anonymous.
 - Client: iterables split their arguments with a heuristic (a trailing object without `forge` is the options), since refs always name their forge. The operations manifest would replace it.
 - Errors now cross the wire with every field their class sets (except `url` and `body`), and the client rebuilds the class with `Reflect.construct` instead of per-class constructors.
+- Dropped the generated `isr` route rules: the handler already sets `Netlify-CDN-Cache-Control` per response and never on errors, which the preset's `isr` handling can't do (it overwrites and applies to every status).
+- Tags are per repository, by both `repoKey` forms (path and `externalId`), since request refs usually lack the id that webhook refs carry and `repoKey` prefers it. Worth considering in `forges`: a helper that returns every key of a ref, for caches to index by.
+- A webhook expires the whole upstream cache (not just the affected repos, whose entries are keyed by request hash), so a CDN refill can't come from an upstream copy the proxy still holds as fresh. Revalidations are 304s, so it's cheap.

@@ -148,6 +148,23 @@ describe("cachingFetch", () => {
     )
   })
 
+  it("revalidates everything it holds once expired", async () => {
+    const forge = upstream()
+    const time = clock()
+    const fetch = cachingFetch(forge.fetch, { now: time.now })
+    await fetch(url, auth("a"))
+    await fetch(url, auth("b"))
+    time.advance(1)
+    fetch.expire()
+    time.advance(1)
+    await fetch(url, auth("a"))
+    await fetch(url, auth("b"))
+    assert.deepEqual(
+      forge.sent.map(({ headers }) => headers.get("if-none-match")),
+      [null, null, '"v1"', '"v1"'],
+    )
+  })
+
   it("does not store what it can't reuse", async () => {
     for (const options of [
       { cacheControl: "no-store" },

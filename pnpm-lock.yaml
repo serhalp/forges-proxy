@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@netlify/functions':
+        specifier: 6.0.1
+        version: 6.0.1
       forges:
         specifier: link:../forges
         version: link:../forges
@@ -29,6 +32,14 @@ importers:
         version: 7.0.2
 
 packages:
+
+  '@netlify/functions@6.0.1':
+    resolution: {integrity: sha512-QapLxXrSBxy+boLOAYUt7R47P5Zyn2XDMe16AaUHJILzAwTbAQIWy20ynXoLuh11JrsqX02qaKaj0/ppou3E/g==}
+    engines: {node: '>=22.12.0'}
+
+  '@netlify/types@3.1.0':
+    resolution: {integrity: sha512-yuVTxsVcKZFzrsXh5aFoHtdi/2aj1RAOJCQteg6TfXgwLx0rR941QNev5eeuBP8eieBXfyfD/loeKOH4OFLJ7w==}
+    engines: {node: '>=22.12.0'}
 
   '@oxc-project/types@0.154.0':
     resolution: {integrity: sha512-KYOUGQFlLWR+s4QMV2Q9ko38TZm7EdO87Qm7rvZLqk/webse/cDjtyxKhg/47l0byCbs/k46LT8qc4PKjAikzA==}
@@ -616,6 +627,12 @@ packages:
     resolution: {integrity: sha512-4rDO/NjgnkbVvWAPpxugX7YI/xVpC74NLrmAbH6I0D4hcSVq/1m5q2pSfQjP/ABs+7EsRtP/ZjyYMD9bEBgeTw==}
 
 snapshots:
+
+  '@netlify/functions@6.0.1':
+    dependencies:
+      '@netlify/types': 3.1.0
+
+  '@netlify/types@3.1.0': {}
 
   '@oxc-project/types@0.154.0': {}
 

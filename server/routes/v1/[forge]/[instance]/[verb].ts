@@ -4,6 +4,7 @@ import { accessMode } from "#server/utils/access.ts"
 import { cacheHeaders } from "#server/utils/cache.ts"
 import { errorResponse, proxyError } from "#server/utils/errors.ts"
 import { useForges } from "#server/utils/forges.ts"
+import { responseTags } from "#server/utils/tags.ts"
 import { callVerb, VERBS } from "#server/utils/verbs.ts"
 import { reviveArgs, serialise } from "#server/utils/wire.ts"
 
@@ -59,7 +60,13 @@ export default defineHandler(async (event) => {
   } catch (error) {
     return errorResponse(error)
   }
-  const headers = cacheHeaders(verb, mode)
+  const tags = responseTags(
+    forge,
+    instance,
+    args,
+    result instanceof ReadableStream ? undefined : result,
+  )
+  const headers = cacheHeaders(verb, mode, tags)
   if (result instanceof ReadableStream) {
     return new Response(result, {
       headers: { "content-type": "application/octet-stream", ...headers },

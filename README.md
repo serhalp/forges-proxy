@@ -47,3 +47,12 @@ const repo = await forges.repos.get({
 ```
 
 Every verb is present. Listings iterate through the proxy's `*Page` verbs, errors come back as the same classes, and verbs the proxy doesn't route reject with `UnsupportedOperationError` (and `can()` says so).
+
+## Webhooks and purging
+
+Point a forge's webhook at `/webhooks/:forge/:instance` and set the provider's `FORGES_<KIND>_WEBHOOK_SECRET`. Each delivery is verified, and the CDN entries of every repository it concerns are purged by cache tag:
+
+- Netlify: automatic, with the `NETLIFY_PURGE_API_TOKEN` Netlify gives functions.
+- Cloudflare: set `CLOUDFLARE_ZONE_ID` and `CLOUDFLARE_API_TOKEN`.
+
+Elsewhere, entries expire by age (60 seconds, then served stale for up to 10 minutes while they refresh).

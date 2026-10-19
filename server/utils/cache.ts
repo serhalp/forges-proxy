@@ -8,7 +8,11 @@ const READ_STALE = 600
  * Cache headers for a successful response. Shared caches only see public reads; browsers always revalidate.
  * Private instances send `no-store` until CDN caching can be keyed on the proxy secret (see PLAN.md).
  */
-export function cacheHeaders(verb: VerbInfo, mode: AccessMode): Record<string, string> {
+export function cacheHeaders(
+  verb: VerbInfo,
+  mode: AccessMode,
+  tags: string[],
+): Record<string, string> {
   if (verb.write || mode === "private") {
     return { "cache-control": "private, no-store" }
   }
@@ -17,5 +21,7 @@ export function cacheHeaders(verb: VerbInfo, mode: AccessMode): Record<string, s
     "cache-control": "public, max-age=0, must-revalidate",
     "cdn-cache-control": cdn,
     "netlify-cdn-cache-control": `${cdn}, durable`,
+    "cache-tag": tags.join(","),
+    "netlify-cache-tag": tags.join(","),
   }
 }

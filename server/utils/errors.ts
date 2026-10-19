@@ -4,6 +4,7 @@ import {
   RateLimitedError,
   UnknownForgeError,
   UnsupportedOperationError,
+  WebhookVerificationError,
 } from "forges"
 
 /** The response for an error thrown by a verb, without leaking anything that is not a forge error. */
@@ -21,6 +22,9 @@ export function errorResponse(error: unknown): Response {
       ? Math.max(0, Math.ceil((error.resetAt.getTime() - Date.now()) / 1000))
       : undefined
     return json(429, body, retryAfter === undefined ? {} : { "retry-after": String(retryAfter) })
+  }
+  if (error instanceof WebhookVerificationError) {
+    return json(401, body)
   }
   if (error instanceof UnsupportedOperationError) {
     return json(501, body)

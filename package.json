@@ -16,6 +16,7 @@
     "test:coverage": "node --experimental-test-module-mocks --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test-coverage-exclude=\"../forges/**\" --test \"test/**/*.test.ts\""
   },
   "dependencies": {
+    "@netlify/functions": "6.0.1",
     "forges": "link:../forges"
   },
   "devDependencies": {
