@@ -11,8 +11,8 @@ import process from "node:process"
 import ts from "typescript-6"
 import type * as TS from "typescript-6"
 import { createGenerator } from "ts-json-schema-generator"
+import { CAPABILITY_TABLE } from "forges/kit"
 import type { Manifest, ManifestParam, Schema } from "#server/utils/manifest.ts"
-import { VERBS } from "#server/utils/verbs.ts"
 
 const root = new URL("..", import.meta.url).pathname
 const cache = `${root}node_modules/.cache/forges-proxy/`
@@ -36,6 +36,30 @@ const BYTES: Schema = {
   required: ["$bytes"],
   additionalProperties: false,
   description: 'Bytes, as `{ "$bytes": "<base64>" }`.',
+}
+
+/**
+ * Verbs with no safe or meaningful HTTP form: `installations.token` mints credentials, `installations.provider(s)`
+ * return live providers, and webhooks and push subscriptions get their own endpoints.
+ */
+const EXCLUDED = new Set([
+  "installations.token",
+  "installations.provider",
+  "installations.providers",
+  "webhooks.verify",
+  "webhooks.ingest",
+  "sources.subscribe",
+])
+
+/** Every verb callable over HTTP, by class. Iterables are left out for their `*Page` form, which clients page through. */
+export function routableVerbs(): Map<string, { write: boolean; account: boolean }> {
+  const entries = CAPABILITY_TABLE.flatMap((entry) =>
+    (entry.verbs ?? []).map(
+      (verb) => [verb, { write: !!entry.write, account: !!entry.account }] as const,
+    ),
+  )
+  const names = new Set(entries.map(([verb]) => verb))
+  return new Map(entries.filter(([verb]) => !EXCLUDED.has(verb) && !names.has(`${verb}Page`)))
 }
 
 interface Signature {
@@ -71,8 +95,9 @@ export function generateManifest(): Manifest {
       .map((s) => s.name),
   )
 
+  const verbs = routableVerbs()
   const signatures = new Map<string, Signature & { summary?: string }>()
-  for (const name of VERBS.keys()) {
+  for (const name of verbs.keys()) {
     const [namespace, method] = name.split(".") as [string, string]
     const symbol = checker.getTypeOfSymbol(provider.getProperty(namespace)!).getProperty(method)!
     const overloads = checker.getTypeOfSymbol(symbol).getCallSignatures()
@@ -178,7 +203,7 @@ export function generateManifest(): Manifest {
   return {
     verbs: Object.fromEntries(
       plan.map(({ name, signature, params, result }) => {
-        const verb = VERBS.get(name)!
+        const verb = verbs.get(name)!
         const resultSchema = inline.get(result)!
         return [
           name,

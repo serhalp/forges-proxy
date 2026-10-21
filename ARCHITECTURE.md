@@ -10,12 +10,12 @@ client ──▶ CDN ──▶ auth middleware ──▶ verb route ──▶ fo
             ETag)     public mode)      call, tag)                        memory)
 ```
 
-- **CDN.** Public reads carry `CDN-Cache-Control` / `Netlify-CDN-Cache-Control` (60 s fresh, 10 min stale-while-revalidate, durable), a weak `ETag`, and `Cache-Tag` / `Netlify-Cache-Tag`. Private instances and writes are `private, no-store`.
+- **CDN.** Public reads carry `CDN-Cache-Control` / `Netlify-CDN-Cache-Control` (60 s fresh, 10 min stale-while-revalidate, durable), a weak `ETag`, and `Netlify-Cache-Tag`. Private instances and writes are `private, no-store`.
 - **Verb route** (`server/routes/v1/[forge]/[instance]/[verb].ts`). Checks the arguments against the operations manifest, revives dates and bytes, passes the request's signal into the verb's options, calls the provider and tags the response with every repository in its arguments and result.
 - **Upstream cache** (`server/utils/upstream-cache.ts`). A `fetch` wrapper given to every provider. It serves fresh JSON, revalidates stale JSON with `If-None-Match` (a GitHub 304 is free for authenticated requests), and stands in with a stored response while upstream is rate-limited or failing. Entries carry the proxy response's tags, so a purge reaches them too.
-- **Webhooks** (`POST /webhooks/:forge/:instance`). Verified by the provider, turned into repository tags with `affectedKeys()`, purged from the CDN (Netlify or Cloudflare) and the upstream cache.
-- **Operations manifest** (`server/manifest.json`, from `scripts/generate-manifest.ts`). Each routed verb's parameters, result and docs as JSON Schemas, read from the `forges` types. Drives validation, the signal passthrough, `/openapi.json` and `/docs`.
-- **Client** (`client/remote.ts`). `connect()` turns a proxy back into `ForgeProvider`s.
+- **Webhooks** (`POST /webhooks/:forge/:instance`). Verified by the provider, turned into repository tags with `affectedKeys()`, purged from the Netlify CDN and the upstream cache.
+- **Operations manifest** (`server/manifest.json`, from `scripts/generate-manifest.ts`). Each routed verb's parameters, result and docs as JSON Schemas, read from the `forges` types. The server's only list of verbs: it drives routing, validation, the signal passthrough, `/v1`, `/openapi.json` and `/docs`.
+- **Client** (`client/remote.ts`). `connect()` turns a proxy back into `ForgeProvider`s, finding each verb's options where `/v1` says they are. Shares the bytes encoding with the server (`shared/wire.ts`).
 
 ## Decisions
 
@@ -25,7 +25,7 @@ Forge credentials come from `FORGES_*` variables via `providersFromEnv()`; calle
 
 ### RPC over the provider surface, not REST
 
-`GET /v1/:forge/:instance/:verb?args=<json array>` for reads, `POST` with `{ "args": [...] }` for writes. Arguments are positional, as the method takes them. Verbs and their classes (write, account) come from `CAPABILITY_TABLE`, so new verbs need no proxy change beyond regenerating the manifest. Only `*Page` listings are routed; clients rebuild iterables with `iteratePages`. `provider.request` (takes absolute URLs, so SSRF), `installations.token` and `installations.provider(s)` are never routed.
+`GET /v1/:forge/:instance/:verb?args=<json array>` for reads, `POST` with `{ "args": [...] }` for writes. Arguments are positional, as the method takes them. The manifest generator takes verbs and their classes (write, account) from `CAPABILITY_TABLE`, so new verbs need no proxy change beyond regenerating it. Only `*Page` listings are routed; clients rebuild iterables with `iteratePages`. `provider.request` (takes absolute URLs, so SSRF), `installations.token` and `installations.provider(s)` are never routed.
 
 On the wire: `null` for a skipped optional argument, bytes as `{ "$bytes": "<base64>" }` both ways (a bare string is text where a field takes either), `raw` dropped unless `?raw=1`, `undefined` as 204, streams as `application/octet-stream`. Errors are `{ "error": { name, message, ...fields } }`, which the client rebuilds into the `ForgeError` class.
 
@@ -51,7 +51,7 @@ Caching is expressed as response headers so the platform CDN does the work; the 
 
 ### Shared upstream store through the Cache API
 
-On Netlify and Cloudflare the upstream cache lives in the platform's Cache API: shared by every instance in a region, cleared on redeploy, and purgeable by tag globally. Elsewhere it is an in-memory LRU. Entries are written only once the verb has returned, so they carry the tags of the repositories in its result, not just its arguments.
+On Netlify the upstream cache lives in the platform's Cache API: shared by every instance in a region, cleared on redeploy, and purgeable by tag globally. Elsewhere it is an in-memory LRU. Entries are written only once the verb has returned, so they carry the tags of the repositories in its result, not just its arguments.
 
 ### Manifest generated from the `forges` types
 

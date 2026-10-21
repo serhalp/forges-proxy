@@ -21,15 +21,15 @@ Settled design and decision records are in [ARCHITECTURE.md](ARCHITECTURE.md); t
 - [x] Pass the request signal through to verbs, into the options parameter the manifest names
 - [ ] SSE for `sources.subscribe`
 - [x] Upstream ETag fetch cache (`server/utils/upstream-cache.ts`), in-memory LRU store
-- [x] Shared store for the upstream cache: the Cache API where the platform has one (Netlify, Cloudflare), shared per region and tagged like the response; memory elsewhere. `x-upstream-cache` reports what it did per request.
-- [x] Cache tags (`Cache-Tag`, `Netlify-Cache-Tag`) on public reads; `POST /webhooks/:forge/:instance` purges them (Netlify or Cloudflare) and expires the upstream cache
+- [x] Shared store for the upstream cache: the Cache API where the platform has one (Netlify), shared per region and tagged like the response; memory elsewhere. `x-upstream-cache` reports what it did per request.
+- [x] Cache tags (`Netlify-Cache-Tag`) on public reads; `POST /webhooks/:forge/:instance` purges them on Netlify and expires the upstream cache. No Cloudflare-specific code (purge API, `Cache-Tag`) in this codebase.
 - [x] Weak `ETag` on public JSON reads, with a 304 for a matching `If-None-Match` (verified live: Netlify's edge answers revalidations with it)
 - [x] Stale-if-error upstream: a stored response stands in (up to a day past fresh) on 5xx, 429, a rate-limit 403 or a network error, not when the caller aborted
 - [ ] Finer tags (per thread, per release) so an active repo doesn't purge all of its entries on every event
 - [x] Operations manifest (`scripts/generate-manifest.ts` → `server/manifest.json`) → OpenAPI 3.1 (`/openapi.json`) → Scalar (`/docs`)
 - [x] Validate `args` against the manifest's schemas (`@cfworker/json-schema`, no codegen, so fine at the edge): a 400 naming the failing path, e.g. `args/0/owner: Instance type "number" is invalid`
 - [x] A test checks every `date-time` input field in the manifest is one `wire.ts` revives, so a new one in `forges` can't arrive as a string
-- [ ] Client: use the manifest instead of the options heuristic for iterables
+- [x] Client: find options where the manifest puts them (via `/v1`), not by a heuristic
 - [x] `connect()` client (`client/remote.ts`): one `ForgeProvider` per proxied forge
 - [ ] Package the client (here or as `forges/remote`); report `rateLimits()` and `refreshCapabilities()` through the proxy
 
@@ -43,7 +43,6 @@ Settled design and decision records are in [ARCHITECTURE.md](ARCHITECTURE.md); t
 - Error messages embed the upstream URL (e.g. `NotFoundError`), so leaving out `error.url` doesn't keep it private.
 - Wire format today: positional `args` (a JSON array, `null` for a skipped optional argument), bytes as `{ "$bytes": "<base64>" }` both ways, `raw` dropped unless `?raw=1`, `undefined` results as 204. Bytes are tagged rather than a bare base64 string because `FileChange.content` takes text or bytes; before, bytes written through the client arrived as an index-keyed object.
 - Upstream cache, verified live: GitHub answers revalidation with a real 304, but an _anonymous_ 304 still costs a request (53 → 52). GitHub documents 304s as free only for authenticated requests, so the public instance should run with a public-read token, not anonymous.
-- Client: iterables split their arguments with a heuristic (a trailing object without `forge` is the options), since refs always name their forge. The operations manifest would replace it.
 - Errors now cross the wire with every field their class sets (except `url` and `body`), and the client rebuilds the class with `Reflect.construct` instead of per-class constructors.
 - Dropped the generated `isr` route rules: the handler already sets `Netlify-CDN-Cache-Control` per response and never on errors, which the preset's `isr` handling can't do (it overwrites and applies to every status).
 - Tags are per repository, by both `repoKey` forms (path and `externalId`), since request refs usually lack the id that webhook refs carry and `repoKey` prefers it. Worth considering in `forges`: a helper that returns every key of a ref, for caches to index by.

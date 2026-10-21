@@ -1,6 +1,7 @@
 import type { AccessMode } from "#server/utils/access.ts"
 import type { ManifestVerb, Schema } from "#server/utils/manifest.ts"
 import { argsSchema, manifest } from "#server/utils/manifest.ts"
+import { isRouted } from "#server/utils/verbs.ts"
 
 const ERROR: Schema = {
   type: "object",
@@ -25,9 +26,7 @@ export function openApi(
   mode: AccessMode,
   providers: Array<{ forge: string; instance: string }>,
 ): Record<string, unknown> {
-  const verbs = Object.entries(manifest.verbs).filter(
-    ([, verb]) => mode === "private" || !(verb.write || verb.account),
-  )
+  const verbs = Object.entries(manifest.verbs).filter(([, verb]) => isRouted(verb, mode))
   const enumOf = (values: string[]) =>
     mode === "public" && values.length ? { enum: [...new Set(values)] } : {}
   const pathParams = [

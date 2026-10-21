@@ -328,7 +328,7 @@ describe("cacheApiStore", () => {
     // The upstream `private` would make the platform refuse it.
     assert.match(stored!.headers.get("cache-control")!, /^public, max-age=\d+$/)
     assert.equal(stored!.headers.get("netlify-cache-tag"), "a,b")
-    assert.equal(stored!.headers.get("cache-tag"), "a,b")
+    assert.equal(stored!.headers.has("cache-tag"), false)
   })
 
   it("backs cachingFetch", async () => {

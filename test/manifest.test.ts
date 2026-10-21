@@ -4,8 +4,7 @@ import { DATE_FIELDS } from "forges"
 import type { Schema } from "#server/utils/manifest.ts"
 import { manifest } from "#server/utils/manifest.ts"
 import { INPUT_DATE_FIELDS } from "#server/utils/wire.ts"
-import { VERBS } from "#server/utils/verbs.ts"
-import { generateManifest } from "#scripts/generate-manifest.ts"
+import { generateManifest, routableVerbs } from "#scripts/generate-manifest.ts"
 
 describe("manifest", () => {
   it("is fresh for the forges it's built against", () => {
@@ -17,8 +16,9 @@ describe("manifest", () => {
   })
 
   it("describes every routed verb, with its class", () => {
-    assert.deepEqual(Object.keys(manifest.verbs).toSorted(), [...VERBS.keys()].toSorted())
-    for (const [name, verb] of VERBS) {
+    const verbs = routableVerbs()
+    assert.deepEqual(Object.keys(manifest.verbs).toSorted(), [...verbs.keys()].toSorted())
+    for (const [name, verb] of verbs) {
       const { write, account } = manifest.verbs[name]!
       assert.deepEqual({ write, account }, verb, name)
     }

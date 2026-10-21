@@ -42,7 +42,7 @@ describe("upstream entries behind a route", () => {
     )
     const first = await app.fetch(new Request(url))
     assert.equal(first.headers.get("x-upstream-cache"), "fetched")
-    assert.deepEqual(tagged, [first.headers.get("cache-tag")!.split(",")])
+    assert.deepEqual(tagged, [first.headers.get("netlify-cache-tag")!.split(",")])
     assert.ok(tagged[0]!.includes("github:github.com/@42"))
     const second = await app.fetch(new Request(url))
     assert.equal(second.headers.get("x-upstream-cache"), "fresh")

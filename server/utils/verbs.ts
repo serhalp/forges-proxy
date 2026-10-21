@@ -1,38 +1,18 @@
 import type { ForgeProvider } from "forges"
-import { CAPABILITY_TABLE } from "forges/kit"
+import type { AccessMode } from "#server/utils/access.ts"
+import type { ManifestVerb } from "#server/utils/manifest.ts"
 import { manifest } from "#server/utils/manifest.ts"
 
-export interface VerbInfo {
-  /** Changes state on the forge: POST only, never cached. */
-  write: boolean
-  /** Needs an account, so it reads data private to the credential. */
-  account: boolean
+/** Public instances route no writes or account verbs, so their tokens only ever read public data. */
+export function isRouted(verb: Pick<ManifestVerb, "write" | "account">, mode: AccessMode): boolean {
+  return mode === "private" || !(verb.write || verb.account)
 }
 
-/**
- * Verbs with no safe or meaningful HTTP form: `installations.token` mints credentials, `installations.provider(s)`
- * return live providers, and webhooks and push subscriptions get their own endpoints.
- */
-const EXCLUDED = new Set([
-  "installations.token",
-  "installations.provider",
-  "installations.providers",
-  "webhooks.verify",
-  "webhooks.ingest",
-  "sources.subscribe",
-])
-
-const entries = CAPABILITY_TABLE.flatMap((entry) =>
-  (entry.verbs ?? []).map(
-    (verb) => [verb, { write: !!entry.write, account: !!entry.account }] as const,
-  ),
-)
-const names = new Set(entries.map(([verb]) => verb))
-
-/** Every verb callable over HTTP. Iterables are left out for their `*Page` form, which clients page through. */
-export const VERBS: ReadonlyMap<string, VerbInfo> = new Map(
-  entries.filter(([verb]) => !EXCLUDED.has(verb) && !names.has(`${verb}Page`)),
-)
+/** The verb, when this instance routes it. */
+export function routedVerb(name: string, mode: AccessMode): ManifestVerb | undefined {
+  const verb = Object.hasOwn(manifest.verbs, name) ? manifest.verbs[name] : undefined
+  return verb && isRouted(verb, mode) ? verb : undefined
+}
 
 type Namespaces = Record<string, Record<string, (...args: unknown[]) => unknown>>
 
@@ -42,8 +22,8 @@ export function callVerb(provider: ForgeProvider, verb: string, args: unknown[])
 }
 
 /** `args` with `signal` in the verb's options, so that a dropped request stops its upstream requests. */
-export function withSignal(verb: string, args: unknown[], signal: AbortSignal): unknown[] {
-  const index = manifest.verbs[verb]?.params.findIndex((param) => param.options) ?? -1
+export function withSignal(verb: ManifestVerb, args: unknown[], signal: AbortSignal): unknown[] {
+  const index = verb.params.findIndex((param) => param.options)
   const options = args[index]
   if (index < 0 || (options !== undefined && (typeof options !== "object" || options === null))) {
     return args

@@ -1,12 +1,16 @@
 import { afterEach, beforeEach, mock } from "node:test"
 import type { Forges } from "forges"
+import { readdirSync } from "node:fs"
+import { join, relative } from "node:path"
+import { fileURLToPath } from "node:url"
+import type { HTTPMethod } from "nitro/h3"
 import { H3 } from "nitro/h3"
 
 /** What the proxy under test purged and expired, since the last reset. */
 export const recorded = { purges: [] as string[][], expiries: 0 }
 
 /**
- * The proxy's middleware and routes on an in-process h3 app, serving `forges` instead of providers from the env, and
+ * The proxy's middleware and routes on an in-process h3 app, found as Nitro finds them, serving `forges` instead of providers from the env, and
  * recording purges instead of calling a CDN. Mocks modules, so call it once per test file, before anything imports the
  * server.
  */
@@ -25,19 +29,33 @@ export async function createProxy(forges: Forges): Promise<H3> {
     recorded.purges = []
     recorded.expiries = 0
   })
-  const { default: auth } = await import("#server/middleware/auth.ts")
-  const { default: index } = await import("#server/routes/v1/index.get.ts")
-  const { default: status } = await import("#server/routes/v1/status.get.ts")
-  const { default: openapi } = await import("#server/routes/openapi.json.get.ts")
-  const { default: verb } = await import("#server/routes/v1/[forge]/[instance]/[verb].ts")
-  const { default: webhook } = await import("#server/routes/webhooks/[forge]/[instance].post.ts")
-  return new H3()
-    .use(auth)
-    .get("/v1", index)
-    .get("/v1/status", status)
-    .get("/openapi.json", openapi)
-    .all("/v1/:forge/:instance/:verb", verb)
-    .post("/webhooks/:forge/:instance", webhook)
+  const app = new H3()
+  for (const file of readdirSync(new URL("middleware", SERVER), { recursive: true })) {
+    app.use((await import(new URL(`middleware/${file}`, SERVER).href)).default)
+  }
+  for (const file of routeFiles()) {
+    const { method, path } = routeOf(file)
+    const { default: handler } = await import(new URL(`routes/${file}`, SERVER).href)
+    app.on(method, path, handler)
+  }
+  return app
+}
+
+const SERVER = new URL("../../server/", import.meta.url)
+
+function routeFiles(): string[] {
+  return readdirSync(new URL("routes", SERVER), { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) =>
+      relative(fileURLToPath(new URL("routes", SERVER)), join(entry.parentPath, entry.name)),
+    )
+}
+
+/** Nitro's file routing: `v1/[forge]/index.get.ts` is `GET /v1/:forge`, and no method suffix takes every method. */
+function routeOf(file: string): { method: HTTPMethod | ""; path: string } {
+  const [, base, method] = /^(.*?)(?:\.(get|post|put|patch|delete))?\.ts$/.exec(file)!
+  const path = `/${base!}`.replace(/\[(\w+)\]/g, ":$1").replace(/\/index$/, "")
+  return { method: (method?.toUpperCase() ?? "") as HTTPMethod | "", path: path || "/" }
 }
 
 /** Sets env vars around each test of the enclosing suite. */

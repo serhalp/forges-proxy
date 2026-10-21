@@ -290,7 +290,7 @@ const RETENTION_SECONDS = 24 * 60 * 60
 const ENTRY_URL = "https://upstream.forges-proxy.invalid/"
 
 /**
- * A store on the Cache API (`caches`), as Netlify Functions and Cloudflare Workers provide it: shared by every instance
+ * A store on the Cache API (`caches`), as Netlify Functions provide it: shared by every instance
  * in a region, and purged along with the CDN by the proxy response's cache tags. The entry's own status, headers and
  * timestamps travel in the body, since the platform reads the stored response's headers as its own instructions.
  */
@@ -318,7 +318,7 @@ export function cacheApiStore(open: () => Promise<Cache>): UpstreamStore {
         "cache-control": `public, max-age=${RETENTION_SECONDS}`,
       }
       if (tags.length) {
-        headers["cache-tag"] = headers["netlify-cache-tag"] = tags.join(",")
+        headers["netlify-cache-tag"] = tags.join(",")
       }
       await (await open()).put(ENTRY_URL + key, new Response(bytes, { headers }))
     },

@@ -18,7 +18,7 @@ pnpm install
 pnpm dev
 ```
 
-- `GET /v1`: configured providers, their capabilities, and the routed verbs.
+- `GET /v1`: configured providers, their capabilities, and the routed verbs with the position of their options.
 - `GET /docs`: API reference (Scalar), from `GET /openapi.json` (OpenAPI 3.1).
 - `GET /v1/status`: each provider's rate-limit budgets, as the server instance that answers last saw them.
 - `GET /v1/:forge/:instance/:verb?args=<json array>`: a read, e.g. `repos.get`, `threads.listPage`.
@@ -52,16 +52,11 @@ Every verb is present. Listings iterate through the proxy's `*Page` verbs, error
 
 ## Webhooks and purging
 
-Point a forge's webhook at `/webhooks/:forge/:instance` and set the provider's `FORGES_<KIND>_WEBHOOK_SECRET`. Each delivery is verified, and the CDN entries of every repository it concerns are purged by cache tag:
-
-- Netlify: automatic, with the `NETLIFY_PURGE_API_TOKEN` Netlify gives functions.
-- Cloudflare: set `CLOUDFLARE_ZONE_ID` and `CLOUDFLARE_API_TOKEN`.
-
-Elsewhere, entries expire by age (60 seconds, then served stale for up to 10 minutes while they refresh).
+Point a forge's webhook at `/webhooks/:forge/:instance` and set the provider's `FORGES_<KIND>_WEBHOOK_SECRET`. Each delivery is verified, and the CDN entries of every repository it concerns are purged by cache tag. On Netlify this is automatic, with the `NETLIFY_PURGE_API_TOKEN` Netlify gives functions. Elsewhere, entries expire by age (60 seconds, then served stale for up to 10 minutes while they refresh).
 
 ## Upstream cache
 
-The proxy keeps upstream JSON responses and revalidates them with their `etag`, so a CDN miss usually costs a `304` (free on GitHub's rate limit for authenticated requests) or nothing. Where the platform has the Cache API (Netlify, Cloudflare), the entries are shared by every instance in a region and purged by the same webhooks; elsewhere they're in memory. While upstream is rate-limited or failing, a stored response stands in for up to a day past its freshness. Each response's `x-upstream-cache` header lists what happened to its upstream requests: `fresh`, `revalidated`, `fetched` or `stale`.
+The proxy keeps upstream JSON responses and revalidates them with their `etag`, so a CDN miss usually costs a `304` (free on GitHub's rate limit for authenticated requests) or nothing. Where the platform has the Cache API (Netlify), the entries are shared by every instance in a region and purged by the same webhooks; elsewhere they're in memory. While upstream is rate-limited or failing, a stored response stands in for up to a day past its freshness. Each response's `x-upstream-cache` header lists what happened to its upstream requests: `fresh`, `revalidated`, `fetched` or `stale`.
 
 ## Operations manifest
 

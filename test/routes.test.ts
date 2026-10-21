@@ -76,6 +76,11 @@ describe("private mode", () => {
     }
   })
 
+  it("guards only /v1 and what's under it", async () => {
+    assert.equal((await call("/v1x")).status, 404)
+    assert.equal((await call("/v1")).status, 401)
+  })
+
   it("serves reads uncached", async () => {
     const response = await read("repos.get", [repo], authorization)
     assert.equal(response.status, 200)
@@ -205,13 +210,19 @@ describe("dispatch", () => {
     assert.equal(response.status, 200)
   })
 
-  it("400s for a ref to another forge", async () => {
-    const response = await read(
-      "repos.get",
-      [{ ...repo, forge: "github", instance: "github.com" }],
-      authorization,
-    )
-    assert.equal(response.status, 400)
+  it("400s for a ref to another forge or instance, however deep", async () => {
+    const github = { ...repo, forge: "github", instance: "github.com" }
+    const cases: Array<[string, unknown[], string]> = [
+      ["repos.get", [github], "args/0 names github on github.com"],
+      ["repos.get", [{ ...repo, instance: "other.test" }], "args/0 names fake on other.test"],
+      ["threads.get", [{ ...issue, repo: github }], "args/0/repo names github"],
+      ["search.threadsPage", [{ repo: github }], "args/0/repo names github"],
+    ]
+    for (const [name, args, message] of cases) {
+      const response = await read(name, args, authorization)
+      assert.equal(response.status, 400, message)
+      assert.ok((await errorOf(response)).message.startsWith(message), message)
+    }
   })
 
   it("sends file bytes tagged as base64", async () => {

@@ -6,10 +6,12 @@ import type {
   ForgeProvider,
   ForgeProviderFactory,
   ForgeVerb,
+  KnownForgeKind,
   Page,
 } from "forges"
 import * as forges from "forges"
-import { CAPABILITY_TABLE, forgeIterable, fromBase64, iteratePages, toBase64 } from "forges/kit"
+import { CAPABILITY_TABLE, forgeIterable, iteratePages } from "forges/kit"
+import { decodeBytes, encodeBytes } from "#shared/wire.ts"
 
 export interface RemoteOptions {
   /** The proxy's origin, such as `https://forges.example.com`. */
@@ -27,8 +29,11 @@ interface RemoteIndex {
     authKind: AuthKind
     capabilities: ForgeCapabilities
   }>
-  verbs: Array<{ name: string; write: boolean }>
+  /** `options` is the position of the verb's options, or -1. */
+  verbs: Array<{ name: string; write: boolean; options: number }>
 }
+
+type RemoteVerb = Omit<RemoteIndex["verbs"][number], "name">
 
 type Factory = (options: ForgeOptionsBase) => ForgeProviderFactory
 // Credential-less providers answer the sync helpers (`urlFor`, `parseUrl`, ...) that need no request.
@@ -44,7 +49,7 @@ const LOCAL: Record<string, Factory> = {
   gitlab: forges.gitlab as Factory,
   pushin: forges.pushin as Factory,
   tangled: forges.tangled as Factory,
-}
+} satisfies Record<KnownForgeKind, Factory>
 
 const ERRORS = new Map<string, new (...args: never[]) => Error>(
   Object.values(forges).flatMap((value) =>
@@ -73,38 +78,32 @@ export async function connect(options: RemoteOptions): Promise<ForgeProvider[]> 
     throw await toError(response, {})
   }
   const index = (await response.json()) as RemoteIndex
-  const writes = new Map(index.verbs.map((verb) => [verb.name, verb.write]))
-  return index.providers.map((info) => remoteProvider(info, writes, { ...options, fetch, headers }))
+  const verbs = new Map(index.verbs.map(({ name, ...verb }) => [name, verb]))
+  return index.providers.map((info) => remoteProvider(info, verbs, { ...options, fetch, headers }))
 }
 
 function remoteProvider(
   info: RemoteIndex["providers"][number],
-  writes: Map<string, boolean>,
+  verbs: Map<string, RemoteVerb>,
   options: RemoteOptions & { fetch: FetchLike; headers: Record<string, string> },
 ): ForgeProvider {
   const { forge, instance } = info
   const local = localProvider(info)
   const origin = { forge, instance }
-  const routed = (verb: string) => writes.has(verb) || writes.has(`${verb}Page`)
+  const routed = (verb: string) => verbs.has(verb) || verbs.has(`${verb}Page`)
   const unsupported = (verb: string) =>
     new forges.UnsupportedOperationError(`The proxy does not route ${verb}`, origin)
 
   async function call(verb: string, args: unknown[]): Promise<unknown> {
+    const { write, options: at } = verbs.get(verb)!
     // `AbortSignal`s can't travel as JSON; the request carries them instead.
-    let signal: AbortSignal | undefined
-    const sent = args.map((arg) => {
-      if (isOptions(arg) && arg.signal instanceof AbortSignal) {
-        const { signal: own, ...rest } = arg
-        signal = own as AbortSignal
-        return rest
-      }
-      return arg
-    })
+    const own = args[at] as { signal?: AbortSignal } | undefined
+    const { signal, ...rest } = own ?? {}
+    const sent = own ? args.with(at, rest) : args
     const url = new URL(
       `/v1/${encodeURIComponent(forge)}/${encodeURIComponent(instance)}/${verb}`,
       options.url,
     )
-    const write = writes.get(verb)
     if (!write) {
       url.searchParams.set("args", JSON.stringify(sent, encodeBytes))
     }
@@ -123,6 +122,7 @@ function remoteProvider(
     if (response.headers.get("content-type") === "application/octet-stream") {
       return response.body
     }
+    // Bytes after dates, since `reviveDates` would take a `Uint8Array` apart.
     return decodeBytes(forges.reviveDates(await response.json()))
   }
 
@@ -130,18 +130,20 @@ function remoteProvider(
   for (const verb of CAPABILITY_TABLE.flatMap((entry) => entry.verbs ?? [])) {
     const [namespace, name] = verb.split(".") as [string, string]
     namespaces[namespace] ??= {}
-    if (writes.has(verb)) {
+    const page = verbs.get(`${verb}Page`)
+    if (verbs.has(verb)) {
       namespaces[namespace][name] = (...args: unknown[]) => call(verb, args)
-    } else if (writes.has(`${verb}Page`)) {
-      namespaces[namespace][name] = (...args: unknown[]) => {
-        // Refs always name their forge, so a trailing object without one is the listing's options.
-        const last = args.at(-1)
-        const [positional, listOptions] = isOptions(last) ? [args.slice(0, -1), last] : [args, {}]
-        return iteratePages(
-          (page) => call(`${verb}Page`, [...positional, page]) as Promise<Page<unknown>>,
-          listOptions,
+    } else if (page) {
+      // A listing takes the same arguments as its page, with the cursor in the options.
+      namespaces[namespace][name] = (...args: unknown[]) =>
+        iteratePages(
+          (options) =>
+            call(`${verb}Page`, [
+              ...Array.from({ length: page.options }, (_, at) => args[at]),
+              options,
+            ]) as Promise<Page<unknown>>,
+          (args[page.options] ?? {}) as object,
         )
-      }
     } else if (CAPABILITY_TABLE.some((entry) => entry.verbs?.includes(`${verb}Page`))) {
       namespaces[namespace][name] = () =>
         forgeIterable(async function* () {
@@ -188,36 +190,6 @@ function localProvider(info: RemoteIndex["providers"][number]): ForgeProvider | 
     // Some forges need options the proxy doesn't share, such as an organisation; their helpers go without.
     return undefined
   }
-}
-
-function isOptions(value: unknown): value is Record<string, unknown> {
-  return (
-    !!value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    !(value instanceof Date) &&
-    !("forge" in value)
-  )
-}
-
-/** Bytes cross the wire as `{ "$bytes": "<base64>" }`, both ways. */
-function encodeBytes(_key: string, value: unknown): unknown {
-  return value instanceof Uint8Array ? { $bytes: toBase64(value) } : value
-}
-
-// After `reviveDates`, which would take a `Uint8Array` apart.
-function decodeBytes(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(decodeBytes)
-  }
-  if (!value || typeof value !== "object" || value instanceof Date) {
-    return value
-  }
-  const { $bytes } = value as { $bytes?: unknown }
-  if (typeof $bytes === "string" && Object.keys(value).length === 1) {
-    return fromBase64($bytes)
-  }
-  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, decodeBytes(item)]))
 }
 
 /** Rebuilds the error class the proxy reports, with its fields, without running its constructor. */

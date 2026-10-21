@@ -5,7 +5,7 @@ import { accessMode } from "#server/utils/access.ts"
 import { proxyError } from "#server/utils/errors.ts"
 
 export default defineMiddleware((event) => {
-  if (!event.url.pathname.startsWith("/v1") || accessMode() === "public") {
+  if (!/^\/v1(\/|$)/.test(event.url.pathname) || accessMode() === "public") {
     return
   }
   const header = event.req.headers.get("authorization") ?? ""

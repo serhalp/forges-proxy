@@ -2,9 +2,13 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { createForges } from "forges"
 import { fake } from "forges/fake"
-import { callVerb, VERBS, withSignal } from "#server/utils/verbs.ts"
+import { manifest } from "#server/utils/manifest.ts"
+import { callVerb, routedVerb, withSignal } from "#server/utils/verbs.ts"
+import { routableVerbs } from "#scripts/generate-manifest.ts"
 
-describe("VERBS", () => {
+const VERBS = routableVerbs()
+
+describe("routableVerbs", () => {
   it("leaves out verbs with no safe HTTP form", () => {
     for (const verb of [
       "installations.token",
@@ -28,6 +32,21 @@ describe("VERBS", () => {
   })
 })
 
+describe("routedVerb", () => {
+  it("routes writes and account verbs only on a private instance", () => {
+    assert.equal(routedVerb("repos.get", "public"), manifest.verbs["repos.get"])
+    assert.equal(routedVerb("threads.comment", "public"), undefined)
+    assert.equal(routedVerb("users.me", "public"), undefined)
+    assert.equal(routedVerb("threads.comment", "private"), manifest.verbs["threads.comment"])
+  })
+
+  it("knows no verb outside the manifest", () => {
+    for (const name of ["repos.nope", "constructor", "__proto__", "toString"]) {
+      assert.equal(routedVerb(name, "private"), undefined, name)
+    }
+  })
+})
+
 describe("callVerb", () => {
   it("calls the verb on the provider with the given arguments", async () => {
     const forges = createForges([
@@ -42,16 +61,17 @@ describe("callVerb", () => {
 })
 
 describe("withSignal", () => {
+  const verb = (name: string) => manifest.verbs[name]!
   const signal = new AbortController().signal
   const repo = { forge: "fake", instance: "fake.test", owner: "acme", name: "widgets" }
 
   it("adds the signal to the options, wherever they sit", () => {
-    assert.deepEqual(withSignal("repos.get", [repo, { licence: true }], signal), [
+    assert.deepEqual(withSignal(verb("repos.get"), [repo, { licence: true }], signal), [
       repo,
       { licence: true, signal },
     ])
-    assert.deepEqual(withSignal("repos.get", [repo], signal), [repo, { signal }])
-    assert.deepEqual(withSignal("contents.compare", [repo, "a"], signal), [
+    assert.deepEqual(withSignal(verb("repos.get"), [repo], signal), [repo, { signal }])
+    assert.deepEqual(withSignal(verb("contents.compare"), [repo, "a"], signal), [
       repo,
       "a",
       undefined,
@@ -60,7 +80,8 @@ describe("withSignal", () => {
   })
 
   it("leaves arguments it can't add to alone", () => {
-    assert.deepEqual(withSignal("repos.get", [repo, "nope"], signal), [repo, "nope"])
-    assert.deepEqual(withSignal("no.verb", [repo], signal), [repo])
+    assert.deepEqual(withSignal(verb("repos.get"), [repo, "nope"], signal), [repo, "nope"])
+    const noOptions = { ...verb("repos.get"), params: [verb("repos.get").params[0]!] }
+    assert.deepEqual(withSignal(noOptions, [repo], signal), [repo])
   })
 })
