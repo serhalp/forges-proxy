@@ -9017,10 +9017,6 @@
           "type": "string",
           "format": "date-time"
         },
-        "secret": {
-          "not": {},
-          "description": "Never returned: no forge reads a webhook secret back."
-        },
         "raw": {}
       },
       "required": [

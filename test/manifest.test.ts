@@ -59,6 +59,29 @@ describe("manifest", () => {
     }
   })
 
+  it("maps lib types to the wire: bytes tagged, streams as the response, signals left out", () => {
+    const streams = Object.keys(manifest.verbs).filter((name) => manifest.verbs[name]!.stream)
+    assert.deepEqual(streams.toSorted(), ["ci.log", "releases.downloadAsset"])
+    const content = JSON.stringify(manifest.schemas.FileContent)
+    assert.ok(content.includes('"$bytes"'), "FileContent carries bytes as { $bytes }")
+    assert.ok(!JSON.stringify(manifest).includes("BYTES_PER_ELEMENT"))
+    assert.doesNotMatch(JSON.stringify(manifest), /"[^"]+":\{"not":\{\}/, "no never-typed property")
+  })
+
+  it("has only components the verbs reach", () => {
+    const reached = new Set<string>()
+    const reach = (value: unknown): void => {
+      for (const [, name] of JSON.stringify(value).matchAll(/"#\/components\/schemas\/([^"]+)"/g)) {
+        if (!reached.has(name!)) {
+          reached.add(name!)
+          reach(manifest.schemas[name!])
+        }
+      }
+    }
+    reach(manifest.verbs)
+    assert.deepEqual(Object.keys(manifest.schemas).toSorted(), [...reached].toSorted())
+  })
+
   it("resolves every reference", () => {
     for (const [, ref] of JSON.stringify(manifest).matchAll(
       /"\$ref":"#\/components\/schemas\/([^"]+)"/g,

@@ -10,7 +10,23 @@ import process from "node:process"
 // The root `typescript` is the native port, which has no compiler API.
 import ts from "typescript-6"
 import type * as TS from "typescript-6"
-import { createGenerator } from "ts-json-schema-generator"
+import type {
+  BaseType,
+  ChainNodeParser,
+  Definition,
+  SubNodeParser,
+  SubTypeFormatter,
+} from "ts-json-schema-generator"
+import {
+  BaseType as Base,
+  Context,
+  createFormatter,
+  createParser,
+  DEFAULT_CONFIG,
+  DefinitionType,
+  NeverType,
+  SchemaGenerator,
+} from "ts-json-schema-generator"
 import { CAPABILITY_TABLE } from "forges/kit"
 import type { Manifest, ManifestParam, Schema } from "#server/utils/manifest.ts"
 
@@ -19,23 +35,17 @@ const cache = `${root}node_modules/.cache/forges-proxy/`
 const tsconfig = `${root}scripts/tsconfig.manifest.json`
 const target = `${root}server/manifest.json`
 
-const STREAM = "ByteStream"
-const LIB_TYPES = new Set([
-  "Array",
-  "Omit",
-  "Partial",
-  "Pick",
-  "Readonly",
-  "Record",
-  "Required",
-  "Uint8Array",
-])
 const BYTES: Schema = {
   type: "object",
   properties: { $bytes: { type: "string", contentEncoding: "base64" } },
   required: ["$bytes"],
   additionalProperties: false,
   description: 'Bytes, as `{ "$bytes": "<base64>" }`.',
+}
+const STREAM: Schema = {
+  type: "string",
+  format: "binary",
+  description: "The bytes, as `application/octet-stream`.",
 }
 
 /**
@@ -62,17 +72,6 @@ export function routableVerbs(): Map<string, { write: boolean; account: boolean 
   return new Map(entries.filter(([verb]) => !EXCLUDED.has(verb) && !names.has(`${verb}Page`)))
 }
 
-interface Signature {
-  params: Array<{
-    name: string
-    optional: boolean
-    types: string[]
-    doc?: string
-    options: boolean
-  }>
-  result: string[]
-}
-
 export function generateManifest(): Manifest {
   mkdirSync(cache, { recursive: true })
   const entry = `${cache}provider.ts`
@@ -80,158 +79,217 @@ export function generateManifest(): Manifest {
     entry,
     `import type { ForgeProvider } from "forges"\nexport type Provider = ForgeProvider\n`,
   )
-  const config = ts.getParsedCommandLineOfConfigFile(tsconfig, {}, ts.sys as never)!
-  const program = ts.createProgram([entry], config.options)
+  const options = ts.getParsedCommandLineOfConfigFile(tsconfig, {}, ts.sys as never)!.options
+  const program = ts.createProgram([entry], options)
   const checker = program.getTypeChecker()
-  const file = program.getSourceFile(entry)!
-  const [importDecl, alias] = file.statements as unknown as [
-    TS.ImportDeclaration,
-    TS.TypeAliasDeclaration,
-  ]
+  const alias = program.getSourceFile(entry)!.statements[1] as TS.TypeAliasDeclaration
   const provider = checker.getTypeAtLocation(alias.name)
-  const exported = new Set(
-    checker
-      .getExportsOfModule(checker.getSymbolAtLocation(importDecl.moduleSpecifier)!)
-      .map((s) => s.name),
-  )
+  const schemas = schemaGenerator(program)
 
-  const verbs = routableVerbs()
-  const signatures = new Map<string, Signature & { summary?: string }>()
-  for (const name of verbs.keys()) {
-    const [namespace, method] = name.split(".") as [string, string]
-    const symbol = checker.getTypeOfSymbol(provider.getProperty(namespace)!).getProperty(method)!
-    const overloads = checker.getTypeOfSymbol(symbol).getCallSignatures()
-    const params: Signature["params"] = []
-    for (const signature of overloads) {
-      signature.getParameters().forEach((parameter, index) => {
-        const declaration = parameter.valueDeclaration as TS.ParameterDeclaration
-        const param = (params[index] ??= {
-          name: parameter.name,
-          optional: false,
-          types: [],
-          options: !!checker
-            .getNonNullableType(checker.getTypeAtLocation(declaration))
-            .getProperty("signal"),
-          doc: ts
-            .getJSDocParameterTags(declaration)
-            .map((tag) => ts.getTextOfJSDocComment(tag.comment))
-            .find(Boolean),
+  const verbs = Object.fromEntries(
+    [...routableVerbs()].map(([name, { write, account }]) => {
+      const [namespace, method] = name.split(".") as [string, string]
+      const symbol = checker.getTypeOfSymbol(provider.getProperty(namespace)!).getProperty(method)!
+      const overloads = checker
+        .getTypeOfSymbol(symbol)
+        .getCallSignatures()
+        .map((signature) => signature.getDeclaration() as TS.SignatureDeclaration)
+      const params: Array<Omit<ManifestParam, "schema"> & { types: TS.TypeNode[] }> = []
+      for (const overload of overloads) {
+        overload.parameters.forEach((declaration, index) => {
+          const param = (params[index] ??= {
+            name: declaration.name.getText(),
+            optional: false,
+            ...(checker
+              .getNonNullableType(checker.getTypeAtLocation(declaration))
+              .getProperty("signal")
+              ? { options: true as const }
+              : {}),
+            ...docOf(declaration),
+            types: [],
+          })
+          param.optional ||= !!declaration.questionToken
+          param.types.push(declaration.type!)
         })
-        param.optional ||= !!declaration.questionToken
-        param.types.push(declaration.type!.getText())
-      })
-    }
-    // A parameter missing from some overloads is optional in all of them.
-    for (const param of params.slice(Math.min(...overloads.map((o) => o.getParameters().length)))) {
-      param.optional = true
-    }
-    const result = overloads.map((signature) => {
-      const text = (signature.getDeclaration() as TS.SignatureDeclaration).type!.getText()
-      return text
-        .replace(/^Promise<([\s\S]*)>$/, "$1")
-        .replaceAll("ReadableStream<Uint8Array>", STREAM)
-    })
-    for (const text of [...params.flatMap((p) => p.types), ...result]) {
-      for (const [, used] of text.matchAll(/\b([A-Z]\w*)\b/g)) {
-        if (used !== STREAM && !exported.has(used!) && !LIB_TYPES.has(used!)) {
-          throw new Error(`${name} uses ${used}, which forges doesn't export`)
-        }
+      }
+      // A parameter missing from some overloads is optional in all of them.
+      for (const param of params.slice(Math.min(...overloads.map((o) => o.parameters.length)))) {
+        param.optional = true
+      }
+      const result = schemas.of(overloads.map((overload) => awaited(program, overload.type!)))
+      const summary = ts.displayPartsToString(symbol.getDocumentationComment(checker))
+      return [
+        name,
+        {
+          ...(summary ? { summary } : {}),
+          write,
+          account,
+          params: params.map(({ types, ...param }) => ({
+            ...param,
+            schema: clean(schemas.of(types)),
+          })),
+          ...(JSON.stringify(result).includes(JSON.stringify(STREAM))
+            ? { stream: true as const }
+            : {}),
+          result: clean(result),
+        },
+      ]
+    }),
+  )
+  // Each type brings every type it mentions, including ones it only picks from; keep those the verbs reach.
+  const components = Object.fromEntries(
+    Object.entries(schemas.definitions).map(([name, schema]) => [
+      componentName(name),
+      clean(schema as Schema),
+    ]),
+  )
+  const reached = new Set<string>()
+  const reach = (value: unknown): void => {
+    for (const [, name] of JSON.stringify(value).matchAll(/"#\/components\/schemas\/([^"]+)"/g)) {
+      if (!reached.has(name!)) {
+        reached.add(name!)
+        reach(components[name!])
       }
     }
-    signatures.set(name, {
-      params,
-      result,
-      summary: ts.displayPartsToString(symbol.getDocumentationComment(checker)) || undefined,
-    })
   }
-
-  // Every type the signatures name, as one alias each, for ts-json-schema-generator to resolve.
-  const aliases = new Map<string, string>()
-  const aliasOf = (types: string[]) => {
-    const text = [...new Set(types)].map((type) => `(${type})`).join(" | ")
-    const existing = [...aliases].find(([, value]) => value === text)?.[0]
-    if (existing) {
-      return existing
-    }
-    const name = `T${aliases.size}`
-    aliases.set(name, text)
-    return name
-  }
-  const plan = [...signatures].map(([name, signature]) => ({
-    name,
-    signature,
-    params: signature.params.map((param) => aliasOf(param.types)),
-    result: aliasOf(signature.result),
-  }))
-  const names = [...exported].filter((name) => /^[A-Z]/.test(name))
-  const types = `${cache}types.ts`
-  writeFileSync(
-    types,
-    [
-      `import type { ${names.join(", ")} } from "forges"`,
-      `export interface ${STREAM} {}`,
-      ...[...aliases].map(([name, text]) => `export type ${name} = ${text}`),
-    ].join("\n"),
-  )
-  const generator = createGenerator({
-    path: types,
-    tsconfig,
-    expose: "export",
-    skipTypeCheck: true,
-    topRef: false,
-    jsDoc: "extended",
-    functions: "hide",
-    additionalProperties: true,
-  })
-  const schemas: Record<string, Schema> = {}
-  const inline = new Map<string, Schema>()
-  for (const name of aliases.keys()) {
-    const {
-      definitions = {},
-      $schema: _,
-      ...schema
-    } = generator.createSchema(name) as Schema & {
-      definitions?: Record<string, Schema>
-    }
-    Object.assign(schemas, definitions)
-    inline.set(name, schema)
-  }
-  delete schemas.AbortSignal
-  delete schemas[STREAM]
-
-  const tidy = (value: Schema): Schema => clean(value) as Schema
+  reach(verbs)
   return {
-    verbs: Object.fromEntries(
-      plan.map(({ name, signature, params, result }) => {
-        const verb = verbs.get(name)!
-        const resultSchema = inline.get(result)!
-        return [
-          name,
-          {
-            ...(signature.summary ? { summary: signature.summary } : {}),
-            write: verb.write,
-            account: verb.account,
-            params: signature.params.map((param, index): ManifestParam => ({
-              name: param.name,
-              optional: param.optional,
-              ...(param.options ? { options: true } : {}),
-              ...(param.doc ? { description: param.doc } : {}),
-              schema: tidy(inline.get(params[index]!)!),
-            })),
-            ...(JSON.stringify(resultSchema).includes(`#/definitions/${STREAM}`)
-              ? { stream: true }
-              : {}),
-            result: tidy(resultSchema),
-          },
-        ]
-      }),
-    ),
-    schemas: Object.fromEntries(
-      Object.keys(schemas)
-        .sort()
-        .map((name) => [componentName(name), tidy(schemas[name]!)]),
-    ),
+    verbs,
+    schemas: Object.fromEntries([...reached].sort().map((name) => [name, components[name]!])),
   }
+}
+
+function docOf(declaration: TS.ParameterDeclaration): { description?: string } {
+  const description = ts
+    .getJSDocParameterTags(declaration)
+    .map((tag) => ts.getTextOfJSDocComment(tag.comment))
+    .find(Boolean)
+  return description ? { description } : {}
+}
+
+/** The type a `Promise<T>` return resolves with. */
+function awaited(program: TS.Program, node: TS.TypeNode): TS.TypeNode {
+  return ts.isTypeReferenceNode(node) && isLib(program, node, "Promise") && node.typeArguments
+    ? node.typeArguments[0]!
+    : node
+}
+
+/** `node` names the global `name` from TypeScript's lib, not a `forges` type that happens to share it. */
+function isLib(program: TS.Program, node: TS.TypeReferenceNode, name: string): boolean {
+  if (!ts.isIdentifier(node.typeName) || node.typeName.text !== name) {
+    return false
+  }
+  return !!program
+    .getTypeChecker()
+    .getSymbolAtLocation(node.typeName)
+    ?.declarations?.some((declaration) =>
+      program.isSourceFileDefaultLibrary(declaration.getSourceFile()),
+    )
+}
+
+class BytesType extends Base {
+  getId(): string {
+    return "bytes"
+  }
+}
+class StreamType extends Base {
+  getId(): string {
+    return "stream"
+  }
+}
+
+/**
+ * Lib types as the wire carries them: bytes as `{ $bytes }`, a byte stream as the response itself, and `AbortSignal`
+ * not at all, since the proxy passes the request's own.
+ */
+class WireTypes implements SubNodeParser, SubTypeFormatter {
+  private readonly program: TS.Program
+
+  constructor(program: TS.Program) {
+    this.program = program
+  }
+
+  supportsNode(node: TS.Node): boolean {
+    return !!this.lib(node)
+  }
+
+  createType(node: TS.Node): BaseType {
+    const name = this.lib(node)
+    return name === "Uint8Array"
+      ? new BytesType()
+      : name === "ReadableStream"
+        ? new StreamType()
+        : new NeverType()
+  }
+
+  supportsType(type: BaseType): boolean {
+    return type instanceof BytesType || type instanceof StreamType
+  }
+
+  getDefinition(type: BaseType): Definition {
+    return (type instanceof BytesType ? BYTES : STREAM) as Definition
+  }
+
+  getChildren(): BaseType[] {
+    return []
+  }
+
+  private lib(node: TS.Node): string | undefined {
+    return ts.isTypeReferenceNode(node)
+      ? ["Uint8Array", "ReadableStream", "AbortSignal"].find((name) =>
+          isLib(this.program, node, name),
+        )
+      : undefined
+  }
+}
+
+/**
+ * Schemas for type nodes in `program`, collecting the named types they reference into `definitions`. Parses with the
+ * chain itself: the parser `createParser()` returns would inline a root reference such as `RepoRef`.
+ */
+function schemaGenerator(program: TS.Program) {
+  const config = {
+    ...DEFAULT_CONFIG,
+    expose: "export" as const,
+    topRef: false,
+    jsDoc: "extended" as const,
+    functions: "hide" as const,
+    additionalProperties: true,
+    skipTypeCheck: true,
+  }
+  const wire = new WireTypes(program)
+  let chain!: ChainNodeParser
+  const parser = createParser(program as never, config, (mutable) => {
+    chain = mutable as ChainNodeParser
+    chain.addNodeParser(wire)
+  })
+  const formatter = createFormatter(config, (mutable) => mutable.addTypeFormatter(wire))
+  return new (class extends SchemaGenerator {
+    readonly definitions: Record<string, Definition> = {}
+    readonly #sources = new Map<string, string>()
+
+    /** The schema of one of `nodes`: overloads give a parameter several. */
+    of(nodes: TS.TypeNode[]): Schema {
+      const branches = nodes.map((node) => {
+        const type = chain.createType(node as never, new Context())
+        // The generator only catches a name clash within one call, and keeps the first type otherwise.
+        for (const child of this.typeFormatter.getChildren(type)) {
+          if (child instanceof DefinitionType) {
+            const source = JSON.stringify(this.typeFormatter.getDefinition(child.getType()))
+            const previous = this.#sources.get(child.getName())
+            if (previous !== undefined && previous !== source) {
+              throw new Error(`Two different types are named ${child.getName()}`)
+            }
+            this.#sources.set(child.getName(), source)
+          }
+        }
+        this.appendRootChildDefinitions(type, this.definitions)
+        return this.typeFormatter.getDefinition(type) as Schema
+      })
+      const distinct = [...new Map(branches.map((b) => [JSON.stringify(b), b])).values()]
+      return distinct.length === 1 ? distinct[0]! : { anyOf: distinct }
+    }
+  })(program as never, parser, formatter, config)
 }
 
 /** OpenAPI component names allow only `[A-Za-z0-9._-]`: `Page<Repo>` becomes `PageOfRepo`. */
@@ -240,48 +298,26 @@ function componentName(name: string): string {
 }
 
 /**
- * Draft-07 as the generator writes it, made what the wire carries: refs point at OpenAPI components, `signal` stays
- * on the server, bytes are base64 and streams are their own response.
+ * Draft-07 as the generator writes it, with refs pointing at OpenAPI components, `{@link}`s as code, and no `never`
+ * properties: the generator keeps those when they have docs, as `signal` does.
  */
-function clean(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(clean)
-  }
-  if (!value || typeof value !== "object") {
-    return value
-  }
-  const schema = value as Schema
-  if (schema.$ref === `#/definitions/${STREAM}`) {
-    return {
-      type: "string",
-      format: "binary",
-      description: "The bytes, as `application/octet-stream`.",
+function clean(value: Schema): Schema {
+  return JSON.parse(JSON.stringify(value), (key, item) => {
+    if (key === "properties" && item && typeof item === "object") {
+      return Object.fromEntries(
+        Object.entries(item as Record<string, Schema>).filter(
+          ([, property]) => JSON.stringify(property.not) !== "{}",
+        ),
+      )
     }
-  }
-  const properties = schema.properties as Record<string, unknown> | undefined
-  if (properties && "BYTES_PER_ELEMENT" in properties) {
-    return BYTES
-  }
-  return Object.fromEntries(
-    Object.entries(schema).flatMap(([key, item]) => {
-      if (key === "$ref" && typeof item === "string") {
-        return [
-          [
-            key,
-            `#/components/schemas/${componentName(decodeURIComponent(item.replace(/^#\/definitions\//, "")))}`,
-          ],
-        ]
-      }
-      if (key === "properties" && item && typeof item === "object") {
-        const { signal: _, ...rest } = item as Record<string, unknown>
-        return [[key, clean(rest)]]
-      }
-      if (key === "description" && typeof item === "string") {
-        return [[key, item.replace(/\{@link\s+([^\s}]+)\s*\}/g, "`$1`").replace(/ {2,}/g, " ")]]
-      }
-      return [[key, clean(item)]]
-    }),
-  )
+    if (key === "$ref" && typeof item === "string") {
+      return `#/components/schemas/${componentName(decodeURIComponent(item.replace(/^#\/definitions\//, "")))}`
+    }
+    if (key === "description" && typeof item === "string") {
+      return item.replace(/\{@link\s+([^\s}]+)\s*\}/g, "`$1`").replace(/ {2,}/g, " ")
+    }
+    return item
+  })
 }
 
 if (import.meta.main) {

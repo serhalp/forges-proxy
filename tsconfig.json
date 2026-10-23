@@ -1,3 +1,5 @@
 {
-  "extends": ["nitro/tsconfig"]
+  "extends": ["nitro/tsconfig"],
+  // Node runs the scripts and tests by stripping types, which only works for erasable syntax.
+  "compilerOptions": { "erasableSyntaxOnly": true }
 }
