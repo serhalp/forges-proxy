@@ -93,10 +93,11 @@
         "type": "boolean"
       }
     },
-    "users.eventsPage": {
-      "summary": "One page of `events()`. Conditional requests and throttling work as for {@link ReposApi.eventsPage}.",
+    "users.events": {
+      "summary": "Lists what an account did across the repositories the credential can see, in the feed's order as for\n{@link ReposApi.events}, with the same conditional requests and throttling. Each event has `source: 'poll'`.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "login",
@@ -118,10 +119,61 @@
         "$ref": "#/components/schemas/PageOfForgeEvent"
       }
     },
-    "repos.listPage": {
-      "summary": "One page of `list()`.",
+    "users.block": {
+      "summary": "Blocks an account on behalf of the account the credential belongs to. A repeat can reject with a\n`ForgeApiError` with `status` 422.",
+      "write": true,
+      "account": true,
+      "params": [
+        {
+          "name": "login",
+          "optional": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "users.unblock": {
+      "summary": "Unblocks an account that `block()` blocked. A repeat can reject with a `ForgeApiError` with `status` 422.",
+      "write": true,
+      "account": true,
+      "params": [
+        {
+          "name": "login",
+          "optional": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "repos.list": {
+      "summary": "The authenticated account's repositories, or the installation's under app auth.",
       "write": false,
       "account": true,
+      "listing": true,
       "params": [
         {
           "name": "options",
@@ -136,10 +188,11 @@
         "$ref": "#/components/schemas/PageOfRepo"
       }
     },
-    "repos.byOwnerPage": {
-      "summary": "One page of `byOwner()`.",
+    "repos.byOwner": {
+      "summary": "The repositories of a user, organisation, group, workspace or project that the credential can see.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "owner",
@@ -161,10 +214,11 @@
         "$ref": "#/components/schemas/PageOfRepo"
       }
     },
-    "repos.labelsPage": {
-      "summary": "One page of `labels()`.",
+    "repos.labels": {
+      "summary": "Every label defined on the repository, whether or not a thread carries it.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "repo",
@@ -218,10 +272,11 @@
         "$ref": "#/components/schemas/Label"
       }
     },
-    "repos.milestonesPage": {
-      "summary": "One page of `milestones()`.",
+    "repos.milestones": {
+      "summary": "Lists the milestones of a repository.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "repo",
@@ -243,10 +298,39 @@
         "$ref": "#/components/schemas/PageOfMilestone"
       }
     },
-    "repos.collaboratorsPage": {
-      "summary": "One page of `collaborators()`.",
+    "repos.issueTypes": {
+      "summary": "The issue types that issues in the repository can have. On GitHub, the enabled types of the account that owns it.",
       "write": false,
       "account": false,
+      "params": [
+        {
+          "name": "repo",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/IssueType"
+        }
+      }
+    },
+    "repos.collaborators": {
+      "summary": "Lists the collaborators of a repository, with their roles.",
+      "write": false,
+      "account": false,
+      "listing": true,
       "params": [
         {
           "name": "repo",
@@ -268,10 +352,11 @@
         "$ref": "#/components/schemas/PageOfCollaborator"
       }
     },
-    "repos.contributorsPage": {
-      "summary": "One page of `contributors()`.",
+    "repos.contributors": {
+      "summary": "Lists the commit authors of a repository with their commit counts, most commits first. Pass\n`includeUnlinked: true` to include the contributors the forge has not linked to an account.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "repo",
@@ -285,7 +370,7 @@
           "optional": true,
           "options": true,
           "schema": {
-            "$ref": "#/components/schemas/PageOptions"
+            "$ref": "#/components/schemas/ContributorQuery"
           }
         }
       ],
@@ -318,6 +403,34 @@
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/ContributorStats"
+        }
+      }
+    },
+    "repos.templates": {
+      "summary": "The issue and pull request templates a repository offers, ready to fill in before `threads.create()`. On GitHub,\na repository without its own falls back to the owner's `.github` repository, same as the web UI.",
+      "write": false,
+      "account": false,
+      "params": [
+        {
+          "name": "repo",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/RepoTemplateOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RepoTemplate"
         }
       }
     },
@@ -358,6 +471,38 @@
       ],
       "result": {
         "$ref": "#/components/schemas/RepoRole"
+      }
+    },
+    "repos.branchRules": {
+      "summary": "The checks and approvals a pull request needs before it can merge into a branch. On GitHub it reads both\nrulesets and classic branch protection, and only an admin can read the approvals that classic protection asks for.",
+      "write": false,
+      "account": false,
+      "params": [
+        {
+          "name": "repo",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "branch",
+          "optional": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/BranchRules"
       }
     },
     "repos.addCollaborator": {
@@ -406,10 +551,11 @@
         "$ref": "#/components/schemas/AddCollaboratorResult"
       }
     },
-    "repos.assignableUsersPage": {
-      "summary": "One page of `assignableUsers()`.",
+    "repos.assignableUsers": {
+      "summary": "Accounts that can be assigned to a thread in the repository.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "repo",
@@ -431,10 +577,11 @@
         "$ref": "#/components/schemas/PageOfActor"
       }
     },
-    "repos.reviewerCandidatesPage": {
-      "summary": "One page of `reviewerCandidates()`.",
+    "repos.reviewerCandidates": {
+      "summary": "Accounts that can be asked to review a given pull request.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "ref",
@@ -456,10 +603,11 @@
         "$ref": "#/components/schemas/PageOfActor"
       }
     },
-    "repos.eventsPage": {
-      "summary": "One page of `events()`. Where the forge supports conditional requests, the first page has an `etag`; pass it\nback as `cursor: { etag }` to read the first page again, which has `notModified: true` and no items when the\nfeed is unchanged. Where the forge sets a minimum wait between reads, reading the first page again sooner\nsends no request and returns a `throttled` page with a `feed_throttled` warning, unless you pass `force: true`.\n`events()` then yields nothing, and the warning lands in its `warnings`.",
+    "repos.events": {
+      "summary": "Lists the activity feed of a repository: pushes, new branches and tags, and changes to its threads and releases.\nEvents come in the order the forge added them to the feed, latest first, which can differ from `occurredAt`\nwhere the forge adds events late. Each event has `source: 'poll'`.\n\nWhere the forge supports conditional requests, the first page has an `etag`; pass it back as\n`cursor: { etag }` to read the first page again, which has `notModified: true` and no items when the feed is\nunchanged. Where the forge sets a minimum wait between reads, reading the first page again sooner sends no\nrequest and returns a `throttled` page with a `feed_throttled` warning, unless you pass `force: true`.\nIterating then yields nothing, and the warning lands in `warnings`.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "repo",
@@ -481,10 +629,11 @@
         "$ref": "#/components/schemas/PageOfForgeEvent"
       }
     },
-    "orgs.teamsPage": {
-      "summary": "One page of `teams()`.",
+    "orgs.teams": {
+      "summary": "Lists the teams of an organisation.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "org",
@@ -506,10 +655,11 @@
         "$ref": "#/components/schemas/PageOfTeam"
       }
     },
-    "orgs.teamMembersPage": {
-      "summary": "One page of `teamMembers()`.",
+    "orgs.teamMembers": {
+      "summary": "Lists the members of a team, as actors.",
       "write": false,
       "account": true,
+      "listing": true,
       "params": [
         {
           "name": "team",
@@ -529,6 +679,70 @@
       ],
       "result": {
         "$ref": "#/components/schemas/PageOfActor"
+      }
+    },
+    "orgs.block": {
+      "summary": "Blocks an account from the repositories of an organisation. A repeat can reject with a `ForgeApiError` with\n`status` 422.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "org",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "login",
+          "optional": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "orgs.unblock": {
+      "summary": "Unblocks an account that `block()` blocked. A repeat can reject with a `ForgeApiError` with `status` 422.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "org",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "login",
+          "optional": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
       }
     },
     "threads.get": {
@@ -556,10 +770,11 @@
         "$ref": "#/components/schemas/Thread"
       }
     },
-    "threads.listPage": {
-      "summary": "One page of `list`; pass `cursor` back in `query` to read the next.",
+    "threads.list": {
+      "summary": "Lists the threads of a repository.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "repo",
@@ -582,7 +797,7 @@
       }
     },
     "threads.getMany": {
-      "summary": "Reads several threads, batched where the forge allows. Failures become per-item warnings.",
+      "summary": "Reads several threads, batched where the forge allows. Failures become per-item warnings, except a rate limit\n(`RateLimitedError`) or a rejected credential (`TokenRevokedError`), which reject the call.",
       "write": false,
       "account": false,
       "params": [
@@ -612,10 +827,63 @@
         }
       }
     },
-    "threads.eventsPage": {
-      "summary": "One page of `events()`.",
+    "threads.closingIssues": {
+      "summary": "Lists the issues that a pull request closes when it merges, such as those its description names after `Fixes`.\nThey can be in other repositories. GitHub also lists the issues linked to the pull request by hand.",
       "write": false,
       "account": false,
+      "listing": true,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/ThreadRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/PageOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/PageOfThread"
+      }
+    },
+    "threads.closingPullRequests": {
+      "summary": "Lists the pull requests that close an issue when they merge, whether they are open, closed or merged.",
+      "write": false,
+      "account": false,
+      "listing": true,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/ThreadRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/PageOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/PageOfThread"
+      }
+    },
+    "threads.events": {
+      "summary": "Lists the events on a thread, such as comments, label changes and state changes.",
+      "write": false,
+      "account": false,
+      "listing": true,
       "params": [
         {
           "name": "ref",
@@ -637,10 +905,11 @@
         "$ref": "#/components/schemas/PageOfForgeEvent"
       }
     },
-    "threads.commentsPage": {
-      "summary": "One page of `comments()`.",
+    "threads.comments": {
+      "summary": "Conversation comments. Inline review comments are events, not comments.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "ref",
@@ -663,7 +932,7 @@
       }
     },
     "threads.getComment": {
-      "summary": "Reads one conversation comment, as `comments()` lists them, so not an inline review comment. Where the forge has\nno endpoint for it, walks `comments()` until the id matches.",
+      "summary": "Reads one conversation comment, as `comments()` lists them, so not an inline review comment. Where the forge has\nno endpoint for it (`capabilities.threads.getComment` is `'emulated'`), it lists the comments of the thread page by page\nuntil the id matches, which costs a request for each page read.",
       "write": false,
       "account": false,
       "params": [
@@ -687,7 +956,39 @@
         "$ref": "#/components/schemas/Comment"
       }
     },
-    "threads.editComment": {
+    "threads.createComment": {
+      "summary": "Adds a comment to a thread. A repeat posts a second comment; to make it safe to retry, mark the body with\n`withCommentMarker()` and retry with `upsertComment()`, both from `forges/helpers`.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/ThreadRef"
+          }
+        },
+        {
+          "name": "body",
+          "optional": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/Comment"
+      }
+    },
+    "threads.updateComment": {
       "summary": "Replaces the body of a comment.",
       "write": true,
       "account": false,
@@ -744,10 +1045,68 @@
         "type": "null"
       }
     },
-    "threads.reactionsPage": {
-      "summary": "One page of `reactions()`.",
+    "threads.hideComment": {
+      "summary": "Hides a comment behind a note of the reason, as GitHub does when it minimises a comment. A repeat leaves it hidden.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CommentRef"
+          }
+        },
+        {
+          "name": "reason",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/HideCommentReason"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "threads.unhideComment": {
+      "summary": "Shows a hidden comment again. A repeat leaves it shown.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CommentRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "threads.reactions": {
+      "summary": "Reactions left on the thread or on one of its comments.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "target",
@@ -776,170 +1135,30 @@
         "$ref": "#/components/schemas/PageOfReaction"
       }
     },
-    "notifications.listPage": {
-      "summary": "One page of `list()`. Pass the `cursor` of the previous page to read the next.",
-      "write": false,
-      "account": true,
-      "params": [
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/NotificationListOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/PageOfNotification"
-      }
-    },
-    "notifications.markRead": {
-      "summary": "Marks a notification as read.",
-      "write": true,
-      "account": true,
-      "params": [
-        {
-          "name": "ref",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/NotificationRef"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BaseOptions"
-          }
-        }
-      ],
-      "result": {
-        "type": "null"
-      }
-    },
-    "notifications.markDone": {
-      "summary": "Marks a notification as done, which clears it from the inbox where the forge has that state.",
-      "write": true,
-      "account": true,
-      "params": [
-        {
-          "name": "ref",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/NotificationRef"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/NotificationWriteOptions"
-          }
-        }
-      ],
-      "result": {
-        "type": "null"
-      }
-    },
-    "notifications.unsubscribe": {
-      "summary": "Stops notifications for the notification's thread, and on some forges also clears the notification.",
-      "write": true,
-      "account": true,
-      "params": [
-        {
-          "name": "ref",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/NotificationRef"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/NotificationWriteOptions"
-          }
-        }
-      ],
-      "result": {
-        "type": "null"
-      }
-    },
-    "notifications.markAllRead": {
-      "summary": "Marks every notification as read, or those of one repository.",
-      "write": true,
-      "account": true,
-      "params": [
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BulkNotificationOptions"
-          }
-        }
-      ],
-      "result": {
-        "type": "null"
-      }
-    },
-    "notifications.markAllDone": {
-      "summary": "Marks every notification as done, or those of one repository.",
-      "write": true,
-      "account": true,
-      "params": [
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BulkNotificationOptions"
-          }
-        }
-      ],
-      "result": {
-        "type": "null"
-      }
-    },
-    "notifications.unreadCount": {
-      "summary": "The number of unread notifications.",
-      "write": false,
-      "account": true,
-      "params": [
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BaseOptions"
-          }
-        }
-      ],
-      "result": {
-        "type": "number"
-      }
-    },
-    "threads.comment": {
-      "summary": "Adds a comment to a thread. A repeat posts a second comment, so pass a `key` and retry with `upsertComment()`.",
+    "threads.react": {
+      "summary": "Reacts as the authenticated account, to the thread or to one of its comments.",
       "write": true,
       "account": false,
       "params": [
         {
-          "name": "ref",
+          "name": "target",
           "optional": false,
           "schema": {
-            "$ref": "#/components/schemas/ThreadRef"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThreadRef"
+              },
+              {
+                "$ref": "#/components/schemas/CommentRef"
+              }
+            ]
           }
         },
         {
-          "name": "body",
+          "name": "reaction",
           "optional": false,
           "schema": {
-            "type": "string"
+            "$ref": "#/components/schemas/ReactionContent"
           }
         },
         {
@@ -947,16 +1166,87 @@
           "optional": true,
           "options": true,
           "schema": {
-            "$ref": "#/components/schemas/CommentOptions"
+            "$ref": "#/components/schemas/BaseOptions"
           }
         }
       ],
       "result": {
-        "$ref": "#/components/schemas/Comment"
+        "type": "null"
       }
     },
-    "threads.upsertComment": {
-      "summary": "Creates the comment, or edits the one an earlier call with the same `key`\nleft behind, unless that one already has the same body. The key is carried in the body as a hidden marker; see\n{@link commentMarker }. Composed from `comments`, `comment` and\n`editComment`, so it costs a listing on every call, which `since` bounds.",
+    "threads.unreact": {
+      "summary": "Removes the account's reaction from the thread or comment.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "target",
+          "optional": false,
+          "schema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThreadRef"
+              },
+              {
+                "$ref": "#/components/schemas/CommentRef"
+              }
+            ]
+          }
+        },
+        {
+          "name": "reaction",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/ReactionContent"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "threads.create": {
+      "summary": "Creates an issue, pull request or discussion. A pull request needs `head` and `base`. A repeat creates a second\nthread, though most forges reject a second open pull request from the same `head` to the same `base`.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "repo",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "input",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/ThreadInput"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/Thread"
+      }
+    },
+    "threads.update": {
+      "summary": "Changes the title, body, state, labels or assignees of a thread. Fields left out stay as they are.\nThis is one request where the forge accepts every field together. Elsewhere it makes the same calls as\n`close()`, `setLabels()` and `setAssignees()`, so a failed call can leave earlier fields changed.\nA field the forge cannot set on this kind of thread throws `UnsupportedOperationError` before anything is written.",
       "write": true,
       "account": false,
       "params": [
@@ -971,7 +1261,7 @@
           "name": "input",
           "optional": false,
           "schema": {
-            "$ref": "#/components/schemas/UpsertCommentInput"
+            "$ref": "#/components/schemas/ThreadUpdate"
           }
         },
         {
@@ -984,7 +1274,7 @@
         }
       ],
       "result": {
-        "$ref": "#/components/schemas/UpsertCommentResult"
+        "$ref": "#/components/schemas/Thread"
       }
     },
     "threads.close": {
@@ -1037,40 +1327,8 @@
         "$ref": "#/components/schemas/Thread"
       }
     },
-    "threads.create": {
-      "summary": "Creates an issue, pull request or discussion. A pull request needs `head` and `base`. A repeat creates a second\nthread, though most forges reject a second open pull request from the same `head` to the same `base`.",
-      "write": true,
-      "account": false,
-      "params": [
-        {
-          "name": "repo",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/RepoRef"
-          }
-        },
-        {
-          "name": "input",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/ThreadCreateInput"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BaseOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/Thread"
-      }
-    },
-    "threads.update": {
-      "summary": "Changes the title, body, state, labels or assignees of a thread. Fields left out stay as they are.\nThis is one request where the forge accepts every field together. Elsewhere it makes the same calls as\n`close()`, `setLabels()` and `setAssignees()`, so a failed call can leave earlier fields changed.\nA field the forge cannot set on this kind of thread throws `UnsupportedOperationError` before anything is written.",
+    "threads.lock": {
+      "summary": "Locks the conversation on a thread, so that only collaborators can comment. A repeat leaves it locked.",
       "write": true,
       "account": false,
       "params": [
@@ -1082,10 +1340,28 @@
           }
         },
         {
-          "name": "input",
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/LockOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "threads.unlock": {
+      "summary": "Unlocks the conversation on a thread. A repeat leaves it unlocked.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
           "optional": false,
           "schema": {
-            "$ref": "#/components/schemas/ThreadUpdateInput"
+            "$ref": "#/components/schemas/ThreadRef"
           }
         },
         {
@@ -1098,7 +1374,7 @@
         }
       ],
       "result": {
-        "$ref": "#/components/schemas/Thread"
+        "type": "null"
       }
     },
     "threads.setLabels": {
@@ -1264,30 +1540,33 @@
         ]
       }
     },
-    "threads.react": {
-      "summary": "Reacts as the authenticated account, to the thread or to one of its comments.",
+    "threads.setIssueType": {
+      "summary": "Sets the issue's type, by issue type or name, or clears it with `undefined`. GitHub leaves the type as it was,\nwithout an error, when the account cannot push to the repository, so compare the result with what you asked for.",
       "write": true,
       "account": false,
       "params": [
         {
-          "name": "target",
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/ThreadRef"
+          }
+        },
+        {
+          "name": "issueType",
           "optional": false,
           "schema": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ThreadRef"
+                "$ref": "#/components/schemas/IssueType"
               },
               {
-                "$ref": "#/components/schemas/CommentRef"
+                "type": "string"
+              },
+              {
+                "not": {}
               }
             ]
-          }
-        },
-        {
-          "name": "reaction",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/ReactionContent"
           }
         },
         {
@@ -1300,46 +1579,14 @@
         }
       ],
       "result": {
-        "type": "null"
-      }
-    },
-    "threads.unreact": {
-      "summary": "Removes the account's reaction from the thread or comment.",
-      "write": true,
-      "account": false,
-      "params": [
-        {
-          "name": "target",
-          "optional": false,
-          "schema": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ThreadRef"
-              },
-              {
-                "$ref": "#/components/schemas/CommentRef"
-              }
-            ]
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/IssueType"
+          },
+          {
+            "not": {}
           }
-        },
-        {
-          "name": "reaction",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/ReactionContent"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BaseOptions"
-          }
-        }
-      ],
-      "result": {
-        "type": "null"
+        ]
       }
     },
     "threads.setAssignees": {
@@ -1454,8 +1701,8 @@
         "$ref": "#/components/schemas/MergeResult"
       }
     },
-    "threads.approveAndMerge": {
-      "summary": "Approves, then merges, and resolves as `merge()` does. The merge method is checked before the approval is sent.\nA repeat approves again, as `approve()` does, so once the approval is in, retry with `merge()`.",
+    "threads.updateBranch": {
+      "summary": "Brings the base branch into a pull request's head branch, by a merge commit or a rebase. A repeat once the branch\nis up to date rejects on GitHub, Forgejo and Gitea, and leaves the branch as it is on GitLab.",
       "write": true,
       "account": false,
       "params": [
@@ -1471,12 +1718,12 @@
           "optional": true,
           "options": true,
           "schema": {
-            "$ref": "#/components/schemas/ApproveAndMergeOptions"
+            "$ref": "#/components/schemas/UpdateBranchOptions"
           }
         }
       ],
       "result": {
-        "$ref": "#/components/schemas/MergeResult"
+        "$ref": "#/components/schemas/UpdateBranchResult"
       }
     },
     "threads.transfer": {
@@ -1618,88 +1865,6 @@
         "type": "null"
       }
     },
-    "installations.listPage": {
-      "summary": "One page of `list()`.",
-      "write": false,
-      "account": true,
-      "params": [
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/PageOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/PageOfInstallation"
-      }
-    },
-    "installations.get": {
-      "summary": "Reads one installation.",
-      "write": false,
-      "account": true,
-      "params": [
-        {
-          "name": "installation",
-          "optional": false,
-          "schema": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Installation"
-              },
-              {
-                "type": "string"
-              }
-            ]
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BaseOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/Installation"
-      }
-    },
-    "installations.reposPage": {
-      "summary": "One page of `repos()`.",
-      "write": false,
-      "account": true,
-      "params": [
-        {
-          "name": "installation",
-          "optional": false,
-          "schema": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Installation"
-              },
-              {
-                "type": "string"
-              }
-            ]
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/PageOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/PageOfRepo"
-      }
-    },
     "threads.checks": {
       "summary": "Every check on the pull's head, in one page; `warnings` names the sources that could not be read.",
       "write": false,
@@ -1725,526 +1890,11 @@
         "$ref": "#/components/schemas/PageOfCheck"
       }
     },
-    "checks.list": {
-      "summary": "Every check on a commit: check runs, commit statuses, jobs or policy evaluations.",
+    "threads.files": {
+      "summary": "Files a pull request changes, with a per-file `patch` where the forge returns one.",
       "write": false,
       "account": false,
-      "params": [
-        {
-          "name": "repo",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/RepoRef"
-          }
-        },
-        {
-          "name": "sha",
-          "optional": false,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BaseOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/PageOfCheck"
-      }
-    },
-    "checks.get": {
-      "summary": "Reads one check. Rejects for a `CheckRef.type` the forge cannot read on its own.",
-      "write": false,
-      "account": false,
-      "params": [
-        {
-          "name": "ref",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/CheckRef"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BaseOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/Check"
-      }
-    },
-    "checks.report": {
-      "summary": "Writes a commit status, or a check run where the credential can (GitHub app auth). A repeat writes a second check\nrun; a second commit status with the same name takes the place of the first, except on GitLab, which rejects a\nrepeat of a status that is still pending.",
-      "write": true,
-      "account": false,
-      "params": [
-        {
-          "name": "repo",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/RepoRef"
-          }
-        },
-        {
-          "name": "sha",
-          "optional": false,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "name": "input",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/CheckReportInput"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BaseOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/Check"
-      }
-    },
-    "checks.rerun": {
-      "summary": "Re-runs a check. Rejects for a `CheckRef.type` the forge cannot re-run. A repeat can start another run.",
-      "write": true,
-      "account": false,
-      "params": [
-        {
-          "name": "ref",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/CheckRef"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BaseOptions"
-          }
-        }
-      ],
-      "result": {
-        "type": "null"
-      }
-    },
-    "ci.runsPage": {
-      "summary": "One page of `runs()`.",
-      "write": false,
-      "account": false,
-      "params": [
-        {
-          "name": "repo",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/RepoRef"
-          }
-        },
-        {
-          "name": "query",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/CiRunQuery"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/PageOfCiRun"
-      }
-    },
-    "ci.run": {
-      "summary": "Reads one CI run.",
-      "write": false,
-      "account": false,
-      "params": [
-        {
-          "name": "ref",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/CiRunRef"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BaseOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/CiRun"
-      }
-    },
-    "ci.jobsPage": {
-      "summary": "One page of `jobs()`.",
-      "write": false,
-      "account": false,
-      "params": [
-        {
-          "name": "ref",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/CiRunRef"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/PageOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/PageOfCiJob"
-      }
-    },
-    "ci.job": {
-      "summary": "Reads one CI job. Where the forge has no endpoint for it, walks `jobs()` of the ref's `run`, so the ref must name one.",
-      "write": false,
-      "account": false,
-      "params": [
-        {
-          "name": "ref",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/CiJobRef"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BaseOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/CiJob"
-      }
-    },
-    "ci.log": {
-      "summary": "The job's log as it arrives. There is no workflow dispatch: CI is read-only here.",
-      "write": false,
-      "account": false,
-      "params": [
-        {
-          "name": "ref",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/CiJobRef"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BaseOptions"
-          }
-        }
-      ],
-      "stream": true,
-      "result": {
-        "type": "string",
-        "format": "binary",
-        "description": "The bytes, as `application/octet-stream`."
-      }
-    },
-    "contents.file": {
-      "summary": "One file's contents. Binary-safe: `content` is a `Uint8Array` unless the\nforge reports text and `as: 'text'` was asked for. Files past the forge's\ninline limit (1 MB on GitHub) are read from the raw or blob endpoint\ninstead of failing.",
-      "write": false,
-      "account": false,
-      "params": [
-        {
-          "name": "repo",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/RepoRef"
-          }
-        },
-        {
-          "name": "path",
-          "optional": false,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/FileOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/FileContent"
-      }
-    },
-    "contents.treePage": {
-      "summary": "One page of `tree()`.",
-      "write": false,
-      "account": false,
-      "params": [
-        {
-          "name": "repo",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/RepoRef"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/TreeOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/PageOfTreeEntry"
-      }
-    },
-    "contents.branchesPage": {
-      "summary": "One page of `branches()`.",
-      "write": false,
-      "account": false,
-      "params": [
-        {
-          "name": "repo",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/RepoRef"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/PageOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/PageOfBranch"
-      }
-    },
-    "contents.tagsPage": {
-      "summary": "One page of `tags()`.",
-      "write": false,
-      "account": false,
-      "params": [
-        {
-          "name": "repo",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/RepoRef"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/PageOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/PageOfTag"
-      }
-    },
-    "contents.resolveRef": {
-      "summary": "Resolves a branch, tag or sha to a full commit sha; a full sha is returned as is.",
-      "write": false,
-      "account": false,
-      "params": [
-        {
-          "name": "repo",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/RepoRef"
-          }
-        },
-        {
-          "name": "ref",
-          "optional": false,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BaseOptions"
-          }
-        }
-      ],
-      "result": {
-        "type": "string"
-      }
-    },
-    "contents.commitsPage": {
-      "summary": "One page of `commits()`.",
-      "write": false,
-      "account": false,
-      "params": [
-        {
-          "name": "repo",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/RepoRef"
-          }
-        },
-        {
-          "name": "query",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/CommitQuery"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/PageOfCommit"
-      }
-    },
-    "contents.commit": {
-      "summary": "One commit, with its files and stats.",
-      "write": false,
-      "account": false,
-      "params": [
-        {
-          "name": "repo",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/RepoRef"
-          }
-        },
-        {
-          "name": "sha",
-          "optional": false,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BaseOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/Commit"
-      }
-    },
-    "contents.compare": {
-      "summary": "Commits and files between two refs.",
-      "write": false,
-      "account": false,
-      "params": [
-        {
-          "name": "repo",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/RepoRef"
-          }
-        },
-        {
-          "name": "base",
-          "optional": false,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "name": "head",
-          "optional": false,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/CompareOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/Comparison"
-      }
-    },
-    "contents.commitFiles": {
-      "summary": "Writes and deletes files in one commit on a branch, and moves the branch to it. A repeat with `expectedHead` or\n`createFrom` rejects once the first attempt has moved or created the branch; without them, it adds a second commit.",
-      "write": true,
-      "account": false,
-      "params": [
-        {
-          "name": "repo",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/RepoRef"
-          }
-        },
-        {
-          "name": "input",
-          "optional": false,
-          "schema": {
-            "$ref": "#/components/schemas/CommitFilesInput"
-          }
-        },
-        {
-          "name": "options",
-          "optional": true,
-          "options": true,
-          "schema": {
-            "$ref": "#/components/schemas/BaseOptions"
-          }
-        }
-      ],
-      "result": {
-        "$ref": "#/components/schemas/Commit"
-      }
-    },
-    "threads.filesPage": {
-      "summary": "One page of `files()`.",
-      "write": false,
-      "account": false,
+      "listing": true,
       "params": [
         {
           "name": "ref",
@@ -2266,10 +1916,11 @@
         "$ref": "#/components/schemas/PageOfChangedFile"
       }
     },
-    "threads.commitsPage": {
-      "summary": "One page of `commits()`.",
+    "threads.commits": {
+      "summary": "Commits on a pull request.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "ref",
@@ -2291,10 +1942,11 @@
         "$ref": "#/components/schemas/PageOfCommit"
       }
     },
-    "threads.reviewsPage": {
-      "summary": "One page of `reviews()`.",
+    "threads.reviews": {
+      "summary": "Reviews on a pull request. Forges with approvals but no review objects\n(GitLab approvals, Azure DevOps votes, Bitbucket participants) synthesise\none review per approver, with `comments: false`.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "ref",
@@ -2317,7 +1969,7 @@
       }
     },
     "threads.getReview": {
-      "summary": "Reads one review by its ref. Where the forge has no endpoint for it, walks `reviews()` until the id matches.",
+      "summary": "Reads one review by its ref. Where the forge has no endpoint for it (`capabilities.threads.getReview` is `'emulated'`),\nit lists the reviews of the pull request page by page until the id matches, which costs a request for each page\nread.",
       "write": false,
       "account": false,
       "params": [
@@ -2508,6 +2160,32 @@
         "$ref": "#/components/schemas/ReviewComment"
       }
     },
+    "threads.reviewThreads": {
+      "summary": "Review conversations on a pull request with their comments; `state` keeps only the resolved or the unresolved ones.",
+      "write": false,
+      "account": false,
+      "listing": true,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/ThreadRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/ReviewThreadListOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/PageOfReviewThread"
+      }
+    },
     "threads.resolveReviewThread": {
       "summary": "Resolves a review conversation, by the id on {@link ReviewComment.thread} or {@link Comment.thread}.",
       "write": true,
@@ -2572,10 +2250,980 @@
         "type": "null"
       }
     },
-    "releases.listPage": {
-      "summary": "One page of `list()`.",
+    "notifications.list": {
+      "summary": "Lists the account's notifications.",
+      "write": false,
+      "account": true,
+      "listing": true,
+      "params": [
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/NotificationListOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/PageOfNotification"
+      }
+    },
+    "notifications.markRead": {
+      "summary": "Marks a notification as read.",
+      "write": true,
+      "account": true,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/NotificationRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "notifications.markDone": {
+      "summary": "Marks a notification as done, which clears it from the inbox where the forge has that state.",
+      "write": true,
+      "account": true,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/NotificationRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/NotificationWriteOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "notifications.unsubscribe": {
+      "summary": "Stops notifications for the notification's thread, and on some forges also clears the notification.",
+      "write": true,
+      "account": true,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/NotificationRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/NotificationWriteOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "notifications.markAllRead": {
+      "summary": "Marks every notification as read, or those of one repository.",
+      "write": true,
+      "account": true,
+      "params": [
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BulkNotificationOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "notifications.markAllDone": {
+      "summary": "Marks every notification as done, or those of one repository.",
+      "write": true,
+      "account": true,
+      "params": [
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BulkNotificationOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "notifications.unreadCount": {
+      "summary": "The number of unread notifications.",
+      "write": false,
+      "account": true,
+      "params": [
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "number"
+      }
+    },
+    "installations.list": {
+      "summary": "Lists the installations of the app.",
+      "write": false,
+      "account": true,
+      "listing": true,
+      "params": [
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/PageOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/PageOfInstallation"
+      }
+    },
+    "installations.get": {
+      "summary": "Reads one installation.",
+      "write": false,
+      "account": true,
+      "params": [
+        {
+          "name": "installation",
+          "optional": false,
+          "schema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Installation"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/Installation"
+      }
+    },
+    "installations.repos": {
+      "summary": "Lists the repositories that an installation can access.",
+      "write": false,
+      "account": true,
+      "listing": true,
+      "params": [
+        {
+          "name": "installation",
+          "optional": false,
+          "schema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Installation"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/PageOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/PageOfRepo"
+      }
+    },
+    "checks.list": {
+      "summary": "Every check on a commit: check runs, commit statuses, jobs or policy evaluations.",
       "write": false,
       "account": false,
+      "params": [
+        {
+          "name": "repo",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "sha",
+          "optional": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/PageOfCheck"
+      }
+    },
+    "checks.get": {
+      "summary": "Reads one check. Rejects for a `CheckRef.type` the forge cannot read on its own.",
+      "write": false,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CheckRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/Check"
+      }
+    },
+    "checks.report": {
+      "summary": "Writes a commit status, or a check run where the credential can (GitHub app auth). A repeat writes a second check\nrun; a second commit status with the same name takes the place of the first, except on GitLab, which rejects a\nrepeat of a status that is still pending.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "repo",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "sha",
+          "optional": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "input",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CheckReportInput"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/Check"
+      }
+    },
+    "checks.rerun": {
+      "summary": "Re-runs a check. Rejects for a `CheckRef.type` the forge cannot re-run. A repeat can start another run.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CheckRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "ci.runs": {
+      "summary": "Lists the CI runs of a repository.",
+      "write": false,
+      "account": false,
+      "listing": true,
+      "params": [
+        {
+          "name": "repo",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "query",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/CiRunQuery"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/PageOfCiRun"
+      }
+    },
+    "ci.getRun": {
+      "summary": "Reads one CI run.",
+      "write": false,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CiRunRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/CiRun"
+      }
+    },
+    "ci.jobs": {
+      "summary": "Lists the jobs of a CI run.",
+      "write": false,
+      "account": false,
+      "listing": true,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CiRunRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/PageOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/PageOfCiJob"
+      }
+    },
+    "ci.getJob": {
+      "summary": "Reads one CI job. Where the forge has no endpoint for it (`capabilities.ci.getJob` is `'emulated'`), it lists the jobs\nof the ref's `run` page by page until the id matches, which costs a request for each page read, so the ref must\nname its run.",
+      "write": false,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CiJobRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/CiJob"
+      }
+    },
+    "ci.log": {
+      "summary": "The job's log as it arrives.",
+      "write": false,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CiJobRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "stream": true,
+      "result": {
+        "type": "string",
+        "format": "binary",
+        "description": "The bytes, as `application/octet-stream`."
+      }
+    },
+    "ci.rerunFailed": {
+      "summary": "Re-runs the jobs of a CI run that failed, and the jobs that depend on them. A repeat can start another attempt.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CiRunRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "contents.getFile": {
+      "summary": "One file's contents. Binary-safe: `content` is a `Uint8Array` unless the\nforge reports text and `as: 'text'` was asked for. Files past the forge's\ninline limit (1 MB on GitHub) are read from the raw or blob endpoint\ninstead of failing.",
+      "write": false,
+      "account": false,
+      "params": [
+        {
+          "name": "repo",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "path",
+          "optional": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/FileOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/FileContent"
+      }
+    },
+    "contents.tree": {
+      "summary": "One level, or every descendant with `recursive`. Truncated listings carry a `tree_truncated` warning.",
+      "write": false,
+      "account": false,
+      "listing": true,
+      "params": [
+        {
+          "name": "repo",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/TreeOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/PageOfTreeEntry"
+      }
+    },
+    "contents.branches": {
+      "summary": "Lists the branches of a repository.",
+      "write": false,
+      "account": false,
+      "listing": true,
+      "params": [
+        {
+          "name": "repo",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/PageOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/PageOfBranch"
+      }
+    },
+    "contents.tags": {
+      "summary": "Lists the tags of a repository.",
+      "write": false,
+      "account": false,
+      "listing": true,
+      "params": [
+        {
+          "name": "repo",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/PageOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/PageOfTag"
+      }
+    },
+    "contents.resolveRef": {
+      "summary": "Resolves a branch, tag or sha to a full commit sha; a full sha is returned as is.",
+      "write": false,
+      "account": false,
+      "params": [
+        {
+          "name": "repo",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "string"
+      }
+    },
+    "contents.compare": {
+      "summary": "Commits and files between two refs.",
+      "write": false,
+      "account": false,
+      "params": [
+        {
+          "name": "repo",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "base",
+          "optional": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "head",
+          "optional": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/CompareOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/Comparison"
+      }
+    },
+    "contents.commitFiles": {
+      "summary": "Writes and deletes files in one commit on a branch, and moves the branch to it. A repeat with `expectedHead` or\n`createFrom` rejects once the first attempt has moved or created the branch; without them, it adds a second commit.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "repo",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "input",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CommitFilesInput"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/Commit"
+      }
+    },
+    "commits.list": {
+      "summary": "Lists the commits that lead to `ref`, or to the default branch.",
+      "write": false,
+      "account": false,
+      "listing": true,
+      "params": [
+        {
+          "name": "repo",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/RepoRef"
+          }
+        },
+        {
+          "name": "query",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/CommitQuery"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/PageOfCommit"
+      }
+    },
+    "commits.get": {
+      "summary": "One commit, with its files and stats.",
+      "write": false,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CommitRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/Commit"
+      }
+    },
+    "commits.comments": {
+      "summary": "Lists the comments on a commit.",
+      "write": false,
+      "account": false,
+      "listing": true,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CommitRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/PageOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/PageOfCommitComment"
+      }
+    },
+    "commits.getComment": {
+      "summary": "Reads one comment on a commit. Where the forge has no endpoint for it (`capabilities.commits.getComment` is\n`'emulated'`), it lists the comments of the commit page by page until the id matches, which costs a request for\neach page read.",
+      "write": false,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CommitCommentRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/CommitComment"
+      }
+    },
+    "commits.createComment": {
+      "summary": "Comments on a commit.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CommitRef"
+          }
+        },
+        {
+          "name": "body",
+          "optional": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/CommitComment"
+      }
+    },
+    "commits.updateComment": {
+      "summary": "Replaces the body of a comment on a commit.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CommitCommentRef"
+          }
+        },
+        {
+          "name": "body",
+          "optional": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "$ref": "#/components/schemas/CommitComment"
+      }
+    },
+    "commits.deleteComment": {
+      "summary": "Deletes a comment on a commit. A repeat can reject with `NotFoundError` once the comment is gone.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CommitCommentRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "commits.hideComment": {
+      "summary": "Hides a comment on a commit behind a note of the reason, as `threads.hideComment()` does for a thread comment. A repeat leaves it hidden.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CommitCommentRef"
+          }
+        },
+        {
+          "name": "reason",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/HideCommentReason"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "commits.unhideComment": {
+      "summary": "Shows a hidden comment on a commit again. A repeat leaves it shown.",
+      "write": true,
+      "account": false,
+      "params": [
+        {
+          "name": "ref",
+          "optional": false,
+          "schema": {
+            "$ref": "#/components/schemas/CommitCommentRef"
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "null"
+      }
+    },
+    "releases.list": {
+      "summary": "Lists the releases of a repository, including drafts and pre-releases where the credential can see them.",
+      "write": false,
+      "account": false,
+      "listing": true,
       "params": [
         {
           "name": "repo",
@@ -2839,10 +3487,11 @@
         "$ref": "#/components/schemas/Release"
       }
     },
-    "webhooks.listPage": {
-      "summary": "One page of `list()`.",
+    "webhooks.list": {
+      "summary": "Hooks on a repository, or on an organisation or workspace when `target` is a namespace ref.",
       "write": false,
       "account": true,
+      "listing": true,
       "params": [
         {
           "name": "target",
@@ -2985,10 +3634,11 @@
         "$ref": "#/components/schemas/Webhook"
       }
     },
-    "webhooks.deliveriesPage": {
-      "summary": "One page of `deliveries()`.",
+    "webhooks.deliveries": {
+      "summary": "Lists the recent deliveries of a webhook.",
       "write": false,
       "account": true,
+      "listing": true,
       "params": [
         {
           "name": "ref",
@@ -3035,17 +3685,18 @@
         "type": "null"
       }
     },
-    "search.threadsPage": {
-      "summary": "One page of `threads()`.",
+    "search.threads": {
+      "summary": "Issues and pull requests across repositories. Fields the forge cannot\nfilter on come back as a `filter_unsupported` warning on the page.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "query",
           "optional": false,
           "options": true,
           "schema": {
-            "$ref": "#/components/schemas/SearchQuery"
+            "$ref": "#/components/schemas/ThreadSearchQuery"
           }
         }
       ],
@@ -3053,10 +3704,11 @@
         "$ref": "#/components/schemas/PageOfThread"
       }
     },
-    "search.reposPage": {
-      "summary": "One page of `repos()`.",
+    "search.repos": {
+      "summary": "Searches repositories.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "query",
@@ -3071,10 +3723,11 @@
         "$ref": "#/components/schemas/PageOfRepo"
       }
     },
-    "search.commitsPage": {
-      "summary": "One page of `commits()`.",
+    "search.commits": {
+      "summary": "Commits across repositories, where the forge indexes them.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "query",
@@ -3089,10 +3742,11 @@
         "$ref": "#/components/schemas/PageOfCommit"
       }
     },
-    "search.codePage": {
-      "summary": "One page of `code()`.",
+    "search.code": {
+      "summary": "Searches the contents of files, where the forge indexes them.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "query",
@@ -3107,10 +3761,11 @@
         "$ref": "#/components/schemas/PageOfCodeMatch"
       }
     },
-    "securityAlerts.listPage": {
-      "summary": "One page of `list()`.",
+    "securityAlerts.list": {
+      "summary": "Lists the security alerts of a repository.",
       "write": false,
       "account": false,
+      "listing": true,
       "params": [
         {
           "name": "repo",
@@ -3210,35 +3865,19 @@
       ],
       "description": "What `repos.addCollaborator()` did."
     },
-    "ApproveAndMergeOptions": {
-      "type": "object",
-      "properties": {
-        "method": {
-          "$ref": "#/components/schemas/MergeMethod",
-          "description": "Defaults to the repository's only allowed method."
-        },
-        "sha": {
-          "type": "string",
-          "description": "Expected head sha; the merge is refused if the branch has moved."
-        },
-        "title": {
-          "type": "string",
-          "description": "Merge commit title. Where the forge takes a single message, it goes above `message`, separated by a blank line."
-        },
-        "message": {
-          "type": "string",
-          "description": "Merge commit body, where the forge takes one. Where the forge takes a single message and `title` is unset, this is the whole message."
-        },
-        "whenChecksPass": {
-          "type": "boolean",
-          "description": "Queue the merge until required checks pass, where the forge supports it."
-        },
-        "body": {
-          "type": "string",
-          "description": "Review body sent with the approval. Rejected where approvals carry no body (Azure DevOps, Bitbucket, GitLab)."
-        }
-      },
-      "description": "Options for `threads.approveAndMerge()`."
+    "AuthorAssociation": {
+      "type": "string",
+      "enum": [
+        "owner",
+        "member",
+        "collaborator",
+        "contributor",
+        "first_time_contributor",
+        "first_timer",
+        "none",
+        "unknown"
+      ],
+      "description": "How the author of a thread or comment relates to its repository:\n\n- `owner` owns the repository.\n- `member` belongs to the organisation that owns it.\n- `collaborator` was invited to collaborate on it.\n- `contributor` has committed to it before.\n- `first_time_contributor` has not committed to it before.\n- `first_timer` has not committed to any repository on the forge before.\n- `none` has none of these, or is a placeholder for an unclaimed account.\n- `unknown` is an association with no normalised value; `authorAssociationRaw` names it."
     },
     "BaseOptions": {
       "type": "object",
@@ -3272,6 +3911,43 @@
         "raw"
       ],
       "description": "A branch of a repository."
+    },
+    "BranchRules": {
+      "type": "object",
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "requiredChecks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/RequiredCheck"
+          },
+          "description": "The checks that have to pass, empty when the branch names none."
+        },
+        "requiresAllChecks": {
+          "type": "boolean",
+          "description": "True when the whole pipeline has to pass, as GitLab's \"Pipelines must succeed\" asks, whatever `requiredChecks` names."
+        },
+        "requiredApprovals": {
+          "type": "number",
+          "description": "The approvals a pull request needs, absent when the credential can't read any rule that sets them."
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ForgeWarning"
+          },
+          "description": "The rules the credential couldn't read. With one here, the result can ask for less than the forge does."
+        },
+        "raw": {}
+      },
+      "required": [
+        "branch",
+        "requiredChecks",
+        "raw"
+      ],
+      "description": "What a branch asks of a pull request before it can merge, as `repos.branchRules()` reads it."
     },
     "BulkNotificationOptions": {
       "type": "object",
@@ -3360,6 +4036,10 @@
           "type": "string",
           "format": "date-time"
         },
+        "run": {
+          "$ref": "#/components/schemas/CiRunRef",
+          "description": "The CI run the check is a job of, where the forge's own CI created it."
+        },
         "raw": {}
       },
       "required": [
@@ -3396,6 +4076,10 @@
             "policy"
           ],
           "description": "What the id addresses: a check run, a commit status, a CI job, or a branch policy evaluation."
+        },
+        "app": {
+          "type": "string",
+          "description": "Slug of the app that created the check run, where the forge reports one, such as `github-actions`."
         }
       },
       "required": [
@@ -3754,7 +4438,7 @@
         },
         "queryRaw": {
           "type": "string",
-          "description": "Forge-native query syntax; see `SearchQuery.queryRaw` ."
+          "description": "Forge-native query syntax; see `ThreadSearchQuery.queryRaw` ."
         },
         "repo": {
           "$ref": "#/components/schemas/RepoRef",
@@ -3805,6 +4489,14 @@
         "author": {
           "$ref": "#/components/schemas/Actor"
         },
+        "authorAssociation": {
+          "$ref": "#/components/schemas/AuthorAssociation",
+          "description": "How the author relates to the repository, where the forge reports it."
+        },
+        "authorAssociationRaw": {
+          "type": "string",
+          "description": "Forge-native association the normalised `authorAssociation` was derived from."
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
@@ -3843,16 +4535,6 @@
         "raw"
       ],
       "description": "A comment on a thread."
-    },
-    "CommentOptions": {
-      "type": "object",
-      "properties": {
-        "key": {
-          "type": "string",
-          "description": "Writes the hidden marker of `upsertComment()` for this key into the body, so that `upsertComment()` with the same key edits this comment instead of posting another."
-        }
-      },
-      "description": "Options for `threads.comment()`."
     },
     "CommentRef": {
       "type": "object",
@@ -3933,7 +4615,7 @@
           "items": {
             "$ref": "#/components/schemas/ChangedFile"
           },
-          "description": "Present on `contents.commit`; absent from listings."
+          "description": "Present on `commits.get`; absent from listings."
         },
         "raw": {}
       },
@@ -3945,6 +4627,75 @@
         "raw"
       ],
       "description": "A commit."
+    },
+    "CommitComment": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "author": {
+          "$ref": "#/components/schemas/Actor"
+        },
+        "authorAssociation": {
+          "$ref": "#/components/schemas/AuthorAssociation",
+          "description": "How the author relates to the repository, where the forge reports it."
+        },
+        "authorAssociationRaw": {
+          "type": "string",
+          "description": "Forge-native association the normalised `authorAssociation` was derived from."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "url": {
+          "type": "string"
+        },
+        "reactions": {
+          "$ref": "#/components/schemas/ReactionSummary"
+        },
+        "raw": {},
+        "ref": {
+          "$ref": "#/components/schemas/CommitCommentRef"
+        }
+      },
+      "required": [
+        "body",
+        "raw",
+        "ref"
+      ],
+      "description": "A comment on a commit."
+    },
+    "CommitCommentRef": {
+      "type": "object",
+      "properties": {
+        "forge": {
+          "$ref": "#/components/schemas/ForgeKind"
+        },
+        "instance": {
+          "$ref": "#/components/schemas/ForgeInstance",
+          "description": "The host of the instance, such as `github.com` or `git.example.com`."
+        },
+        "commit": {
+          "$ref": "#/components/schemas/CommitRef"
+        },
+        "id": {
+          "type": "string",
+          "description": "Forge-native comment id."
+        }
+      },
+      "required": [
+        "commit",
+        "forge",
+        "id",
+        "instance"
+      ],
+      "description": "Reference to a comment on a commit."
     },
     "CommitFilesInput": {
       "type": "object",
@@ -4030,7 +4781,7 @@
           "description": "Login or email, as the forge matches it."
         }
       },
-      "description": "Filters for `contents.commits()`."
+      "description": "Filters for `commits.list()`."
     },
     "CommitRef": {
       "type": "object",
@@ -4075,7 +4826,7 @@
         },
         "queryRaw": {
           "type": "string",
-          "description": "Forge-native query syntax; see `SearchQuery.queryRaw` ."
+          "description": "Forge-native query syntax; see `ThreadSearchQuery.queryRaw` ."
         },
         "repo": {
           "$ref": "#/components/schemas/RepoRef",
@@ -4228,6 +4979,25 @@
       ],
       "description": "A commit author on a repository, as `repos.contributors()` reads it."
     },
+    "ContributorQuery": {
+      "type": "object",
+      "properties": {
+        "perPage": {
+          "type": "number",
+          "description": "How many items to ask for. The forge may return fewer."
+        },
+        "cursor": {
+          "$ref": "#/components/schemas/Cursor",
+          "description": "Resume after the page that returned this cursor."
+        },
+        "includeUnlinked": {
+          "type": "boolean",
+          "description": "Includes contributors the forge has not linked to an account, as GitHub's `anon=1` does. GitHub links only the first 500 author emails of a repository to accounts, and reports the rest with a `name` and an `email` but no `actor`. GitLab and Gitee link no accounts, so all of theirs are already unlinked: `true` changes nothing there, while `false` warns, since it asks for a list neither forge can report.",
+          "default": false
+        }
+      },
+      "description": "Filters for `repos.contributors()`."
+    },
     "ContributorStats": {
       "type": "object",
       "properties": {
@@ -4328,6 +5098,8 @@
         "unarchived",
         "added",
         "removed",
+        "typed",
+        "untyped",
         "other"
       ],
       "description": "What happened, independent of `kind`, so \"anything that closed\" is `action === 'closed'` whatever the subject."
@@ -4342,7 +5114,14 @@
               "const": "comment"
             },
             "comment": {
-              "$ref": "#/components/schemas/CommentRef"
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CommentRef"
+                },
+                {
+                  "$ref": "#/components/schemas/CommitCommentRef"
+                }
+              ]
             },
             "body": {
               "type": "string"
@@ -4413,6 +5192,9 @@
             },
             "draft": {
               "type": "boolean"
+            },
+            "reason": {
+              "type": "string"
             }
           },
           "required": [
@@ -4622,13 +5404,92 @@
             "release": {
               "$ref": "#/components/schemas/ReleaseRef"
             },
+            "tag": {
+              "type": "string"
+            },
             "name": {
+              "type": "string"
+            },
+            "body": {
+              "type": "string"
+            },
+            "isPrerelease": {
+              "type": "boolean"
+            },
+            "isDraft": {
+              "type": "boolean"
+            },
+            "url": {
               "type": "string"
             }
           },
           "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "fork"
+            },
+            "fork": {
+              "$ref": "#/components/schemas/RepoRef"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "wiki"
+            },
+            "title": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "issue_type"
+            },
+            "issueType": {
+              "$ref": "#/components/schemas/IssueType"
+            }
+          },
+          "required": [
             "type",
-            "release"
+            "issueType"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "repo_visibility"
+            },
+            "isPublic": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "type",
+            "isPublic"
           ]
         },
         {
@@ -4700,6 +5561,10 @@
         "installation",
         "membership",
         "release",
+        "star",
+        "fork",
+        "wiki",
+        "issue_type",
         "other"
       ],
       "description": "What an event is about."
@@ -4838,9 +5703,14 @@
           ],
           "description": "`'text'` decodes as UTF-8 and rejects with `ContentNotTextError` when the bytes are not text.",
           "default": "binary"
+        },
+        "metadata": {
+          "type": "boolean",
+          "description": "`false` reads the content alone, through a cheaper endpoint where the forge has one, so the result may lack `sha` and `url`.",
+          "default": true
         }
       },
-      "description": "Options for `contents.file()`."
+      "description": "Options for `contents.getFile()`."
     },
     "FileStatus": {
       "type": "string",
@@ -4903,6 +5773,14 @@
         },
         "thread": {
           "$ref": "#/components/schemas/ThreadRef"
+        },
+        "commit": {
+          "$ref": "#/components/schemas/CommitRef",
+          "description": "The commit the event concerns, such as the commit of a commit comment."
+        },
+        "threadSnapshot": {
+          "$ref": "#/components/schemas/ThreadSnapshot",
+          "description": "What the event's source says about `thread`, as of when the forge built the payload."
         },
         "isPublic": {
           "type": "boolean",
@@ -5041,6 +5919,19 @@
       ],
       "description": "One `threads.getMany()` entry, in input order; narrow on `ok`."
     },
+    "HideCommentReason": {
+      "type": "string",
+      "enum": [
+        "abuse",
+        "duplicate",
+        "low_quality",
+        "off_topic",
+        "outdated",
+        "resolved",
+        "spam"
+      ],
+      "description": "Why a comment was hidden."
+    },
     "Installation": {
       "type": "object",
       "properties": {
@@ -5075,6 +5966,36 @@
       ],
       "description": "An app installation on an account, with its own credential scope."
     },
+    "IssueType": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Forge-native id: a node id on GitHub, the name on Azure DevOps."
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "colour": {
+          "type": "string",
+          "description": "The forge's own colour, a name such as `red` on GitHub."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether issues can be given the type."
+        },
+        "raw": {}
+      },
+      "required": [
+        "id",
+        "name",
+        "raw"
+      ],
+      "description": "A kind of issue, such as a bug or a feature, from the set its repository offers."
+    },
     "KnownForgeKind": {
       "type": "string",
       "enum": [
@@ -5088,7 +6009,8 @@
         "azure-devops",
         "cursor-origin",
         "pushin",
-        "cloudflare-artifacts"
+        "cloudflare-artifacts",
+        "sourcehut"
       ],
       "description": "The forges this package ships providers for."
     },
@@ -5148,6 +6070,26 @@
         }
       },
       "description": "Options for listings that can start from a point in time: events, comments, reactions."
+    },
+    "LockOptions": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "$ref": "#/components/schemas/LockReason",
+          "description": "Forges without lock reasons lock the conversation without one."
+        }
+      },
+      "description": "Options for `threads.lock()`."
+    },
+    "LockReason": {
+      "type": "string",
+      "enum": [
+        "off_topic",
+        "too_heated",
+        "resolved",
+        "spam"
+      ],
+      "description": "Why a conversation was locked."
     },
     "MergeCommitDefaults": {
       "type": "object",
@@ -5245,7 +6187,7 @@
       "required": [
         "status"
       ],
-      "description": "What `threads.merge()` and `threads.approveAndMerge()` resolve with."
+      "description": "What `threads.merge()` resolves with."
     },
     "Milestone": {
       "type": "object",
@@ -5352,6 +6294,17 @@
         "url": {
           "type": "string"
         },
+        "latestComment": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/ResolvedCommentRef"
+            },
+            {
+              "$ref": "#/components/schemas/CommitCommentRef"
+            }
+          ],
+          "description": "The latest comment on a thread or commit subject, where the forge links it. Read it with `threads.getComment()` or `commits.getComment()`. Absent when the latest activity is not a comment on the subject, such as a review comment."
+        },
         "raw": {
           "description": "Unnormalised forge payload, retained for fidelity."
         }
@@ -5387,6 +6340,11 @@
         "all": {
           "type": "boolean",
           "description": "Include notifications already marked read.",
+          "default": false
+        },
+        "force": {
+          "type": "boolean",
+          "description": "Read the first page even when the forge asked to wait longer between reads, as GitHub does with `X-Poll-Interval`. Without it, such a read returns a `throttled` page.",
           "default": false
         }
       },
@@ -5455,6 +6413,22 @@
           "required": [
             "type",
             "thread"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "commit"
+            },
+            "commit": {
+              "$ref": "#/components/schemas/CommitRef"
+            }
+          },
+          "required": [
+            "type",
+            "commit"
           ]
         },
         {
@@ -5641,6 +6615,11 @@
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
         },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -5686,6 +6665,11 @@
         "throttled": {
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
+        },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
         },
         "warnings": {
           "type": "array",
@@ -5733,6 +6717,11 @@
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
         },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -5778,6 +6767,11 @@
         "throttled": {
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
+        },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
         },
         "warnings": {
           "type": "array",
@@ -5825,6 +6819,11 @@
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
         },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -5870,6 +6869,11 @@
         "throttled": {
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
+        },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
         },
         "warnings": {
           "type": "array",
@@ -5917,6 +6921,11 @@
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
         },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -5962,6 +6971,11 @@
         "throttled": {
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
+        },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
         },
         "warnings": {
           "type": "array",
@@ -6009,6 +7023,11 @@
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
         },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -6054,6 +7073,62 @@
         "throttled": {
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
+        },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ForgeWarning"
+          },
+          "description": "The non-fatal problems that came up while reading the page."
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "description": "One page of a listing: its `items`, and the `cursor` to pass back for the next page. The cursor is absent on the last page."
+    },
+    "PageOfCommitComment": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/CommitComment"
+          }
+        },
+        "total": {
+          "type": "number",
+          "description": "The forge's reported total for the whole listing, when it reports one. Absent when the forge reports no total, so an absent value is unknown and not zero."
+        },
+        "rateLimit": {
+          "$ref": "#/components/schemas/RateLimit",
+          "description": "From the response headers of the request behind this page."
+        },
+        "cursor": {
+          "$ref": "#/components/schemas/Cursor",
+          "description": "Absent when the listing is exhausted."
+        },
+        "etag": {
+          "type": "string",
+          "description": "Validator of the first page, where the forge supports conditional requests. Pass it back as `cursor: { etag }` to read the first page again. Absent on later pages, and on listings that read more than one endpoint."
+        },
+        "notModified": {
+          "type": "boolean",
+          "description": "True when the forge reported no change since `cursor.etag`. The page then has no items and no `cursor`."
+        },
+        "throttled": {
+          "type": "boolean",
+          "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
+        },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
         },
         "warnings": {
           "type": "array",
@@ -6101,6 +7176,11 @@
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
         },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -6146,6 +7226,11 @@
         "throttled": {
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
+        },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
         },
         "warnings": {
           "type": "array",
@@ -6193,6 +7278,11 @@
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
         },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -6238,6 +7328,11 @@
         "throttled": {
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
+        },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
         },
         "warnings": {
           "type": "array",
@@ -6285,6 +7380,11 @@
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
         },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -6330,6 +7430,11 @@
         "throttled": {
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
+        },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
         },
         "warnings": {
           "type": "array",
@@ -6377,6 +7482,11 @@
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
         },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -6422,6 +7532,11 @@
         "throttled": {
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
+        },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
         },
         "warnings": {
           "type": "array",
@@ -6469,6 +7584,11 @@
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
         },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -6514,6 +7634,62 @@
         "throttled": {
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
+        },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ForgeWarning"
+          },
+          "description": "The non-fatal problems that came up while reading the page."
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "description": "One page of a listing: its `items`, and the `cursor` to pass back for the next page. The cursor is absent on the last page."
+    },
+    "PageOfReviewThread": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ReviewThread"
+          }
+        },
+        "total": {
+          "type": "number",
+          "description": "The forge's reported total for the whole listing, when it reports one. Absent when the forge reports no total, so an absent value is unknown and not zero."
+        },
+        "rateLimit": {
+          "$ref": "#/components/schemas/RateLimit",
+          "description": "From the response headers of the request behind this page."
+        },
+        "cursor": {
+          "$ref": "#/components/schemas/Cursor",
+          "description": "Absent when the listing is exhausted."
+        },
+        "etag": {
+          "type": "string",
+          "description": "Validator of the first page, where the forge supports conditional requests. Pass it back as `cursor: { etag }` to read the first page again. Absent on later pages, and on listings that read more than one endpoint."
+        },
+        "notModified": {
+          "type": "boolean",
+          "description": "True when the forge reported no change since `cursor.etag`. The page then has no items and no `cursor`."
+        },
+        "throttled": {
+          "type": "boolean",
+          "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
+        },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
         },
         "warnings": {
           "type": "array",
@@ -6561,6 +7737,11 @@
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
         },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -6606,6 +7787,11 @@
         "throttled": {
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
+        },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
         },
         "warnings": {
           "type": "array",
@@ -6653,6 +7839,11 @@
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
         },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -6698,6 +7889,11 @@
         "throttled": {
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
+        },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
         },
         "warnings": {
           "type": "array",
@@ -6745,6 +7941,11 @@
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
         },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -6791,6 +7992,11 @@
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
         },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -6836,6 +8042,11 @@
         "throttled": {
           "type": "boolean",
           "description": "True when the provider sent no request, because the forge asked to wait longer between reads of this feed. The page has no items and a `feed_throttled` warning; read it again later, or pass `force: true`."
+        },
+        "nextPollAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The earliest time the forge allows the first page to be read again, as GitHub sets with `X-Poll-Interval`. Until then, a read of the first page returns a `throttled` page unless it passes `force: true`."
         },
         "warnings": {
           "type": "array",
@@ -7592,11 +8803,15 @@
             "repo",
             "namespace"
           ],
-          "description": "`'namespace'` for subjects that belong to a group rather than a repository (GitLab epics). Absent means a repository."
+          "description": "`'namespace'` for an organisation, group, workspace or project, and for subjects that belong to one rather than to a repository (GitLab epics). Absent means a repository. `namespaceRef` builds a namespace ref."
         },
         "externalId": {
           "type": "string",
           "description": "Stable forge-native identifier that survives renames and transfers: a GitHub, Forgejo or Gitea numeric id, a GitLab project or group id, a Bitbucket UUID or a Tangled repo DID. `repoKey` prefers it over `owner` and `name`."
+        },
+        "ownerHandle": {
+          "type": "string",
+          "description": "The owner's handle, where the forge identifies accounts by DID but addresses them by handle in its web URLs (Tangled). The `owner` stays the DID, so that a repository is found the same way whichever is known."
         }
       },
       "required": [
@@ -7635,7 +8850,7 @@
         },
         "queryRaw": {
           "type": "string",
-          "description": "Forge-native query syntax; see `SearchQuery.queryRaw` ."
+          "description": "Forge-native query syntax; see `ThreadSearchQuery.queryRaw` ."
         },
         "owner": {
           "type": "string",
@@ -7666,6 +8881,115 @@
       },
       "description": "A search for repositories."
     },
+    "RepoTemplate": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "issue",
+            "pull_request"
+          ],
+          "description": "What the template opens."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the template, where the forge's API parses one, or its file name."
+        },
+        "path": {
+          "type": "string",
+          "description": "The file the template lives in. Not available on GitLab."
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "markdown",
+            "form"
+          ],
+          "description": "`'form'` for a form written in YAML, `'markdown'` for the rest."
+        },
+        "body": {
+          "type": "string",
+          "description": "The template as the repository stores it: Markdown with any front matter, or the YAML of a form."
+        },
+        "title": {
+          "type": "string",
+          "description": "The title a new thread starts with, where the forge parses one."
+        },
+        "about": {
+          "type": "string",
+          "description": "What the template is for, where the forge parses it."
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Labels a new thread gets, where the forge parses them."
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/RepoTemplateField"
+          },
+          "description": "The fields of a form, where the forge parses them."
+        },
+        "source": {
+          "$ref": "#/components/schemas/RepoRef",
+          "description": "Where the template comes from when the forge falls back to another repository, like GitHub's `.github`."
+        },
+        "raw": {}
+      },
+      "required": [
+        "kind",
+        "name",
+        "format",
+        "body",
+        "raw"
+      ],
+      "description": "An issue or pull request template of a repository, as `repos.templates()` reads it."
+    },
+    "RepoTemplateField": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "The kind of input, such as `'input'`, `'textarea'`, `'dropdown'`, `'checkboxes'` or `'markdown'`."
+        },
+        "id": {
+          "type": "string"
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The field's label, description, options and default value, as the form declares them."
+        },
+        "validations": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Whether the field is required, and other checks the form declares."
+        }
+      },
+      "required": [
+        "type",
+        "attributes"
+      ],
+      "description": "One field of an issue form, as the forge parses it."
+    },
+    "RepoTemplateOptions": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "issue",
+            "pull_request"
+          ],
+          "description": "Only templates for this kind of thread. Defaults to both."
+        }
+      },
+      "description": "Options for `repos.templates()`."
+    },
     "RepoVisibility": {
       "type": "string",
       "enum": [
@@ -7674,6 +8998,23 @@
         "internal"
       ],
       "description": "Who can see a repository."
+    },
+    "RequiredCheck": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the check run or the context of the commit status. On Forgejo and Gitea it can be a glob, such as `ci / **`."
+        },
+        "appId": {
+          "type": "string",
+          "description": "The id of the app that has to report the check, where the rule names one, such as `15368` for GitHub Actions."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "description": "A check that has to pass before a pull request can merge into a branch."
     },
     "ResolvedCommentRef": {
       "type": "object",
@@ -7749,7 +9090,7 @@
         },
         "number": {
           "type": "string",
-          "description": "Per-repo thread number, the commit sha for `kind: 'commit'`, or the forge-native id for `kind: 'other'`."
+          "description": "Per-repo thread number."
         },
         "displayNumber": {
           "type": "string",
@@ -7979,6 +9320,79 @@
       ],
       "description": "What a review or a reviewer says about a pull request. `unknown` is a state that the model does not name."
     },
+    "ReviewThread": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Forge-native id; `resolveReviewThread()` takes it where the forge can resolve a conversation."
+        },
+        "resolved": {
+          "type": "boolean"
+        },
+        "outdated": {
+          "type": "boolean",
+          "description": "Whether the code under the conversation has changed since. Absent where the forge doesn't say."
+        },
+        "path": {
+          "type": "string"
+        },
+        "line": {
+          "type": "number",
+          "description": "Line the conversation is anchored to, in `side`; the last line of a multi-line conversation."
+        },
+        "startLine": {
+          "type": "number",
+          "description": "First line of a multi-line conversation."
+        },
+        "side": {
+          "type": "string",
+          "enum": [
+            "left",
+            "right"
+          ],
+          "description": "`'left'` is the base of the diff, `'right'` the head."
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ReviewComment"
+          },
+          "description": "The comments in the conversation, oldest first."
+        },
+        "raw": {}
+      },
+      "required": [
+        "id",
+        "resolved",
+        "comments",
+        "raw"
+      ],
+      "description": "A review conversation on a pull request: comments that are resolved together, usually on one line of the diff."
+    },
+    "ReviewThreadListOptions": {
+      "type": "object",
+      "properties": {
+        "perPage": {
+          "type": "number",
+          "description": "How many items to ask for. The forge may return fewer."
+        },
+        "cursor": {
+          "$ref": "#/components/schemas/Cursor",
+          "description": "Resume after the page that returned this cursor."
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "resolved",
+            "unresolved",
+            "all"
+          ],
+          "description": "Only resolved or only unresolved conversations; `'all'` by default."
+        }
+      },
+      "description": "Options for `threads.reviewThreads()`."
+    },
     "Reviewer": {
       "type": "object",
       "properties": {
@@ -7994,6 +9408,11 @@
         "isTeam": {
           "type": "boolean",
           "description": "True when the reviewer is a team rather than an account."
+        },
+        "requestedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the pending review was last requested. Absent where the forge doesn't report it; on GitHub, `threads.getMany()` reports it."
         }
       },
       "required": [
@@ -8001,88 +9420,6 @@
         "state"
       ],
       "description": "A reviewer who was asked to review a pull request, and what they said."
-    },
-    "SearchQuery": {
-      "type": "object",
-      "properties": {
-        "perPage": {
-          "type": "number",
-          "description": "How many items to ask for. The forge may return fewer."
-        },
-        "cursor": {
-          "$ref": "#/components/schemas/Cursor",
-          "description": "Resume after the page that returned this cursor."
-        },
-        "text": {
-          "type": "string",
-          "description": "Free text, matched against title and body."
-        },
-        "queryRaw": {
-          "type": "string",
-          "description": "Forge-native query syntax, added to the query as is, for qualifiers the other fields don't cover. Forges whose search has no query syntax ignore it with a `filter_unsupported` warning."
-        },
-        "repo": {
-          "$ref": "#/components/schemas/RepoRef",
-          "description": "Limit to one repository."
-        },
-        "kind": {
-          "type": "string",
-          "enum": [
-            "issue",
-            "pull_request"
-          ]
-        },
-        "state": {
-          "type": "string",
-          "enum": [
-            "open",
-            "closed",
-            "all"
-          ],
-          "description": "Defaults to every state."
-        },
-        "author": {
-          "type": "string"
-        },
-        "involves": {
-          "type": "string",
-          "description": "Threads the login authored, is assigned, commented on or was mentioned in."
-        },
-        "assignee": {
-          "type": "string"
-        },
-        "labels": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Threads carrying every one of these labels."
-        },
-        "since": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Updated at or after."
-        },
-        "sort": {
-          "type": "string",
-          "enum": [
-            "created",
-            "updated",
-            "comments",
-            "relevance"
-          ],
-          "description": "Defaults to the forge's relevance order."
-        },
-        "direction": {
-          "type": "string",
-          "enum": [
-            "asc",
-            "desc"
-          ],
-          "default": "desc"
-        }
-      },
-      "description": "A structured search. Providers translate it into their own syntax; a field the forge cannot filter on becomes a `filter_unsupported` warning on the page rather than a filter applied client-side."
     },
     "SecurityAlert": {
       "type": "object",
@@ -8261,7 +9598,7 @@
       "enum": [
         "poll",
         "webhook",
-        "subscribe"
+        "stream"
       ],
       "description": "How an event reached the caller."
     },
@@ -8396,6 +9733,14 @@
         "author": {
           "$ref": "#/components/schemas/Actor"
         },
+        "authorAssociation": {
+          "$ref": "#/components/schemas/AuthorAssociation",
+          "description": "How the author relates to the repository, where the forge reports it."
+        },
+        "authorAssociationRaw": {
+          "type": "string",
+          "description": "Forge-native association the normalised `authorAssociation` was derived from."
+        },
         "assignees": {
           "type": "array",
           "items": {
@@ -8457,20 +9802,16 @@
           },
           "description": "Everyone who authored or commented on the thread, where the forge reports them."
         },
-        "readState": {
-          "type": "string",
-          "enum": [
-            "read",
-            "unread"
-          ],
-          "description": "Whether the authenticated account has read the thread, where the forge tracks it per thread."
-        },
         "subscription": {
           "$ref": "#/components/schemas/SubscriptionState",
           "description": "The authenticated account's subscription, where the thread read already carries it."
         },
         "milestone": {
           "$ref": "#/components/schemas/Milestone"
+        },
+        "issueType": {
+          "$ref": "#/components/schemas/IssueType",
+          "description": "Issues only, where the forge has issue types and the issue has one."
         },
         "reactions": {
           "$ref": "#/components/schemas/ReactionSummary"
@@ -8513,9 +9854,9 @@
         "labels",
         "raw"
       ],
-      "description": "An issue, pull request, discussion or commit conversation."
+      "description": "An issue, pull request or discussion."
     },
-    "ThreadCreateInput": {
+    "ThreadInput": {
       "type": "object",
       "properties": {
         "kind": {
@@ -8581,11 +9922,9 @@
       "enum": [
         "issue",
         "pull_request",
-        "discussion",
-        "commit",
-        "other"
+        "discussion"
       ],
-      "description": "Kind of thread. `'other'` holds forge-specific subjects with no shared kind (check suites, epics); `ThreadRef.typeRaw` names them."
+      "description": "Kind of thread."
     },
     "ThreadQuery": {
       "type": "object",
@@ -8635,7 +9974,7 @@
         },
         "involves": {
           "type": "string",
-          "description": "Threads the login authored, is assigned, commented on or was mentioned in."
+          "description": "Threads the login authored, is assigned, commented on or was mentioned in. A listing without this filter ignores it and warns with `filter_unsupported`, as for `mentions` and `milestone`."
         },
         "mentions": {
           "type": "string",
@@ -8698,7 +10037,7 @@
         },
         "number": {
           "type": "string",
-          "description": "Per-repo thread number, the commit sha for `kind: 'commit'`, or the forge-native id for `kind: 'other'`. Absent when the forge did not identify the thread; such a ref cannot be fetched or keyed until enriched."
+          "description": "Per-repo thread number. Absent when the forge did not identify the thread; such a ref cannot be fetched or keyed until enriched."
         },
         "displayNumber": {
           "type": "string",
@@ -8716,6 +10055,147 @@
         "repo"
       ],
       "description": "Reference to a thread. A thread `number` is unique only within its repo, so the repo is always carried alongside it."
+    },
+    "ThreadSearchQuery": {
+      "type": "object",
+      "properties": {
+        "perPage": {
+          "type": "number",
+          "description": "How many items to ask for. The forge may return fewer."
+        },
+        "cursor": {
+          "$ref": "#/components/schemas/Cursor",
+          "description": "Resume after the page that returned this cursor."
+        },
+        "text": {
+          "type": "string",
+          "description": "Free text, matched against title and body."
+        },
+        "queryRaw": {
+          "type": "string",
+          "description": "Forge-native query syntax, added to the query as is, for qualifiers the other fields don't cover. Forges whose search has no query syntax ignore it with a `filter_unsupported` warning."
+        },
+        "repo": {
+          "$ref": "#/components/schemas/RepoRef",
+          "description": "Limit to one repository."
+        },
+        "owner": {
+          "type": "string",
+          "description": "Limit to the repositories of one account or namespace; `repo` wins when both are set."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "issue",
+            "pull_request"
+          ]
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "open",
+            "closed",
+            "all"
+          ],
+          "description": "Defaults to every state."
+        },
+        "author": {
+          "type": "string"
+        },
+        "involves": {
+          "type": "string",
+          "description": "Threads the login authored, is assigned, commented on or was mentioned in."
+        },
+        "assignee": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Threads carrying every one of these labels."
+        },
+        "since": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Updated at or after."
+        },
+        "sort": {
+          "type": "string",
+          "enum": [
+            "created",
+            "updated",
+            "comments",
+            "relevance"
+          ],
+          "description": "Defaults to the forge's relevance order."
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "default": "desc"
+        }
+      },
+      "description": "A structured search. Providers translate it into their own syntax; a field the forge cannot filter on becomes a `filter_unsupported` warning on the page rather than a filter applied client-side."
+    },
+    "ThreadSnapshot": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "open",
+            "closed",
+            "merged"
+          ],
+          "description": "Thread state. `'unknown'` is distinct from any real state and signals that the value was not present in the payload, so the caller may enrich it with `threads.get()`. Draft status is orthogonal; see `Thread.isDraft`."
+        },
+        "stateRaw": {
+          "type": "string"
+        },
+        "stateReason": {
+          "type": "string"
+        },
+        "isDraft": {
+          "type": "boolean"
+        },
+        "author": {
+          "$ref": "#/components/schemas/Actor"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Label"
+          }
+        },
+        "issueType": {
+          "$ref": "#/components/schemas/IssueType",
+          "description": "Absent both when the issue has no type and when the source doesn't report one."
+        },
+        "url": {
+          "type": "string"
+        },
+        "branches": {
+          "$ref": "#/components/schemas/PullBranches"
+        },
+        "stats": {
+          "$ref": "#/components/schemas/PullStats"
+        },
+        "mergedBy": {
+          "$ref": "#/components/schemas/Actor"
+        }
+      },
+      "description": "Fields of a `Thread` that an event's source carries. A field is absent when the source does not report it; `labels: []` means the source listed no labels. `threads.get()` reads the rest."
     },
     "ThreadStack": {
       "type": "object",
@@ -8741,7 +10221,7 @@
       ],
       "description": "Thread state. `'unknown'` is distinct from any real state and signals that the value was not present in the payload, so the caller may enrich it with `threads.get()`. Draft status is orthogonal; see `Thread.isDraft`."
     },
-    "ThreadUpdateInput": {
+    "ThreadUpdate": {
       "type": "object",
       "properties": {
         "title": {
@@ -8849,45 +10329,47 @@
       },
       "description": "Options for `contents.tree()`."
     },
-    "UpsertCommentInput": {
-      "type": "object",
-      "properties": {
-        "key": {
-          "type": "string",
-          "description": "Identifies the comment to replace across runs. It is written into the body as an HTML comment, so it is invisible when rendered but matchable on the next run."
-        },
-        "body": {
-          "type": "string"
-        },
-        "since": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Only comments updated at or after this time are searched for the key. When retrying a change, pass the time of its first attempt, less a margin for clock skew, so the retry lists only recent comments. A comment with the same key from before `since` is not found, and a new one is created."
-        }
-      },
-      "required": [
-        "key",
-        "body"
+    "UpdateBranchMethod": {
+      "type": "string",
+      "enum": [
+        "merge",
+        "rebase"
       ],
-      "description": "What `threads.upsertComment()` needs."
+      "description": "How `threads.updateBranch()` brings the base branch into a pull request's head branch."
     },
-    "UpsertCommentResult": {
+    "UpdateBranchOptions": {
       "type": "object",
       "properties": {
-        "comment": {
-          "$ref": "#/components/schemas/Comment",
-          "description": "The comment that was created or edited."
+        "method": {
+          "$ref": "#/components/schemas/UpdateBranchMethod",
+          "description": "Defaults to `'merge'`, or `'rebase'` where the forge can only rebase (GitLab)."
         },
-        "created": {
-          "type": "boolean",
-          "description": "`false` when a comment with the same key already existed, and was edited or already had the body."
+        "sha": {
+          "type": "string",
+          "description": "Expected head sha; the update is refused with `BranchMovedError` if the branch has moved."
+        }
+      },
+      "description": "Options for `threads.updateBranch()`."
+    },
+    "UpdateBranchResult": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "updated",
+            "queued"
+          ],
+          "description": "`'updated'` once the head branch has the base in it. `'queued'` when the forge updates it in the background (GitHub, GitLab)."
+        },
+        "raw": {
+          "description": "Unnormalised forge payload, retained for fidelity. Absent where the response has no body."
         }
       },
       "required": [
-        "comment",
-        "created"
+        "status"
       ],
-      "description": "What `threads.upsertComment()` did."
+      "description": "What `threads.updateBranch()` resolves with."
     },
     "User": {
       "type": "object",
@@ -9162,7 +10644,7 @@
         "instance",
         "target"
       ],
-      "description": "Reference to a registered webhook. `target` is the repository, or a namespace ref (`kind: 'namespace'`, empty `name`) for an organisation or workspace hook."
+      "description": "Reference to a registered webhook. `target` is the repository, or a namespace ref ( `namespaceRef` ) for an organisation or workspace hook."
     },
     "WebhookUpdate": {
       "type": "object",

@@ -58,18 +58,28 @@ const EXCLUDED = new Set([
   "installations.providers",
   "webhooks.verify",
   "webhooks.ingest",
-  "sources.subscribe",
+  "sources.stream",
 ])
 
-/** Every verb callable over HTTP, by class. Iterables are left out for their `*Page` form, which clients page through. */
-export function routableVerbs(): Map<string, { write: boolean; account: boolean }> {
-  const entries = CAPABILITY_TABLE.flatMap((entry) =>
-    (entry.verbs ?? []).map(
-      (verb) => [verb, { write: !!entry.write, account: !!entry.account }] as const,
+/** Every verb callable over HTTP, by class. A listing answers with one page, which clients page through. */
+export function routableVerbs(): Map<
+  string,
+  { write: boolean; account: boolean; listing: boolean }
+> {
+  return new Map(
+    CAPABILITY_TABLE.flatMap((entry) =>
+      (entry.verbs ?? [])
+        .filter((verb) => !EXCLUDED.has(verb))
+        .map((verb) => [
+          verb,
+          {
+            write: !!entry.write,
+            account: !!entry.account,
+            listing: !!entry.listings?.includes(verb),
+          },
+        ]),
     ),
   )
-  const names = new Set(entries.map(([verb]) => verb))
-  return new Map(entries.filter(([verb]) => !EXCLUDED.has(verb) && !names.has(`${verb}Page`)))
 }
 
 export function generateManifest(): Manifest {
@@ -82,12 +92,50 @@ export function generateManifest(): Manifest {
   const options = ts.getParsedCommandLineOfConfigFile(tsconfig, {}, ts.sys as never)!.options
   const program = ts.createProgram([entry], options)
   const checker = program.getTypeChecker()
-  const alias = program.getSourceFile(entry)!.statements[1] as TS.TypeAliasDeclaration
+  const [importDecl, alias] = program.getSourceFile(entry)!.statements as unknown as [
+    TS.ImportDeclaration,
+    TS.TypeAliasDeclaration,
+  ]
   const provider = checker.getTypeAtLocation(alias.name)
-  const schemas = schemaGenerator(program)
+  const exports = checker.getExportsOfModule(
+    checker.getSymbolAtLocation(importDecl.moduleSpecifier)!,
+  )
+  const exported = (name: string) =>
+    checker.getAliasedSymbol(exports.find((symbol) => symbol.name === name)!)
+  const schemas = schemaGenerator(program, {
+    listing: exported("ForgeListing"),
+    page: exported("Page").declarations![0]!,
+  })
+
+  // The published declarations are bundled without `export` keywords, so the generator names every type it meets.
+  // Components are the types `forges` exports, and the rest, such as `Pick<…>` or a helper, are inlined.
+  const names = new Set(exports.map((symbol) => symbol.name))
+  const isComponent = (definition: string) => names.has(definition.replace(/<[\s\S]*$/, ""))
+  const inline = (value: unknown, stack: string[] = []): Schema => {
+    if (Array.isArray(value)) {
+      return value.map((item) => inline(item, stack)) as never
+    }
+    if (!value || typeof value !== "object") {
+      return value as never
+    }
+    const { $ref, ...rest } = value as Schema
+    const name =
+      typeof $ref === "string"
+        ? decodeURIComponent($ref.replace(/^#\/definitions\//, ""))
+        : undefined
+    if (name && !isComponent(name)) {
+      if (stack.includes(name)) {
+        throw new Error(`${name} refers to itself, and forges doesn't export it to name it by`)
+      }
+      return { ...inline(schemas.definitions[name], [...stack, name]), ...inline(rest, stack) }
+    }
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, inline(item, stack)]),
+    )
+  }
 
   const verbs = Object.fromEntries(
-    [...routableVerbs()].map(([name, { write, account }]) => {
+    [...routableVerbs()].map(([name, { write, account, listing }]) => {
       const [namespace, method] = name.split(".") as [string, string]
       const symbol = checker.getTypeOfSymbol(provider.getProperty(namespace)!).getProperty(method)!
       const overloads = checker
@@ -124,24 +172,24 @@ export function generateManifest(): Manifest {
           ...(summary ? { summary } : {}),
           write,
           account,
+          ...(listing ? { listing: true as const } : {}),
           params: params.map(({ types, ...param }) => ({
             ...param,
-            schema: clean(schemas.of(types)),
+            schema: clean(inline(schemas.of(types))),
           })),
           ...(JSON.stringify(result).includes(JSON.stringify(STREAM))
             ? { stream: true as const }
             : {}),
-          result: clean(result),
+          result: clean(inline(result)),
         },
       ]
     }),
   )
   // Each type brings every type it mentions, including ones it only picks from; keep those the verbs reach.
   const components = Object.fromEntries(
-    Object.entries(schemas.definitions).map(([name, schema]) => [
-      componentName(name),
-      clean(schema as Schema),
-    ]),
+    Object.entries(schemas.definitions)
+      .filter(([name]) => isComponent(name))
+      .map(([name, schema]) => [componentName(name), clean(inline(schema as Schema))]),
   )
   const reached = new Set<string>()
   const reach = (value: unknown): void => {
@@ -199,21 +247,31 @@ class StreamType extends Base {
 }
 
 /**
- * Lib types as the wire carries them: bytes as `{ $bytes }`, a byte stream as the response itself, and `AbortSignal`
- * not at all, since the proxy passes the request's own.
+ * Types as the wire carries them: bytes as `{ $bytes }`, a byte stream as the response itself, `AbortSignal` not at
+ * all, since the proxy passes the request's own, and a `ForgeListing<T>` as the `Page<T>` the proxy answers with.
  */
 class WireTypes implements SubNodeParser, SubTypeFormatter {
+  chain!: ChainNodeParser
   private readonly program: TS.Program
+  private readonly forges: ForgesTypes
 
-  constructor(program: TS.Program) {
+  constructor(program: TS.Program, forges: ForgesTypes) {
     this.program = program
+    this.forges = forges
   }
 
   supportsNode(node: TS.Node): boolean {
-    return !!this.lib(node)
+    return !!this.lib(node) || this.isListing(node)
   }
 
-  createType(node: TS.Node): BaseType {
+  createType(node: TS.Node, context: Context): BaseType {
+    if (this.isListing(node)) {
+      const page = new Context(node as never)
+      for (const argument of (node as TS.TypeReferenceNode).typeArguments ?? []) {
+        page.pushArgument(this.chain.createType(argument as never, context))
+      }
+      return this.chain.createType(this.forges.page as never, page)
+    }
     const name = this.lib(node)
     return name === "Uint8Array"
       ? new BytesType()
@@ -234,6 +292,19 @@ class WireTypes implements SubNodeParser, SubTypeFormatter {
     return []
   }
 
+  private isListing(node: TS.Node): boolean {
+    if (!ts.isTypeReferenceNode(node)) {
+      return false
+    }
+    const checker = this.program.getTypeChecker()
+    const symbol = checker.getSymbolAtLocation(node.typeName)
+    return (
+      !!symbol &&
+      (symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol) ===
+        this.forges.listing
+    )
+  }
+
   private lib(node: TS.Node): string | undefined {
     return ts.isTypeReferenceNode(node)
       ? ["Uint8Array", "ReadableStream", "AbortSignal"].find((name) =>
@@ -247,20 +318,27 @@ class WireTypes implements SubNodeParser, SubTypeFormatter {
  * Schemas for type nodes in `program`, collecting the named types they reference into `definitions`. Parses with the
  * chain itself: the parser `createParser()` returns would inline a root reference such as `RepoRef`.
  */
-function schemaGenerator(program: TS.Program) {
+/** The `forges` types the wire maps: a listing is answered with its page. */
+interface ForgesTypes {
+  listing: TS.Symbol
+  page: TS.Declaration
+}
+
+function schemaGenerator(program: TS.Program, forges: ForgesTypes) {
   const config = {
     ...DEFAULT_CONFIG,
-    expose: "export" as const,
+    expose: "all" as const,
     topRef: false,
     jsDoc: "extended" as const,
     functions: "hide" as const,
     additionalProperties: true,
     skipTypeCheck: true,
   }
-  const wire = new WireTypes(program)
+  const wire = new WireTypes(program, forges)
   let chain!: ChainNodeParser
   const parser = createParser(program as never, config, (mutable) => {
     chain = mutable as ChainNodeParser
+    wire.chain = chain
     chain.addNodeParser(wire)
   })
   const formatter = createFormatter(config, (mutable) => mutable.addTypeFormatter(wire))

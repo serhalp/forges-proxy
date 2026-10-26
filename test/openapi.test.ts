@@ -25,7 +25,7 @@ describe("GET /openapi.json", () => {
       const { response, doc } = await document()
       assert.equal(response.headers.get("cache-control"), "public, max-age=300")
       assert.ok(doc.paths["/v1/{forge}/{instance}/repos.get"]?.get)
-      assert.equal(doc.paths["/v1/{forge}/{instance}/threads.comment"], undefined)
+      assert.equal(doc.paths["/v1/{forge}/{instance}/threads.createComment"], undefined)
       assert.equal(doc.paths["/v1/{forge}/{instance}/users.me"], undefined)
       const [forge, instance] = doc.paths["/v1/{forge}/{instance}/repos.get"]!.parameters
       assert.deepEqual(forge.schema.enum, ["fake"])
@@ -73,7 +73,7 @@ describe("GET /openapi.json", () => {
     it("documents writes as POSTs, behind the secret", async () => {
       const { response, doc } = await document()
       assert.equal(response.headers.get("cache-control"), "private, no-store")
-      const comment = doc.paths["/v1/{forge}/{instance}/threads.comment"]!
+      const comment = doc.paths["/v1/{forge}/{instance}/threads.createComment"]!
       assert.ok(comment.post.requestBody.content["application/json"].schema.properties.args)
       assert.equal(comment.get, undefined)
       assert.ok(doc.components.securitySchemes)

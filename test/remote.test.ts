@@ -15,7 +15,7 @@ import { connect } from "#client/remote.ts"
 import { serialise } from "#server/utils/wire.ts"
 import { createProxy, env } from "./support/proxy.ts"
 
-const factory = fake({
+const direct = fake({
   seed: {
     repos: [{ repo: "acme/widgets", description: "Widgets" }],
     files: [{ repo: "acme/widgets", path: "logo.png", content: new Uint8Array([0, 255, 1]) }],
@@ -27,7 +27,6 @@ const factory = fake({
     runs: [{ repo: "acme/widgets", name: "ci", jobs: [{ name: "test", log: "ok\n" }] }],
   },
 })
-const direct = factory.create()
 const app = await createProxy(createForges([direct, github()]))
 // In-process h3 ignores an aborted signal, where a real `fetch` rejects with it.
 const fetch = async (url: string, init?: RequestInit) => {
@@ -62,7 +61,7 @@ describe("connect", () => {
 
   it("plugs into createForges", async () => {
     const forges = createForges(Object.values(await remote("s3cret")))
-    assert.equal((await forges.repos.get(repo)).description, "Widgets")
+    assert.equal((await forges.for(repo)!.repos.get(repo)).description, "Widgets")
   })
 
   it("fans out registry listings over the providers' pages", async () => {
@@ -94,11 +93,14 @@ describe("remote provider", () => {
     }
     assert.deepEqual(await titles(fake), await titles(direct))
     assert.equal((await titles(fake)).length, 3)
+    const page = await fake.threads.list(repo, { perPage: 2, state: "all" }).page()
+    assert.equal(page.items.length, 2)
+    assert.ok(page.cursor)
   })
 
   it("returns file bytes as bytes", async () => {
     const { fake } = await remote("s3cret")
-    const file = await fake.contents.file(repo, "logo.png")
+    const file = await fake.contents.getFile(repo, "logo.png")
     assert.deepEqual(file.content, new Uint8Array([0, 255, 1]))
   })
 
@@ -110,13 +112,13 @@ describe("remote provider", () => {
       message: "Add bytes",
       changes: [{ path: "data.bin", content: bytes }],
     })
-    assert.deepEqual((await direct.contents.file(repo, "data.bin")).content, bytes)
+    assert.deepEqual((await direct.contents.getFile(repo, "data.bin")).content, bytes)
   })
 
   it("streams job logs", async () => {
     const { fake } = await remote("s3cret")
-    const [run] = (await fake.ci.runsPage(repo)).items
-    const [job] = (await fake.ci.jobsPage(run!.ref)).items
+    const [run] = (await fake.ci.runs(repo).page()).items
+    const [job] = (await fake.ci.jobs(run!.ref).page()).items
     assert.equal(await new Response(await fake.ci.log(job!.ref)).text(), "ok\n")
   })
 
@@ -127,10 +129,10 @@ describe("remote provider", () => {
 
   it("writes", async () => {
     const { fake } = await remote("s3cret")
-    const comment = await fake.threads.comment(issue, "Over the wire")
+    const comment = await fake.threads.createComment(issue, "Over the wire")
     assert.equal(comment.body, "Over the wire")
     assert.ok(
-      (await direct.threads.commentsPage(issue)).items.some(
+      (await direct.threads.comments(issue).page()).items.some(
         (item) => item.body === "Over the wire",
       ),
     )
@@ -138,7 +140,7 @@ describe("remote provider", () => {
 
   it("rebuilds forge errors with their class and fields", async () => {
     const { fake } = await remote("s3cret")
-    factory.failNext(
+    direct.failNext(
       "repos.get",
       new NotFoundError("Gone", 404, "", { forge: "fake", instance: "fake.test" }),
     )
@@ -149,7 +151,7 @@ describe("remote provider", () => {
       return true
     })
     const resetAt = new Date(Date.now() + 60_000)
-    factory.failNext(
+    direct.failNext(
       "repos.get",
       new RateLimitedError("Slow", 429, "", { resetAt, secondary: true }),
     )
@@ -159,7 +161,7 @@ describe("remote provider", () => {
       assert.equal(error.secondary, true)
       return true
     })
-    factory.failNext("repos.get", new ForbiddenError("No", 403, "", "sso_required"))
+    direct.failNext("repos.get", new ForbiddenError("No", 403, "", "sso_required"))
     await assert.rejects(fake.repos.get(repo), { name: "ForbiddenError", reason: "sso_required" })
   })
 
@@ -185,13 +187,14 @@ describe("remote provider of a public instance", () => {
   it("reports and rejects the verbs the proxy doesn't route", async () => {
     const { fake } = await remote()
     assert.equal(fake.can("repos.get"), true)
-    assert.equal(fake.can("threads.comment", "issue"), false)
+    assert.equal(fake.can("threads.createComment", "issue"), false)
     assert.equal(fake.support("users.me"), false)
-    await assert.rejects(fake.threads.comment(issue, "x"), UnsupportedOperationError)
+    await assert.rejects(fake.threads.createComment(issue, "x"), UnsupportedOperationError)
     await assert.rejects(async () => {
       for await (const _ of fake.notifications.list()) {
         // unreachable
       }
     }, UnsupportedOperationError)
+    await assert.rejects(fake.notifications.list().page(), UnsupportedOperationError)
   })
 })

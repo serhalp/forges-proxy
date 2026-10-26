@@ -15,6 +15,8 @@ export interface ManifestVerb {
   summary?: string
   write: boolean
   account: boolean
+  /** Answers with one `Page` of a listing; the options carry the cursor of the next. */
+  listing?: true
   params: ManifestParam[]
   /** The result may be a byte stream, sent as `application/octet-stream`. */
   stream?: true

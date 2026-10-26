@@ -19,8 +19,8 @@ describe("manifest", () => {
     const verbs = routableVerbs()
     assert.deepEqual(Object.keys(manifest.verbs).toSorted(), [...verbs.keys()].toSorted())
     for (const [name, verb] of verbs) {
-      const { write, account } = manifest.verbs[name]!
-      assert.deepEqual({ write, account }, verb, name)
+      const { write, account, listing = false } = manifest.verbs[name]!
+      assert.deepEqual({ write, account, listing }, verb, name)
     }
   })
 

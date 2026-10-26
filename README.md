@@ -21,10 +21,10 @@ pnpm dev
 - `GET /v1`: configured providers, their capabilities, and the routed verbs with the position of their options.
 - `GET /docs`: API reference (Scalar), from `GET /openapi.json` (OpenAPI 3.1).
 - `GET /v1/status`: each provider's rate-limit budgets, as the server instance that answers last saw them.
-- `GET /v1/:forge/:instance/:verb?args=<json array>`: a read, e.g. `repos.get`, `threads.listPage`.
+- `GET /v1/:forge/:instance/:verb?args=<json array>`: a read, e.g. `repos.get`, `threads.list`.
 - `POST /v1/:forge/:instance/:verb` with `{ "args": [...] }`: a write.
 
-Arguments are positional, as the `ForgeProvider` method takes them, and are validated against the verb's signature (see `/docs`). Pass `null` for a skipped optional argument. Bytes travel as `{ "$bytes": "<base64>" }` in both directions. Listings are exposed as their `*Page` verb; pass `cursor` back to read the next page.
+Arguments are positional, as the `ForgeProvider` method takes them, and are validated against the verb's signature (see `/docs`). Pass `null` for a skipped optional argument. Bytes travel as `{ "$bytes": "<base64>" }` in both directions. A listing answers with one page; pass its `cursor` back in the options to read the next.
 
 ```sh
 curl -G localhost:3000/v1/github/github.com/repos.get \
@@ -48,7 +48,7 @@ const repo = await forges.repos.get({
 })
 ```
 
-Every verb is present. Listings iterate through the proxy's `*Page` verbs, errors come back as the same classes, and verbs the proxy doesn't route reject with `UnsupportedOperationError` (and `can()` says so).
+Every verb is present. Listings read a page per request, both when iterated and through `page()`, errors come back as the same classes, and verbs the proxy doesn't route reject with `UnsupportedOperationError` (and `can()` says so).
 
 ## Webhooks and purging
 

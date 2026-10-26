@@ -19,7 +19,7 @@ Settled design and decision records are in [ARCHITECTURE.md](ARCHITECTURE.md); t
 - [x] Tests: `node:test` (Node 26) with `forges/fake` behind `mock.module`; unit + route tests
 - [x] `GET /v1/status` with `rateLimits()` (per server instance)
 - [x] Pass the request signal through to verbs, into the options parameter the manifest names
-- [ ] SSE for `sources.subscribe`
+- [ ] SSE for `sources.stream`
 - [x] Upstream ETag fetch cache (`server/utils/upstream-cache.ts`), in-memory LRU store
 - [x] Shared store for the upstream cache: the Cache API where the platform has one (Netlify), shared per region and tagged like the response; memory elsewhere. `x-upstream-cache` reports what it did per request.
 - [x] Cache tags (`Netlify-Cache-Tag`) on public reads; `POST /webhooks/:forge/:instance` purges them on Netlify and expires the upstream cache. No Cloudflare-specific code (purge API, `Cache-Tag`) in this codebase.

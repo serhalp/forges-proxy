@@ -209,7 +209,7 @@ describe("cachingFetch", () => {
     const provider = github({
       auth: { type: "token", token: "t" },
       fetch: cachingFetch(forge.fetch, { now: time.now }),
-    }).create()
+    })
     const repo = { forge: "github", instance: "github.com", owner: "acme", name: "widgets" }
     await provider.repos.get(repo)
     time.advance(61)

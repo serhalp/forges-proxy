@@ -3,8 +3,8 @@ import type {
   FetchLike,
   ForgeCapabilities,
   ForgeOptionsBase,
+  ForgeListing,
   ForgeProvider,
-  ForgeProviderFactory,
   ForgeVerb,
   KnownForgeKind,
   Page,
@@ -29,13 +29,13 @@ interface RemoteIndex {
     authKind: AuthKind
     capabilities: ForgeCapabilities
   }>
-  /** `options` is the position of the verb's options, or -1. */
-  verbs: Array<{ name: string; write: boolean; options: number }>
+  /** `options` is the position of the verb's options, or -1. A listing answers with one page. */
+  verbs: Array<{ name: string; write: boolean; listing: boolean; options: number }>
 }
 
 type RemoteVerb = Omit<RemoteIndex["verbs"][number], "name">
 
-type Factory = (options: ForgeOptionsBase) => ForgeProviderFactory
+type Factory = (options: ForgeOptionsBase) => ForgeProvider
 // Credential-less providers answer the sync helpers (`urlFor`, `parseUrl`, ...) that need no request.
 const LOCAL: Record<string, Factory> = {
   "azure-devops": forges.azureDevOps as Factory,
@@ -48,6 +48,7 @@ const LOCAL: Record<string, Factory> = {
   github: forges.github as Factory,
   gitlab: forges.gitlab as Factory,
   pushin: forges.pushin as Factory,
+  sourcehut: forges.sourcehut as Factory,
   tangled: forges.tangled as Factory,
 } satisfies Record<KnownForgeKind, Factory>
 
@@ -61,8 +62,8 @@ const ERRORS = new Map<string, new (...args: never[]) => Error>(
 
 /**
  * One `ForgeProvider` per forge the proxy at `url` serves, to pass to `createForges()`. Every verb is present: those
- * the proxy routes call it, listings page through their `*Page` verb, and the rest reject with
- * `UnsupportedOperationError`, as `can()` reports.
+ * the proxy routes call it, listings read a page per request, and the rest reject with `UnsupportedOperationError`,
+ * as `can()` reports.
  * @example
  * ```ts
  * const forges = createForges(await connect({ url: 'https://forges.example.com', secret }))
@@ -90,7 +91,7 @@ function remoteProvider(
   const { forge, instance } = info
   const local = localProvider(info)
   const origin = { forge, instance }
-  const routed = (verb: string) => verbs.has(verb) || verbs.has(`${verb}Page`)
+  const routed = (verb: string) => verbs.has(verb)
   const unsupported = (verb: string) =>
     new forges.UnsupportedOperationError(`The proxy does not route ${verb}`, origin)
 
@@ -126,37 +127,48 @@ function remoteProvider(
     return decodeBytes(forges.reviveDates(await response.json()))
   }
 
+  /** A listing: each page is a request, with the cursor in the options. */
+  function listing(verb: string, at: number, args: unknown[]): ForgeListing<unknown> {
+    const page = (options: object) =>
+      call(verb, [...Array.from({ length: at }, (_, index) => args[index]), options]) as Promise<
+        Page<unknown>
+      >
+    const first = (args[at] ?? {}) as object
+    return Object.assign(iteratePages(page, first), { page: () => page(first) })
+  }
+
   const namespaces: Record<string, Record<string, unknown>> = {}
-  for (const verb of CAPABILITY_TABLE.flatMap((entry) => entry.verbs ?? [])) {
-    const [namespace, name] = verb.split(".") as [string, string]
-    namespaces[namespace] ??= {}
-    const page = verbs.get(`${verb}Page`)
-    if (verbs.has(verb)) {
-      namespaces[namespace][name] = (...args: unknown[]) => call(verb, args)
-    } else if (page) {
-      // A listing takes the same arguments as its page, with the cursor in the options.
-      namespaces[namespace][name] = (...args: unknown[]) =>
-        iteratePages(
-          (options) =>
-            call(`${verb}Page`, [
-              ...Array.from({ length: page.options }, (_, at) => args[at]),
-              options,
-            ]) as Promise<Page<unknown>>,
-          (args[page.options] ?? {}) as object,
-        )
-    } else if (CAPABILITY_TABLE.some((entry) => entry.verbs?.includes(`${verb}Page`))) {
-      namespaces[namespace][name] = () =>
-        forgeIterable(async function* () {
-          yield* []
-          throw unsupported(verb)
-        })
-    } else {
-      namespaces[namespace][name] = () => Promise.reject(unsupported(verb))
+  for (const entry of CAPABILITY_TABLE) {
+    for (const verb of entry.verbs ?? []) {
+      const [namespace, name] = verb.split(".") as [string, string]
+      namespaces[namespace] ??= {}
+      namespaces[namespace][name] = method(verb, !!entry.listings?.includes(verb))
     }
   }
   namespaces.webhooks!.events = local?.webhooks.events ?? []
   namespaces.installations!.provider = () => {
     throw unsupported("installations.provider")
+  }
+
+  function method(verb: string, isListing: boolean): (...args: unknown[]) => unknown {
+    const remote = verbs.get(verb)
+    if (remote?.listing) {
+      return (...args) => listing(verb, remote.options, args)
+    }
+    if (remote) {
+      return (...args) => call(verb, args)
+    }
+    if (isListing) {
+      return () =>
+        Object.assign(
+          forgeIterable(async function* () {
+            yield* []
+            throw unsupported(verb)
+          }),
+          { page: () => Promise.reject(unsupported(verb)) },
+        )
+    }
+    return () => Promise.reject(unsupported(verb))
   }
 
   const provider = {
@@ -170,22 +182,25 @@ function remoteProvider(
     rateLimits: () => [],
     request: () => Promise.reject(unsupported("request")),
     can: (verb: ForgeVerb, kind?: Parameters<ForgeProvider["can"]>[1]) =>
-      routed(verb) && forges.supports(info.capabilities, verb, kind),
+      routed(verb) && forges.can(info.capabilities, verb, kind),
     support: (verb: ForgeVerb, kind?: Parameters<ForgeProvider["support"]>[1]) =>
-      routed(verb) ? forges.supportOf(info.capabilities, verb, kind) : false,
+      routed(verb) ? forges.support(info.capabilities, verb, kind) : false,
     normaliseMarkdown: (body: string) => local?.normaliseMarkdown(body) ?? body,
     urlFor: (target: Parameters<ForgeProvider["urlFor"]>[0]) => local?.urlFor(target),
     webOrigin: local?.webOrigin,
     scopesFor: (verb: ForgeVerb) => local?.scopesFor(verb) ?? {},
     parseUrl: (url: string | URL) => local?.parseUrl(url),
-    referenceTo: (...args: Parameters<ForgeProvider["referenceTo"]>) => local?.referenceTo(...args),
+    referenceFor: (...args: Parameters<ForgeProvider["referenceFor"]>) =>
+      local?.referenceFor(...args),
+    parseReferences: (...args: Parameters<ForgeProvider["parseReferences"]>) =>
+      local?.parseReferences(...args) ?? [],
   }
   return provider as unknown as ForgeProvider
 }
 
 function localProvider(info: RemoteIndex["providers"][number]): ForgeProvider | undefined {
   try {
-    return LOCAL[info.forge]?.({ baseUrl: info.baseUrl, instance: info.instance }).create()
+    return LOCAL[info.forge]?.({ baseUrl: info.baseUrl, instance: info.instance })
   } catch {
     // Some forges need options the proxy doesn't share, such as an organisation; their helpers go without.
     return undefined

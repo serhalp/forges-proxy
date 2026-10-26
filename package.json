@@ -19,7 +19,7 @@
   "dependencies": {
     "@cfworker/json-schema": "4.1.1",
     "@netlify/functions": "6.0.1",
-    "forges": "link:../forges"
+    "forges": "0.3.0"
   },
   "devDependencies": {
     "@types/node": "26.6.5",

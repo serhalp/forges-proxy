@@ -8,7 +8,10 @@ const factory = fake({
   seed: {
     repos: [{ repo: "acme/widgets", description: "Widgets" }],
     files: [{ repo: "acme/widgets", path: "README.md", content: "hi" }],
-    threads: [{ repo: "acme/widgets", kind: "issue", title: "Bug" }],
+    threads: [
+      { repo: "acme/widgets", kind: "issue", title: "Bug" },
+      { repo: "acme/widgets", kind: "issue", title: "Feature" },
+    ],
     runs: [{ repo: "acme/widgets", name: "ci", jobs: [{ name: "test", log: "ok\n" }] }],
   },
 })
@@ -91,7 +94,7 @@ describe("private mode", () => {
   })
 
   it("routes writes and account verbs", async () => {
-    const response = await write("threads.comment", [issue, "Thanks"], authorization)
+    const response = await write("threads.createComment", [issue, "Thanks"], authorization)
     assert.equal(response.status, 200)
     assert.equal(((await response.json()) as { body: string }).body, "Thanks")
     assert.equal((await read("users.me", [], authorization)).status, 200)
@@ -104,7 +107,7 @@ describe("private mode", () => {
       skipped: unknown[]
     }
     assert.equal(body.mode, "private")
-    assert.ok(body.verbs.some((verb) => verb.name === "threads.comment"))
+    assert.ok(body.verbs.some((verb) => verb.name === "threads.createComment"))
     assert.deepEqual(body.skipped, [{ forge: "GITLAB", suffix: "", reason: "needs TOKEN" }])
   })
 })
@@ -141,9 +144,9 @@ describe("public mode", () => {
     const comments = () =>
       factory.store.repos.get("acme/widgets")!.threads.get("1")!.comments.length
     const before = comments()
-    assert.equal((await write("threads.comment", [issue, "Thanks"])).status, 404)
+    assert.equal((await write("threads.createComment", [issue, "Thanks"])).status, 404)
     assert.equal((await read("users.me", [])).status, 404)
-    assert.equal((await read("notifications.listPage", [])).status, 404)
+    assert.equal((await read("notifications.list", [])).status, 404)
     assert.equal(comments(), before)
   })
 
@@ -161,8 +164,8 @@ describe("dispatch", () => {
   env({ FORGES_PROXY_SECRET: "s3cret" })
   const authorization = { authorization: "Bearer s3cret" }
 
-  it("404s for unknown, excluded and iterable verbs, and unknown providers", async () => {
-    for (const name of ["repos.nope", "installations.token", "threads.list"]) {
+  it("404s for unknown and excluded verbs, and unknown providers", async () => {
+    for (const name of ["repos.nope", "installations.token", "threads.listPage"]) {
       const response = await read(name, [repo], authorization)
       assert.equal(response.status, 404, name)
       assert.equal((await errorOf(response)).name, "ProxyError")
@@ -175,7 +178,7 @@ describe("dispatch", () => {
   })
 
   it("405s for the wrong method", async () => {
-    const getWrite = await read("threads.comment", [issue, "x"], authorization)
+    const getWrite = await read("threads.createComment", [issue, "x"], authorization)
     assert.equal(getWrite.status, 405)
     assert.equal(getWrite.headers.get("allow"), "POST")
     assert.equal((await write("repos.get", [repo], authorization)).status, 405)
@@ -201,12 +204,12 @@ describe("dispatch", () => {
       assert.equal(response.status, 400)
       assert.ok((await errorOf(response)).message.startsWith(message), message)
     }
-    const since = await read("search.threadsPage", [{ repo, since: "yesterday" }], authorization)
+    const since = await read("search.threads", [{ repo, since: "yesterday" }], authorization)
     assert.match((await errorOf(since)).message, /^args\/0\/since: .*date-time/)
   })
 
   it("takes null for a skipped optional argument", async () => {
-    const response = await read("contents.file", [repo, "README.md", null], authorization)
+    const response = await read("contents.getFile", [repo, "README.md", null], authorization)
     assert.equal(response.status, 200)
   })
 
@@ -216,7 +219,7 @@ describe("dispatch", () => {
       ["repos.get", [github], "args/0 names github on github.com"],
       ["repos.get", [{ ...repo, instance: "other.test" }], "args/0 names fake on other.test"],
       ["threads.get", [{ ...issue, repo: github }], "args/0/repo names github"],
-      ["search.threadsPage", [{ repo: github }], "args/0/repo names github"],
+      ["search.threads", [{ repo: github }], "args/0/repo names github"],
     ]
     for (const [name, args, message] of cases) {
       const response = await read(name, args, authorization)
@@ -226,10 +229,27 @@ describe("dispatch", () => {
   })
 
   it("sends file bytes tagged as base64", async () => {
-    const response = await read("contents.file", [repo, "README.md"], authorization)
+    const response = await read("contents.getFile", [repo, "README.md"], authorization)
     const file = (await response.json()) as { encoding: string; content: { $bytes: string } }
     assert.equal(file.encoding, "binary")
     assert.equal(Buffer.from(file.content.$bytes, "base64").toString(), "hi")
+  })
+
+  it("answers a listing with one page, and the next for its cursor", async () => {
+    const page = async (cursor?: unknown) => {
+      const response = await read(
+        "threads.list",
+        [repo, { perPage: 1, state: "all", ...(cursor ? { cursor } : {}) }],
+        authorization,
+      )
+      assert.equal(response.status, 200)
+      return (await response.json()) as { items: Array<{ title: string }>; cursor?: unknown }
+    }
+    const first = await page()
+    assert.equal(first.items.length, 1)
+    assert.ok(first.cursor)
+    const second = await page(first.cursor)
+    assert.notDeepEqual(second.items, first.items)
   })
 
   it("answers 204 for a verb that resolves with nothing", async () => {
@@ -240,8 +260,8 @@ describe("dispatch", () => {
 
   it("streams job logs", async () => {
     const provider = forges.providers[0]!
-    const [run] = (await provider.ci.runsPage(repo)).items
-    const [job] = (await provider.ci.jobsPage(run!.ref)).items
+    const [run] = (await provider.ci.runs(repo).page()).items
+    const [job] = (await provider.ci.jobs(run!.ref).page()).items
     const response = await read("ci.log", [job!.ref], authorization)
     assert.equal(response.headers.get("content-type"), "application/octet-stream")
     assert.equal(await response.text(), "ok\n")
@@ -251,14 +271,14 @@ describe("dispatch", () => {
     // The fake calls `since.getTime()`, so a string left unrevived would fail the request.
     const search = async (since: Date) => {
       const response = await read(
-        "search.threadsPage",
+        "search.threads",
         [{ repo, since: since.toISOString() }],
         authorization,
       )
       assert.equal(response.status, 200)
       return ((await response.json()) as { items: unknown[] }).items.length
     }
-    assert.equal(await search(new Date(0)), 1)
+    assert.equal(await search(new Date(0)), 2)
     assert.equal(await search(new Date(Date.now() + 86_400_000)), 0)
   })
 

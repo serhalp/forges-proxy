@@ -14,30 +14,30 @@ describe("routableVerbs", () => {
       "installations.token",
       "installations.provider",
       "webhooks.ingest",
-      "sources.subscribe",
+      "sources.stream",
     ]) {
       assert.equal(VERBS.has(verb), false, verb)
     }
   })
 
-  it("exposes listings only as their page", () => {
-    assert.equal(VERBS.has("threads.list"), false)
-    assert.equal(VERBS.has("threads.listPage"), true)
-  })
-
-  it("classifies writes and account verbs from the capability table", () => {
-    assert.deepEqual(VERBS.get("repos.get"), { write: false, account: false })
-    assert.deepEqual(VERBS.get("threads.comment"), { write: true, account: false })
-    assert.deepEqual(VERBS.get("users.me"), { write: false, account: true })
+  it("classifies listings, writes and account verbs from the capability table", () => {
+    const plain = { write: false, account: false, listing: false }
+    assert.deepEqual(VERBS.get("repos.get"), plain)
+    assert.deepEqual(VERBS.get("threads.list"), { ...plain, listing: true })
+    assert.deepEqual(VERBS.get("threads.createComment"), { ...plain, write: true })
+    assert.deepEqual(VERBS.get("users.me"), { ...plain, account: true })
   })
 })
 
 describe("routedVerb", () => {
   it("routes writes and account verbs only on a private instance", () => {
     assert.equal(routedVerb("repos.get", "public"), manifest.verbs["repos.get"])
-    assert.equal(routedVerb("threads.comment", "public"), undefined)
+    assert.equal(routedVerb("threads.createComment", "public"), undefined)
     assert.equal(routedVerb("users.me", "public"), undefined)
-    assert.equal(routedVerb("threads.comment", "private"), manifest.verbs["threads.comment"])
+    assert.equal(
+      routedVerb("threads.createComment", "private"),
+      manifest.verbs["threads.createComment"],
+    )
   })
 
   it("knows no verb outside the manifest", () => {
@@ -53,10 +53,27 @@ describe("callVerb", () => {
       fake({ seed: { repos: [{ repo: "acme/widgets", description: "Widgets" }] } }),
     ])
     const ref = { forge: "fake", instance: "fake.test", owner: "acme", name: "widgets" }
-    const repo = (await callVerb(forges.providers[0]!, "repos.get", [ref])) as {
+    const repo = (await callVerb(forges.providers[0]!, "repos.get", {}, [ref])) as {
       description: string
     }
     assert.equal(repo.description, "Widgets")
+  })
+
+  it("reads one page of a listing", async () => {
+    const provider = fake({
+      seed: {
+        repos: [{ repo: "acme/widgets" }],
+        threads: [{ repo: "acme/widgets", kind: "issue", title: "Bug" }],
+      },
+    })
+    const ref = { forge: "fake", instance: "fake.test", owner: "acme", name: "widgets" }
+    const page = (await callVerb(provider, "threads.list", { listing: true }, [ref])) as {
+      items: Array<{ title: string }>
+    }
+    assert.deepEqual(
+      page.items.map((thread) => thread.title),
+      ["Bug"],
+    )
   })
 })
 

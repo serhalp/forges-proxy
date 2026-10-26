@@ -1,4 +1,4 @@
-import type { ForgeProvider } from "forges"
+import type { ForgeListing, ForgeProvider } from "forges"
 import type { AccessMode } from "#server/utils/access.ts"
 import type { ManifestVerb } from "#server/utils/manifest.ts"
 import { manifest } from "#server/utils/manifest.ts"
@@ -16,9 +16,16 @@ export function routedVerb(name: string, mode: AccessMode): ManifestVerb | undef
 
 type Namespaces = Record<string, Record<string, (...args: unknown[]) => unknown>>
 
-export function callVerb(provider: ForgeProvider, verb: string, args: unknown[]): unknown {
-  const [namespace, name] = verb.split(".") as [string, string]
-  return (provider as unknown as Namespaces)[namespace]![name]!(...args)
+/** Calls `name` on `provider`; a listing answers with the page its options' cursor names. */
+export function callVerb(
+  provider: ForgeProvider,
+  name: string,
+  verb: Pick<ManifestVerb, "listing">,
+  args: unknown[],
+): unknown {
+  const [namespace, method] = name.split(".") as [string, string]
+  const result = (provider as unknown as Namespaces)[namespace]![method]!(...args)
+  return verb.listing ? (result as ForgeListing<unknown>).page() : result
 }
 
 /** `args` with `signal` in the verb's options, so that a dropped request stops its upstream requests. */

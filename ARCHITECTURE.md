@@ -25,7 +25,7 @@ Forge credentials come from `FORGES_*` variables via `providersFromEnv()`; calle
 
 ### RPC over the provider surface, not REST
 
-`GET /v1/:forge/:instance/:verb?args=<json array>` for reads, `POST` with `{ "args": [...] }` for writes. Arguments are positional, as the method takes them. The manifest generator takes verbs and their classes (write, account) from `CAPABILITY_TABLE`, so new verbs need no proxy change beyond regenerating it. Only `*Page` listings are routed; clients rebuild iterables with `iteratePages`. `provider.request` (takes absolute URLs, so SSRF), `installations.token` and `installations.provider(s)` are never routed.
+`GET /v1/:forge/:instance/:verb?args=<json array>` for reads, `POST` with `{ "args": [...] }` for writes. Arguments are positional, as the method takes them. The manifest generator takes verbs and their classes (write, account, listing) from `CAPABILITY_TABLE`, so new verbs need no proxy change beyond regenerating it. A listing answers with the page its options' `cursor` names (`listing.page()`); clients rebuild the iterable with `iteratePages`. `provider.request` (takes absolute URLs, so SSRF), `installations.token` and `installations.provider(s)` are never routed.
 
 On the wire: `null` for a skipped optional argument, bytes as `{ "$bytes": "<base64>" }` both ways (a bare string is text where a field takes either), `raw` dropped unless `?raw=1`, `undefined` as 204, streams as `application/octet-stream`. Errors are `{ "error": { name, message, ...fields } }`, which the client rebuilds into the `ForgeError` class.
 
@@ -47,7 +47,7 @@ Caching is expressed as response headers so the platform CDN does the work; the 
 
 **Costs.** One request per provider per page instead of one, which matters to a browser on a slow connection. Non-TypeScript clients (curl, other languages, anything generated from the OpenAPI document) get no fan-out.
 
-**Revisit if** npmx needs fewer browser round trips, or a non-TypeScript consumer needs cross-forge search. The shape would be `GET /v1/_all/search.threadsPage?args=...` with a base64 JSON cursor of per-provider cursors and offsets, and `POST /v1/_all/threads.getMany`.
+**Revisit if** npmx needs fewer browser round trips, or a non-TypeScript consumer needs cross-forge search. The shape would be `GET /v1/_all/search.threads?args=...` with a base64 JSON cursor of per-provider cursors and offsets, and `POST /v1/_all/threads.getMany`.
 
 ### Shared upstream store through the Cache API
 
@@ -55,4 +55,4 @@ On Netlify the upstream cache lives in the platform's Cache API: shared by every
 
 ### Manifest generated from the `forges` types
 
-`ts-json-schema-generator` can't evaluate `Parameters<>`, so the script finds each verb's signature with the TypeScript checker and hands the declared parameter and result type nodes straight to the generator's parser, in one program. Lib types the wire carries differently are parsed by a custom parser, matched by symbol rather than by name: `Uint8Array` is `{ $bytes }`, `ReadableStream` the binary response, `AbortSignal` nothing. Everything runs on TypeScript 6 (`typescript-6`, and the generator's own `typescript` overridden to it in `pnpm-workspace.yaml`), the version `forges` is written in, since the root TypeScript 7 has no compiler API. A test fails while the checked-in manifest is stale. Candidate for upstreaming next to `forges`' `schemas.json`.
+`ts-json-schema-generator` can't evaluate `Parameters<>`, so the script finds each verb's signature with the TypeScript checker and hands the declared parameter and result type nodes straight to the generator's parser, in one program. Lib types the wire carries differently are parsed by a custom parser, matched by symbol rather than by name: `Uint8Array` is `{ $bytes }`, `ReadableStream` the binary response, `AbortSignal` nothing, and `ForgeListing<T>` the `Page<T>` a listing answers with. The published declarations are bundled without `export` keywords, so every named type is parsed as a definition; only the types `forges` exports become components, and the rest are inlined. Everything runs on TypeScript 6 (`typescript-6`, and the generator's own `typescript` overridden to it in `pnpm-workspace.yaml`), the version `forges` is written in, since the root TypeScript 7 has no compiler API. A test fails while the checked-in manifest is stale. Candidate for upstreaming next to `forges`' `schemas.json`.

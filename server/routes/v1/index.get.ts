@@ -25,6 +25,7 @@ export default defineHandler(() => {
         name,
         write: verb.write,
         account: verb.account,
+        listing: !!verb.listing,
         options: verb.params.findIndex((param) => param.options),
       })),
     // Only a private instance says which env sets were skipped; it describes the operator's configuration.

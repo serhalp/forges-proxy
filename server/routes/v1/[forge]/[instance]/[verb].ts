@@ -40,7 +40,7 @@ export default defineHandler(async (event) => {
   let result: unknown
   try {
     result = await upstream.run(async () =>
-      callVerb(provider, name, withSignal(verb, read.args, event.req.signal)),
+      callVerb(provider, name, verb, withSignal(verb, read.args, event.req.signal)),
     )
   } catch (error) {
     return errorResponse(error)
