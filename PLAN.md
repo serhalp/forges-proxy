@@ -6,6 +6,8 @@ Settled design and decision records are in [ARCHITECTURE.md](ARCHITECTURE.md); t
 
 ## Open questions
 
+- RPC or a transparent forge-API proxy: see the record in [ARCHITECTURE.md](ARCHITECTURE.md#under-consideration-a-transparent-forge-api-proxy-instead-of-rpc).
+- Forges whose hosts aren't known in advance (Tangled authors' servers and knots, self-hosted instances, Radicle nodes). The proxy only serves instances configured through env vars; how should it serve the rest, and what keeps fetching hosts named by user data from reaching the proxy's own network?
 - What else to build on the manifest: Hey API client generation, an MCP server (read verbs as tools), argument validation.
 - Whether the manifest and `connect()` move into `forges` (e.g. `forges/remote`), where the types live.
 
@@ -15,9 +17,9 @@ Settled design and decision records are in [ARCHITECTURE.md](ARCHITECTURE.md); t
 - [x] Generic dispatcher: providers from env, GET reads / POST writes, error mapping
 - [x] Cache headers per verb class (public reads only; private is `no-store` until the parked issue is solved)
 - [x] Proxy access secret (`FORGES_PROXY_SECRET`) or public mode (`FORGES_PROXY_PUBLIC=1`); both or neither is a 503
-- [x] `GET /v1`: providers, capabilities, routed verbs
+- [x] `GET /`: providers, capabilities, routed verbs
 - [x] Tests: `node:test` (Node 26) with `forges/fake` behind `mock.module`; unit + route tests
-- [x] `GET /v1/status` with `rateLimits()` (per server instance)
+- [x] `GET /status` with `rateLimits()` (per server instance)
 - [x] Pass the request signal through to verbs, into the options parameter the manifest names
 - [ ] SSE for `sources.stream`
 - [x] Upstream ETag fetch cache (`server/utils/upstream-cache.ts`), in-memory LRU store
@@ -25,11 +27,14 @@ Settled design and decision records are in [ARCHITECTURE.md](ARCHITECTURE.md); t
 - [x] Cache tags (`Netlify-Cache-Tag`) on public reads; `POST /webhooks/:forge/:instance` purges them on Netlify and expires the upstream cache. No Cloudflare-specific code (purge API, `Cache-Tag`) in this codebase.
 - [x] Weak `ETag` on public JSON reads, with a 304 for a matching `If-None-Match` (verified live: Netlify's edge answers revalidations with it)
 - [x] Stale-if-error upstream: a stored response stands in (up to a day past fresh) on 5xx, 429, a rate-limit 403 or a network error, not when the caller aborted
+- [ ] CORS, so browsers can call a public instance directly
+- [ ] Pluggable purging: a hook (e.g. a Nitro plugin) that registers a host's purge-by-tag, so hosts other than Netlify can purge without host-specific code here. Today they expire by age.
+- [ ] Evaluate [`cdn-cache-control`](https://github.com/ascorbic/cdn-cache-control) for response cache headers: per-CDN header names from a `CDN` env var instead of hardcoded `netlify-*`. Gotchas: `.swr()` resets the TTL (call `.ttl()` after), and it sends only the CDN-specific header, not the generic `CDN-Cache-Control` too.
 - [ ] Finer tags (per thread, per release) so an active repo doesn't purge all of its entries on every event
 - [x] Operations manifest (`scripts/generate-manifest.ts` → `server/manifest.json`) → OpenAPI 3.1 (`/openapi.json`) → Scalar (`/docs`)
 - [x] Validate `args` against the manifest's schemas (`@cfworker/json-schema`, no codegen, so fine at the edge): a 400 naming the failing path, e.g. `args/0/owner: Instance type "number" is invalid`
 - [x] A test checks every `date-time` input field in the manifest is one `wire.ts` revives, so a new one in `forges` can't arrive as a string
-- [x] Client: find options where the manifest puts them (via `/v1`), not by a heuristic
+- [x] Client: find options where the manifest puts them (via `/`), not by a heuristic
 - [x] `connect()` client (`client/remote.ts`): one `ForgeProvider` per proxied forge
 - [ ] Package the client (here or as `forges/remote`); report `rateLimits()` and `refreshCapabilities()` through the proxy
 

@@ -2,6 +2,7 @@ import type { AccessMode } from "#server/utils/access.ts"
 import type { ManifestVerb, Schema } from "#server/utils/manifest.ts"
 import { argsSchema, manifest } from "#server/utils/manifest.ts"
 import { isRouted } from "#server/utils/verbs.ts"
+import { FORGES_VERSION } from "#shared/version.ts"
 
 const ERROR: Schema = {
   type: "object",
@@ -49,6 +50,7 @@ export function openApi(
     info: {
       title: "forges proxy",
       version: "0",
+      "x-forges-version": FORGES_VERSION,
       description:
         "Calls `forges` provider verbs over HTTP. Arguments are positional, as the verb takes them: a JSON array in `args`.",
     },
@@ -64,7 +66,7 @@ export function openApi(
     tags: [...new Set(verbs.map(([name]) => name.split(".")[0]!))].map((name) => ({ name })),
     paths: Object.fromEntries(
       verbs.map(([name, verb]) => [
-        `/v1/{forge}/{instance}/${name}`,
+        `/{forge}/{instance}/${name}`,
         { parameters: pathParams, [verb.write ? "post" : "get"]: operation(name, verb) },
       ]),
     ),

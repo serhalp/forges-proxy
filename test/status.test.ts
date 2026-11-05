@@ -13,20 +13,20 @@ const repo = { forge: "fake", instance: "fake.test", owner: "acme", name: "widge
 const get = (path: string, headers?: HeadersInit) =>
   Promise.resolve(app.fetch(new Request(new URL(path, "http://proxy.test"), { headers })))
 
-describe("GET /v1/status", () => {
+describe("GET /status", () => {
   env({ FORGES_PROXY_SECRET: "s3cret" })
   const authorization = { authorization: "Bearer s3cret" }
 
   it("needs the secret on a private instance", async () => {
-    assert.equal((await get("/v1/status")).status, 401)
+    assert.equal((await get("/status")).status, 401)
   })
 
   it("reports the budgets the latest upstream responses left", async () => {
     await get(
-      `/v1/fake/fake.test/repos.get?args=${encodeURIComponent(JSON.stringify([repo]))}`,
+      `/fake/fake.test/repos.get?args=${encodeURIComponent(JSON.stringify([repo]))}`,
       authorization,
     )
-    const response = await get("/v1/status", authorization)
+    const response = await get("/status", authorization)
     assert.equal(response.headers.get("cache-control"), "no-store")
     const { providers } = (await response.json()) as {
       providers: Array<{ forge: string; rateLimits: Array<{ limit: number; remaining: number }> }>

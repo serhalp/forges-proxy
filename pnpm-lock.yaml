@@ -176,8 +176,8 @@ importers:
         specifier: 6.0.1
         version: 6.0.1
       forges:
-        specifier: 0.3.0
-        version: 0.3.0
+        specifier: 0.3.2
+        version: 0.3.2
     devDependencies:
       '@types/node':
         specifier: 26.6.5
@@ -598,8 +598,8 @@ packages:
   exsolve@1.1.3:
     resolution: {integrity: sha512-kuzL9zherLQoqDeQaS55AiiIg1kb4KYXaSusTtgZTPlvKP2gGCI82LNmBNh5RjDVUXIcmgx+/Mx7vPwRzBbhJA==}
 
-  forges@0.3.0:
-    resolution: {integrity: sha512-qMb+HKxakUXqHBNSENvdkwBaUu/2mtfsCgQkiRCbuD6jMrrM8+wnvKct/nIz0vcHTBorZH/PGFesN95LIyGwHw==}
+  forges@0.3.2:
+    resolution: {integrity: sha512-x6epJowWXC8yOQThyxmvgPL4duk8iB9/smsmEU0gKuq7M6CGgzcljoA1KDyIlhrYwTZP8HtMNMQXIPm931OiyA==}
     engines: {node: '>=22.18'}
 
   glob@13.0.6:
@@ -1071,7 +1071,7 @@ snapshots:
 
   exsolve@1.1.3: {}
 
-  forges@0.3.0: {}
+  forges@0.3.2: {}
 
   glob@13.0.6:
     dependencies:

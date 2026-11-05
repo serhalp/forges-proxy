@@ -2,13 +2,21 @@
 
 A self-hostable, single-tenant HTTP proxy for [`forges`](https://forges.link): one API and one cache in front of every forge you configure. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the design and [PLAN.md](./PLAN.md) for what's next.
 
+## Use cases
+
+- Non-JS clients reaching `forges` over HTTP, from the OpenAPI document.
+- Internal tools, bots and CI across several forges, with credentials in one place and rate limits pooled behind one cache.
+- Public read-only services such as [npmx](https://npmx.dev), where many readers share one cache in front of every forge.
+- Browsers and sandboxes whose network access is limited to known hosts (CSP, egress allowlists) reaching forges whose hosts aren't known in advance: Tangled reads go to each author's server and per-repo knots, and self-hosted forges and Radicle nodes can be anywhere.
+- AI agents, given forge access without holding tokens.
+
 ## Configure
 
 Providers come from `FORGES_<KIND>_<FIELD>[_<SUFFIX>]` variables, as `forgesFromEnv()` reads them (e.g. `FORGES_GITHUB_TOKEN`, `FORGES_GITLAB_ENABLED=1`).
 
 Set exactly one of:
 
-- `FORGES_PROXY_SECRET`: private instance. Callers send `Authorization: Bearer <secret>`. Every verb is routed.
+- `FORGES_PROXY_SECRET`: private instance. Callers send `Authorization: Bearer <secret>` to everything but `/docs`, `/openapi.json` and webhooks. Every verb is routed.
 - `FORGES_PROXY_PUBLIC=1`: public instance. No auth, and only verbs that need neither an account nor write access are routed. Use tokens that can only read public data.
 
 ## Use
@@ -18,16 +26,16 @@ pnpm install
 pnpm dev
 ```
 
-- `GET /v1`: configured providers, their capabilities, and the routed verbs with the position of their options.
+- `GET /`: configured providers, their capabilities, and the routed verbs with the position of their options.
 - `GET /docs`: API reference (Scalar), from `GET /openapi.json` (OpenAPI 3.1).
-- `GET /v1/status`: each provider's rate-limit budgets, as the server instance that answers last saw them.
-- `GET /v1/:forge/:instance/:verb?args=<json array>`: a read, e.g. `repos.get`, `threads.list`.
-- `POST /v1/:forge/:instance/:verb` with `{ "args": [...] }`: a write.
+- `GET /status`: each provider's rate-limit budgets, as the server instance that answers last saw them.
+- `GET /:forge/:instance/:verb?args=<json array>`: a read, e.g. `repos.get`, `threads.list`.
+- `POST /:forge/:instance/:verb` with `{ "args": [...] }`: a write.
 
 Arguments are positional, as the `ForgeProvider` method takes them, and are validated against the verb's signature (see `/docs`). Pass `null` for a skipped optional argument. Bytes travel as `{ "$bytes": "<base64>" }` in both directions. A listing answers with one page; pass its `cursor` back in the options to read the next.
 
 ```sh
-curl -G localhost:3000/v1/github/github.com/repos.get \
+curl -G localhost:3000/github/github.com/repos.get \
   --data-urlencode 'args=[{"forge":"github","instance":"github.com","owner":"danielroe","name":"forges"}]'
 ```
 

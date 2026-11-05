@@ -77,7 +77,7 @@ describe("cache tags", () => {
   env({ FORGES_PROXY_PUBLIC: "1" })
 
   it("tag a public read with its instance and the repositories it names", async () => {
-    const url = new URL("/v1/fake/fake.test/repos.get", "http://proxy.test")
+    const url = new URL("/fake/fake.test/repos.get", "http://proxy.test")
     url.searchParams.set("args", JSON.stringify([repo]))
     const response = await app.fetch(new Request(url))
     const tags = response.headers.get("netlify-cache-tag")!.split(",")

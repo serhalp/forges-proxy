@@ -93,6 +93,37 @@
         "type": "boolean"
       }
     },
+    "users.sponsorableMany": {
+      "summary": "Whether several accounts accept sponsorship, batched where the forge allows. Returns one entry per login, in\ninput order. GitHub reads up to 50 logins per request, so a few dozen maintainers cost one request rather than\none each. An unknown or renamed login becomes an `ok: false` entry with an `account_not_found` warning, and an\naccount that cannot be read for another reason becomes `account_unreadable`, rather than rejecting the call. A\nrequest-level failure, such as a transport error, rate limit, or rejected credential, rejects the whole call.\nOther GraphQL failures without `data` return an `ok: false` warning for each login in the affected chunk.",
+      "write": false,
+      "account": true,
+      "params": [
+        {
+          "name": "logins",
+          "optional": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "name": "options",
+          "optional": true,
+          "options": true,
+          "schema": {
+            "$ref": "#/components/schemas/BaseOptions"
+          }
+        }
+      ],
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SponsorableManyResult"
+        }
+      }
+    },
     "users.events": {
       "summary": "Lists what an account did across the repositories the credential can see, in the feed's order as for\n{@link ReposApi.events}, with the same conditional requests and throttling. Each event has `source: 'poll'`.",
       "write": false,
@@ -6010,7 +6041,9 @@
         "cursor-origin",
         "pushin",
         "cloudflare-artifacts",
-        "sourcehut"
+        "sourcehut",
+        "entire",
+        "gitbucket"
       ],
       "description": "The forges this package ships providers for."
     },
@@ -9601,6 +9634,51 @@
         "stream"
       ],
       "description": "How an event reached the caller."
+    },
+    "SponsorableManyResult": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "const": true
+            },
+            "login": {
+              "type": "string"
+            },
+            "sponsorable": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "ok",
+            "login",
+            "sponsorable"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "login": {
+              "type": "string"
+            },
+            "warning": {
+              "$ref": "#/components/schemas/ForgeWarning"
+            }
+          },
+          "required": [
+            "ok",
+            "login",
+            "warning"
+          ]
+        }
+      ],
+      "description": "One `users.sponsorableMany()` entry, in input order; narrow on `ok`."
     },
     "SubscriptionState": {
       "type": "string",

@@ -11,6 +11,7 @@ import type {
 } from "forges"
 import * as forges from "forges"
 import { CAPABILITY_TABLE, forgeIterable, iteratePages } from "forges/kit"
+import { compatible, FORGES_VERSION } from "#shared/version.ts"
 import { decodeBytes, encodeBytes } from "#shared/wire.ts"
 
 export interface RemoteOptions {
@@ -22,6 +23,8 @@ export interface RemoteOptions {
 }
 
 interface RemoteIndex {
+  /** Absent from proxies older than the check. */
+  forges?: string
   providers: Array<{
     forge: string
     instance: string
@@ -42,7 +45,9 @@ const LOCAL: Record<string, Factory> = {
   bitbucket: forges.bitbucket as Factory,
   "cloudflare-artifacts": forges.cloudflareArtifacts as Factory,
   "cursor-origin": forges.cursorOrigin as Factory,
+  entire: forges.entire as Factory,
   forgejo: forges.forgejo as Factory,
+  gitbucket: forges.gitbucket as Factory,
   gitea: forges.gitea as Factory,
   gitee: forges.gitee as Factory,
   github: forges.github as Factory,
@@ -74,11 +79,17 @@ export async function connect(options: RemoteOptions): Promise<ForgeProvider[]> 
   const headers: Record<string, string> = options.secret
     ? { authorization: `Bearer ${options.secret}` }
     : {}
-  const response = await fetch(new URL("/v1", options.url).href, { headers })
+  const response = await fetch(new URL("/", options.url).href, { headers })
   if (!response.ok) {
     throw await toError(response, {})
   }
   const index = (await response.json()) as RemoteIndex
+  // A warning, not a rejection: most verbs survive a mismatch, and unrouted ones already reject.
+  if (index.forges && !compatible(index.forges, FORGES_VERSION)) {
+    console.warn(
+      `forges-proxy: ${options.url} runs forges ${index.forges}, but this client was built against ${FORGES_VERSION}. Verbs whose arguments or results changed between them may fail.`,
+    )
+  }
   const verbs = new Map(index.verbs.map(({ name, ...verb }) => [name, verb]))
   return index.providers.map((info) => remoteProvider(info, verbs, { ...options, fetch, headers }))
 }
@@ -102,7 +113,7 @@ function remoteProvider(
     const { signal, ...rest } = own ?? {}
     const sent = own ? args.with(at, rest) : args
     const url = new URL(
-      `/v1/${encodeURIComponent(forge)}/${encodeURIComponent(instance)}/${verb}`,
+      `/${encodeURIComponent(forge)}/${encodeURIComponent(instance)}/${verb}`,
       options.url,
     )
     if (!write) {

@@ -35,7 +35,7 @@ describe("upstream entries behind a route", () => {
   env({ FORGES_PROXY_PUBLIC: "1" })
 
   it("are tagged like the response, and reported per request", async () => {
-    const url = new URL("/v1/github/github.com/repos.get", "http://proxy.test")
+    const url = new URL("/github/github.com/repos.get", "http://proxy.test")
     url.searchParams.set(
       "args",
       JSON.stringify([{ forge: "github", instance: "github.com", owner: "acme", name: "widgets" }]),

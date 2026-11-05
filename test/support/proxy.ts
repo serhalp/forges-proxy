@@ -51,7 +51,7 @@ function routeFiles(): string[] {
     )
 }
 
-/** Nitro's file routing: `v1/[forge]/index.get.ts` is `GET /v1/:forge`, and no method suffix takes every method. */
+/** Nitro's file routing: `[forge]/index.get.ts` is `GET /:forge`, and no method suffix takes every method. */
 function routeOf(file: string): { method: HTTPMethod | ""; path: string } {
   const [, base, method] = /^(.*?)(?:\.(get|post|put|patch|delete))?\.ts$/.exec(file)!
   const path = `/${base!}`.replace(/\[(\w+)\]/g, ":$1").replace(/\/index$/, "")

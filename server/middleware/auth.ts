@@ -4,8 +4,11 @@ import { defineMiddleware } from "nitro"
 import { accessMode } from "#server/utils/access.ts"
 import { proxyError } from "#server/utils/errors.ts"
 
+// Webhooks are verified by their signatures instead.
+const OPEN = /^\/(?:docs|openapi\.json)$|^\/webhooks\//
+
 export default defineMiddleware((event) => {
-  if (!/^\/v1(\/|$)/.test(event.url.pathname) || accessMode() === "public") {
+  if (OPEN.test(event.url.pathname) || accessMode() === "public") {
     return
   }
   const header = event.req.headers.get("authorization") ?? ""

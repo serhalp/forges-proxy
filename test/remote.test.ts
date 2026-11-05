@@ -12,6 +12,7 @@ import {
 } from "forges"
 import { fake } from "forges/fake"
 import { connect } from "#client/remote.ts"
+import { FORGES_VERSION } from "#shared/version.ts"
 import { serialise } from "#server/utils/wire.ts"
 import { createProxy, env } from "./support/proxy.ts"
 
@@ -53,6 +54,25 @@ describe("connect", () => {
     assert.deepEqual([fake.forge, fake.instance], ["fake", "fake.test"])
     assert.deepEqual(fake.capabilities, overTheWire(direct.capabilities))
     assert.equal(github.forge, "github")
+  })
+
+  it("warns when the proxy runs an incompatible forges", async (t) => {
+    const warn = t.mock.method(console, "warn", () => {})
+    const runs = (version: string) => async (url: string, init?: RequestInit) => {
+      const response = await fetch(url, init)
+      return new URL(url).pathname === "/"
+        ? Response.json({ ...((await response.json()) as object), forges: version })
+        : response
+    }
+    for (const version of [FORGES_VERSION, "0.3.9"]) {
+      await connect({ url: "http://proxy.test", secret: "s3cret", fetch: runs(version) })
+    }
+    assert.equal(warn.mock.callCount(), 0)
+    await connect({ url: "http://proxy.test", secret: "s3cret", fetch: runs("0.4.0") })
+    assert.match(
+      String(warn.mock.calls[0]!.arguments[0]),
+      /runs forges 0\.4\.0, but this client was built against/,
+    )
   })
 
   it("rejects a wrong secret", async () => {

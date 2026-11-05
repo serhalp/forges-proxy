@@ -38,9 +38,9 @@ function call(path: string, init: RequestInit & { args?: unknown[] } = {}): Prom
 }
 
 const read = (name: string, args: unknown[], headers?: HeadersInit) =>
-  call(`/v1/fake/fake.test/${name}`, { args, headers })
+  call(`/fake/fake.test/${name}`, { args, headers })
 const write = (name: string, args: unknown[], headers?: HeadersInit) =>
-  call(`/v1/fake/fake.test/${name}`, {
+  call(`/fake/fake.test/${name}`, {
     method: "POST",
     args,
     headers: { "content-type": "application/json", ...headers },
@@ -79,9 +79,13 @@ describe("private mode", () => {
     }
   })
 
-  it("guards only /v1 and what's under it", async () => {
-    assert.equal((await call("/v1x")).status, 404)
-    assert.equal((await call("/v1")).status, 401)
+  it("guards everything but the docs and webhooks", async () => {
+    assert.equal((await call("/")).status, 401)
+    assert.equal((await call("/status")).status, 401)
+    assert.equal((await call("/nope")).status, 401)
+    assert.equal((await call("/docs")).status, 200)
+    assert.equal((await call("/openapi.json")).status, 200)
+    assert.equal((await call("/docsx")).status, 401)
   })
 
   it("serves reads uncached", async () => {
@@ -101,7 +105,7 @@ describe("private mode", () => {
   })
 
   it("lists every verb and the skipped env sets", async () => {
-    const body = (await (await call("/v1", { headers: authorization })).json()) as {
+    const body = (await (await call("/", { headers: authorization })).json()) as {
       mode: string
       verbs: Array<{ name: string }>
       skipped: unknown[]
@@ -151,7 +155,7 @@ describe("public mode", () => {
   })
 
   it("lists only public verbs and hides the skipped env sets", async () => {
-    const body = (await (await call("/v1")).json()) as {
+    const body = (await (await call("/")).json()) as {
       verbs: Array<{ write: boolean; account: boolean }>
     }
     assert.ok(body.verbs.length > 0)
@@ -171,8 +175,7 @@ describe("dispatch", () => {
       assert.equal((await errorOf(response)).name, "ProxyError")
     }
     assert.equal(
-      (await call("/v1/github/github.com/repos.get", { args: [repo], headers: authorization }))
-        .status,
+      (await call("/github/github.com/repos.get", { args: [repo], headers: authorization })).status,
       404,
     )
   })
@@ -186,7 +189,7 @@ describe("dispatch", () => {
 
   it("400s for args that are not a JSON array", async () => {
     for (const args of ["nope", '{"a":1}']) {
-      const response = await call(`/v1/fake/fake.test/repos.get?args=${encodeURIComponent(args)}`, {
+      const response = await call(`/fake/fake.test/repos.get?args=${encodeURIComponent(args)}`, {
         headers: authorization,
       })
       assert.equal(response.status, 400, args)
@@ -285,7 +288,7 @@ describe("dispatch", () => {
   it("passes the request's signal to the verb", async (t) => {
     const get = t.mock.method(forges.providers[0]!.repos, "get")
     const controller = new AbortController()
-    const url = new URL("/v1/fake/fake.test/repos.get", "http://proxy.test")
+    const url = new URL("/fake/fake.test/repos.get", "http://proxy.test")
     url.searchParams.set("args", JSON.stringify([repo]))
     await app.fetch(new Request(url, { headers: authorization, signal: controller.signal }))
     const { signal } = get.mock.calls[0]!.arguments[1] as { signal: AbortSignal }
