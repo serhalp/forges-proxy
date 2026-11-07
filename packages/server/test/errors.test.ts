@@ -8,6 +8,7 @@ import {
   UnsupportedOperationError,
 } from "forges"
 import { errorResponse, proxyError } from "#src/errors.ts"
+import * as v from "valibot"
 
 const context = { forge: "github", instance: "github.com", url: "https://api.github.com/repos/a/b" }
 
@@ -39,7 +40,8 @@ describe("errorResponse", () => {
     assert.equal(response.status, 429)
     assert.equal(response.headers.get("retry-after"), "31")
     assert.equal(
-      ((await response.json()) as { error: { secondary: boolean } }).error.secondary,
+      v.parse(v.object({ error: v.object({ secondary: v.boolean() }) }), await response.json())
+        .error.secondary,
       true,
     )
   })

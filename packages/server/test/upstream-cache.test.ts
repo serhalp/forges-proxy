@@ -3,6 +3,7 @@ import { describe, it } from "node:test"
 import { github } from "forges"
 import type { StoredResponse, UpstreamStore } from "#src/upstream-cache.ts"
 import { cacheApiStore, cachingFetch, memoryStore, upstreamScope } from "#src/upstream-cache.ts"
+import * as v from "valibot"
 
 interface Sent {
   url: string
@@ -77,7 +78,7 @@ describe("cachingFetch", () => {
     await fetch(url, auth("a"))
     time.advance(61)
     const response = await fetch(url, auth("a"))
-    assert.equal(forge.sent[1]!.headers.get("if-none-match"), '"v1"')
+    assert.equal(forge.sent[1].headers.get("if-none-match"), '"v1"')
     assert.equal(response.status, 200)
     assert.deepEqual(await response.json(), { version: 1, url })
     assert.equal(response.headers.get("x-ratelimit-remaining"), "4999")
@@ -109,7 +110,7 @@ describe("cachingFetch", () => {
       headers: { authorization: "Bearer a", accept: "application/vnd.github.raw" },
     })
     assert.equal(forge.sent.length, 3)
-    assert.equal(forge.sent[1]!.headers.get("if-none-match"), null)
+    assert.equal(forge.sent[1].headers.get("if-none-match"), null)
   })
 
   it("passes the caller's own conditional request through untouched", async () => {
@@ -178,14 +179,15 @@ describe("cachingFetch", () => {
       await fetch(url, auth("a"))
       await fetch(url, auth("a"))
       assert.equal(forge.sent.length, 2, JSON.stringify(options))
-      assert.equal(forge.sent[1]!.headers.get("if-none-match"), null, JSON.stringify(options))
+      assert.equal(forge.sent[1].headers.get("if-none-match"), null, JSON.stringify(options))
     }
   })
 
   it("passes a body larger than the limit through without storing it", async () => {
     const forge = upstream()
     const fetch = cachingFetch(forge.fetch, { maxBodyBytes: 10 })
-    assert.equal(((await (await fetch(url, auth("a"))).json()) as { version: number }).version, 1)
+    const body = await (await fetch(url, auth("a"))).json()
+    assert.equal(v.parse(v.object({ version: v.number() }), body).version, 1)
     await fetch(url, auth("a"))
     assert.equal(forge.sent.length, 2)
   })
@@ -210,7 +212,7 @@ describe("cachingFetch", () => {
     time.advance(61)
     await provider.repos.get(repo)
     assert.equal(forge.sent.length, 2)
-    assert.equal(forge.sent[1]!.headers.get("if-none-match"), '"v1"')
+    assert.equal(forge.sent[1].headers.get("if-none-match"), '"v1"')
     // The provider read the 304 as the full response, and saw the fresh budget.
     assert.equal(provider.rateLimits()[0]?.remaining, 4999)
   })
@@ -289,9 +291,11 @@ describe("upstreamScope", () => {
 /** Enough of a `Cache` for the store: responses by URL. */
 function stubCache() {
   const responses = new Map<string, Response>()
+  // Only what the store calls.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   const cache = {
-    match: async (url: string) => responses.get(url)?.clone(),
-    put: async (url: string, response: Response) => void responses.set(url, response),
+    match: async (key: string) => responses.get(key)?.clone(),
+    put: async (key: string, response: Response) => void responses.set(key, response),
   } as unknown as Cache
   return { cache, responses }
 }
@@ -321,8 +325,8 @@ describe("cacheApiStore", () => {
     await cacheApiStore(async () => cache).set("key", entry, ["a", "b"])
     const [stored] = [...responses.values()]
     // The upstream `private` would make the platform refuse it.
-    assert.match(stored!.headers.get("cache-control")!, /^public, max-age=\d+$/)
-    assert.equal(stored!.headers.get("cache-tag"), "a,b")
+    assert.match(stored.headers.get("cache-control")!, /^public, max-age=\d+$/)
+    assert.equal(stored.headers.get("cache-tag"), "a,b")
   })
 
   it("names tags as the platform reads them", async () => {
@@ -330,8 +334,8 @@ describe("cacheApiStore", () => {
     const tagHeaders = (tags: string[]) => ({ "x-tags": tags.join(" ") })
     await cacheApiStore(async () => cache, { tagHeaders }).set("key", entry, ["a", "b"])
     const [stored] = [...responses.values()]
-    assert.equal(stored!.headers.get("x-tags"), "a b")
-    assert.equal(stored!.headers.has("cache-tag"), false)
+    assert.equal(stored.headers.get("x-tags"), "a b")
+    assert.equal(stored.headers.has("cache-tag"), false)
   })
 
   it("backs cachingFetch", async () => {

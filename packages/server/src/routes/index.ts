@@ -9,7 +9,7 @@ import { isRouted } from "#src/verbs.ts"
  * The `forges` version, the configured providers with their capabilities, and the verbs this instance routes, each
  * with the position of its options, where clients put `signal` and a listing's cursor.
  */
-export function index(context: Context): EventHandler {
+export function indexRoute(context: Context): EventHandler {
   return () => {
     const mode = accessMode(context.env)
     return {

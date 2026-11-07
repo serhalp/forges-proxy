@@ -3,6 +3,7 @@ import { describe, it } from "node:test"
 import { createForges } from "forges"
 import { fake } from "forges/fake"
 import { createProxy, env } from "./support/proxy.ts"
+import * as v from "valibot"
 
 const forges = createForges([
   fake({ rateLimit: { limit: 10 }, seed: { repos: [{ repo: "acme/widgets" }] } }),
@@ -28,11 +29,19 @@ describe("GET /status", () => {
     )
     const response = await get("/status", authorization)
     assert.equal(response.headers.get("cache-control"), "no-store")
-    const { providers } = (await response.json()) as {
-      providers: Array<{ forge: string; rateLimits: Array<{ limit: number; remaining: number }> }>
-    }
-    assert.equal(providers[0]!.forge, "fake")
-    assert.equal(providers[0]!.rateLimits[0]!.limit, 10)
-    assert.ok(providers[0]!.rateLimits[0]!.remaining < 10)
+    const { providers } = v.parse(
+      v.object({
+        providers: v.array(
+          v.object({
+            forge: v.string(),
+            rateLimits: v.array(v.object({ limit: v.number(), remaining: v.number() })),
+          }),
+        ),
+      }),
+      await response.json(),
+    )
+    assert.equal(providers[0].forge, "fake")
+    assert.equal(providers[0].rateLimits[0].limit, 10)
+    assert.ok(providers[0].rateLimits[0].remaining < 10)
   })
 })

@@ -5,7 +5,7 @@ import type { Context } from "#src/context.ts"
  * Each provider's request budgets, as the latest upstream responses reported them. They're per server instance, so on
  * serverless platforms a reading reflects whichever instance answered.
  */
-export function status(context: Context): EventHandler {
+export function statusRoute(context: Context): EventHandler {
   return (event) => {
     event.res.headers.set("cache-control", "no-store")
     return {

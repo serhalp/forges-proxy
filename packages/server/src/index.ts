@@ -4,12 +4,12 @@ import { H3, handleCors } from "h3"
 import { auth } from "#src/auth.ts"
 import type { CdnHeaders, Env, Purge } from "#src/context.ts"
 import { standardCdnHeaders } from "#src/response.ts"
-import { docs } from "#src/routes/docs.ts"
-import { index } from "#src/routes/index.ts"
-import { openapi } from "#src/routes/openapi.ts"
-import { status } from "#src/routes/status.ts"
-import { verb } from "#src/routes/verb.ts"
-import { webhook } from "#src/routes/webhook.ts"
+import { docsRoute } from "#src/routes/docs.ts"
+import { indexRoute } from "#src/routes/index.ts"
+import { openapiRoute } from "#src/routes/openapi.ts"
+import { statusRoute } from "#src/routes/status.ts"
+import { verbRoute } from "#src/routes/verb.ts"
+import { webhookRoute } from "#src/routes/webhook.ts"
 import type { CachingFetch, UpstreamStore } from "#src/upstream-cache.ts"
 import { cachingFetch } from "#src/upstream-cache.ts"
 
@@ -60,12 +60,12 @@ export function createServer(options: ServerOptions = {}): Server {
     // Before auth, so preflights pass and errors stay readable.
     .use((event) => handleCors(event, { ...CORS, methods: [...CORS.methods] }) || undefined)
     .use(auth(context))
-    .get("/", index(context))
-    .get("/status", status(context))
-    .get("/docs", docs)
-    .get("/openapi.json", openapi(context))
-    .post("/webhooks/:forge/:instance", webhook(context))
-    .all("/:forge/:instance/:verb", verb(context))
+    .get("/", indexRoute(context))
+    .get("/status", statusRoute(context))
+    .get("/docs", docsRoute)
+    .get("/openapi.json", openapiRoute(context))
+    .post("/webhooks/:forge/:instance", webhookRoute(context))
+    .all("/:forge/:instance/:verb", verbRoute(context))
   return { fetch: async (request) => app.fetch(request) }
 }
 

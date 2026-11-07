@@ -4,6 +4,7 @@ import { createForges } from "forges"
 import { fake } from "forges/fake"
 import { signDelivery } from "forges/testing"
 import { createProxy, env, recorded } from "./support/proxy.ts"
+import * as v from "valibot"
 
 const factory = fake({
   webhookSecret: "whsec",
@@ -50,7 +51,8 @@ describe("webhooks", () => {
     const response = await deliver(body, await signDelivery("fake", body, "wrong"))
     assert.equal(response.status, 401)
     assert.equal(
-      ((await response.json()) as { error: { name: string } }).error.name,
+      v.parse(v.object({ error: v.object({ name: v.string() }) }), await response.json()).error
+        .name,
       "WebhookVerificationError",
     )
     assert.deepEqual(recorded.purges, [])

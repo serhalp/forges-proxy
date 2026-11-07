@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks"
 import type { FetchLike } from "forges"
 import { sha256Hex } from "forges/kit"
+import * as v from "valibot"
 
 /** An upstream response as the cache keeps it. */
 export interface StoredResponse {
@@ -42,6 +43,10 @@ interface ScopeState {
 
 const scopes = new AsyncLocalStorage<ScopeState>()
 
+function record(outcome: UpstreamOutcome): void {
+  scopes.getStore()?.outcomes.push(outcome)
+}
+
 export function upstreamScope(): UpstreamScope {
   const state: ScopeState = { pending: new Map(), outcomes: [] }
   return {
@@ -49,7 +54,7 @@ export function upstreamScope(): UpstreamScope {
     async commit(tags) {
       const writes = [...state.pending]
       state.pending.clear()
-      await Promise.all(writes.map(([key, { store, entry }]) => store.set(key, entry, tags)))
+      await Promise.all(writes.map(async ([key, { store, entry }]) => store.set(key, entry, tags)))
     },
     outcomes: state.outcomes,
   }
@@ -96,7 +101,6 @@ export function cachingFetch(fetch: FetchLike, options: UpstreamCacheOptions = {
       await store.set(key, entry)
     }
   }
-  const record = (outcome: UpstreamOutcome) => scopes.getStore()?.outcomes.push(outcome)
 
   const cached: FetchLike = async (input, init = {}) => {
     const headers = new Headers(init.headers)
@@ -252,7 +256,10 @@ function toResponse(entry: StoredResponse, options: { withoutRateLimit?: boolean
 }
 
 /** An in-memory store that evicts the least recently used entries beyond `maxBytes`. */
-export function memoryStore(maxBytes = 64 * 1024 * 1024): UpstreamStore {
+export function memoryStore(maxBytes = 64 * 1024 * 1024): {
+  get: (key: string) => StoredResponse | undefined
+  set: (key: string, value: StoredResponse) => void
+} {
   const entries = new Map<string, StoredResponse>()
   let bytes = 0
   const sizeOf = (entry: StoredResponse) =>
@@ -289,6 +296,13 @@ export function memoryStore(maxBytes = 64 * 1024 * 1024): UpstreamStore {
 const RETENTION_SECONDS = 24 * 60 * 60
 const ENTRY_URL = "https://upstream.forges-proxy.invalid/"
 
+const StoredMeta = v.object({
+  status: v.number(),
+  headers: v.array(v.tuple([v.string(), v.string()])),
+  storedAt: v.number(),
+  maxAge: v.number(),
+})
+
 /**
  * A store on the Cache API (`caches`), where the platform has one: shared by every instance in a region, and purged
  * along with the CDN by the proxy response's cache tags (`Cache-Tag`, unless `tagHeaders` says otherwise). The entry's
@@ -309,8 +323,12 @@ export function cacheApiStore(
       }
       const bytes = new Uint8Array(await response.arrayBuffer())
       const length = new DataView(bytes.buffer, bytes.byteOffset).getUint32(0)
-      const meta = JSON.parse(new TextDecoder().decode(bytes.subarray(4, 4 + length)))
-      return { ...meta, body: bytes.slice(4 + length) } as StoredResponse
+      const meta = v.safeParse(
+        StoredMeta,
+        JSON.parse(new TextDecoder().decode(bytes.subarray(4, 4 + length))),
+      )
+      // An entry from an older layout is a miss.
+      return meta.success ? { ...meta.output, body: bytes.slice(4 + length) } : undefined
     },
     async set(key, { body, ...meta }, tags = []) {
       const json = encoder.encode(JSON.stringify(meta))

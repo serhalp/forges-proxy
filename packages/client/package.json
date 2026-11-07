@@ -55,6 +55,9 @@
     "typecheck": "tsc --noEmit",
     "test": "node --conditions=@forges-proxy/source --test \"test/**/*.test.ts\""
   },
+  "dependencies": {
+    "valibot": "^1.5.0"
+  },
   "devDependencies": {
     "forges": "0.3.2",
     "tsdown": "0.23.7"

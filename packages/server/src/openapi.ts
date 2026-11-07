@@ -64,7 +64,7 @@ export function openApi(
           security: [{ secret: [] }],
         }
       : { components: { schemas: { ...manifest.schemas, Error: ERROR } } }),
-    tags: [...new Set(verbs.map(([name]) => name.split(".")[0]!))].map((name) => ({ name })),
+    tags: [...new Set(verbs.map(([name]) => name.split(".")[0]))].map((name) => ({ name })),
     paths: Object.fromEntries(
       verbs.map(([name, verb]) => [
         `/{forge}/{instance}/${name}`,
@@ -124,12 +124,19 @@ function signature(verb: ManifestVerb): string {
   return `\`[${verb.params.map((param) => `${param.name}${param.optional ? "?" : ""}`).join(", ")}]\``
 }
 
+function isSchema(value: unknown): value is Schema {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+// `undefined` results are a 204, and `void` is nothing but.
+function isEmpty(schema: Schema): boolean {
+  return schema.type === "null" || JSON.stringify(schema) === '{"not":{}}'
+}
+
 function responses(verb: ManifestVerb): Record<string, unknown> {
-  const branches = (verb.result.anyOf as Schema[] | undefined) ?? [verb.result]
-  // `undefined` results are a 204, and `void` is nothing but.
-  const empty = (schema: Schema) =>
-    schema.type === "null" || JSON.stringify(schema) === '{"not":{}}'
-  const json = branches.filter((schema) => !empty(schema) && schema.format !== "binary")
+  const { anyOf } = verb.result
+  const branches = Array.isArray(anyOf) ? anyOf.filter(isSchema) : [verb.result]
+  const json = branches.filter((schema) => !isEmpty(schema) && schema.format !== "binary")
   return {
     ...(json.length || verb.stream
       ? {
@@ -146,7 +153,7 @@ function responses(verb: ManifestVerb): Record<string, unknown> {
           },
         }
       : {}),
-    ...(branches.some(empty) ? { 204: { description: "The verb returned nothing." } } : {}),
+    ...(branches.some(isEmpty) ? { 204: { description: "The verb returned nothing." } } : {}),
     default: {
       description: "A `ForgeError`, with the upstream status where there is one.",
       content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },

@@ -5,12 +5,7 @@ import { fromBase64, toBase64 } from "forges/kit"
  * takes either (`FileChange.content`).
  */
 export function isBytes(value: object): value is { $bytes: string } {
-  const keys = Object.keys(value)
-  return (
-    keys.length === 1 &&
-    keys[0] === "$bytes" &&
-    typeof (value as { $bytes: unknown }).$bytes === "string"
-  )
+  return Object.keys(value).length === 1 && "$bytes" in value && typeof value.$bytes === "string"
 }
 
 /** A `JSON.stringify` replacer that sends bytes as `{ "$bytes": "<base64>" }`. */

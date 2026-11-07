@@ -11,6 +11,7 @@ import type {
 } from "forges"
 import * as forges from "forges"
 import { CAPABILITY_TABLE, forgeIterable, iteratePages } from "forges/kit"
+import * as v from "valibot"
 import { compatible, FORGES_VERSION } from "#src/version.ts"
 import { decodeBytes, encodeBytes } from "#src/wire.ts"
 
@@ -22,24 +23,38 @@ export interface RemoteOptions {
   fetch?: FetchLike
 }
 
-interface RemoteIndex {
+const isObject = (value: unknown): value is object => typeof value === "object" && value !== null
+
+const RemoteIndex = v.object({
   /** Absent from proxies older than the check. */
-  forges?: string
-  providers: Array<{
-    forge: string
-    instance: string
-    baseUrl: string
-    authKind: AuthKind
-    capabilities: ForgeCapabilities
-  }>
+  forges: v.optional(v.string()),
+  providers: v.array(
+    v.object({
+      forge: v.string(),
+      instance: v.string(),
+      baseUrl: v.string(),
+      // `forges` values the proxy passes through, trusted like verb results.
+      authKind: v.custom<AuthKind>((value) => typeof value === "string"),
+      capabilities: v.custom<ForgeCapabilities>(isObject),
+    }),
+  ),
   /** `options` is the position of the verb's options, or -1. A listing answers with one page. */
-  verbs: Array<{ name: string; write: boolean; listing: boolean; options: number }>
-}
+  verbs: v.array(
+    v.object({ name: v.string(), write: v.boolean(), listing: v.boolean(), options: v.number() }),
+  ),
+})
+type RemoteIndex = v.InferOutput<typeof RemoteIndex>
+
+const ErrorBody = v.object({
+  error: v.looseObject({ name: v.optional(v.string()), message: v.optional(v.string()) }),
+})
 
 type RemoteVerb = Omit<RemoteIndex["verbs"][number], "name">
 
 type Factory = (options: ForgeOptionsBase) => ForgeProvider
-// Credential-less providers answer the sync helpers (`urlFor`, `parseUrl`, ...) that need no request.
+// Credential-less providers answer the sync helpers (`urlFor`, `parseUrl`, ...) that need no request. Some factories'
+// types require `auth`, which those helpers never use.
+/* oxlint-disable typescript/no-unsafe-type-assertion */
 const LOCAL: Record<string, Factory> = {
   "azure-devops": forges.azureDevOps as Factory,
   bitbucket: forges.bitbucket as Factory,
@@ -56,14 +71,19 @@ const LOCAL: Record<string, Factory> = {
   sourcehut: forges.sourcehut as Factory,
   tangled: forges.tangled as Factory,
 } satisfies Record<KnownForgeKind, Factory>
+/* oxlint-enable typescript/no-unsafe-type-assertion */
 
-const ERRORS = new Map<string, new (...args: never[]) => Error>(
-  Object.values(forges).flatMap((value) =>
-    typeof value === "function" && value.prototype instanceof Error
-      ? [[value.name, value as new (...args: never[]) => Error]]
-      : [],
-  ),
-)
+type ErrorClass = new (...args: never[]) => Error
+
+const isErrorClass = (value: unknown): value is ErrorClass =>
+  typeof value === "function" && value.prototype instanceof Error
+
+const ERRORS = new Map<string, ErrorClass>()
+for (const value of Object.values(forges)) {
+  if (isErrorClass(value)) {
+    ERRORS.set(value.name, value)
+  }
+}
 
 /**
  * One `ForgeProvider` per forge the proxy at `url` serves, to pass to `createForges()`. Every verb is present: those
@@ -85,7 +105,7 @@ export async function connect(options: RemoteOptions): Promise<ForgeProvider[]> 
   if (!response.ok) {
     throw await toError(response, {})
   }
-  const index = (await response.json()) as RemoteIndex
+  const index = v.parse(RemoteIndex, await response.json())
   // A warning, not a rejection: most verbs survive a mismatch, and unrouted ones already reject.
   if (index.forges && !compatible(index.forges, FORGES_VERSION)) {
     console.warn(
@@ -113,9 +133,14 @@ function remoteProvider(
   async function call(verb: string, args: unknown[]): Promise<unknown> {
     const { write, options: at } = verbs.get(verb)!
     // `AbortSignal`s can't travel as JSON; the request carries them instead.
-    const own = args[at] as { signal?: AbortSignal } | undefined
-    const { signal, ...rest } = own ?? {}
-    const sent = own ? args.with(at, rest) : args
+    const own = args[at]
+    let signal: AbortSignal | undefined
+    let sent = args
+    if (isObject(own) && "signal" in own) {
+      const { signal: given, ...rest } = own
+      signal = given instanceof AbortSignal ? given : undefined
+      sent = args.with(at, rest)
+    }
     const url = new URL(
       `${encodeURIComponent(forge)}/${encodeURIComponent(instance)}/${verb}`,
       options.url,
@@ -144,24 +169,27 @@ function remoteProvider(
 
   /** A listing: each page is a request, with the cursor in the options. */
   function listing(verb: string, at: number, args: unknown[]): ForgeListing<unknown> {
-    const page = (options: object) =>
-      call(verb, [...Array.from({ length: at }, (_, index) => args[index]), options]) as Promise<
-        Page<unknown>
-      >
-    const first = (args[at] ?? {}) as object
+    const page = (pageOptions: object) =>
+      // Trusted: the proxy answered with the `forges` listing's own page.
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+      call(verb, [
+        ...Array.from({ length: at }, (_, index) => args[index]),
+        pageOptions,
+      ]) as Promise<Page<unknown>>
+    const first = args[at] ?? {}
     return Object.assign(iteratePages(page, first), { page: () => page(first) })
   }
 
   const namespaces: Record<string, Record<string, unknown>> = {}
   for (const entry of CAPABILITY_TABLE) {
     for (const verb of entry.verbs ?? []) {
-      const [namespace, name] = verb.split(".") as [string, string]
+      const [namespace, name] = verb.split(".")
       namespaces[namespace] ??= {}
       namespaces[namespace][name] = method(verb, !!entry.listings?.includes(verb))
     }
   }
-  namespaces.webhooks!.events = local?.webhooks.events ?? []
-  namespaces.installations!.provider = () => {
+  namespaces.webhooks.events = local?.webhooks.events ?? []
+  namespaces.installations.provider = () => {
     throw unsupported("installations.provider")
   }
 
@@ -210,6 +238,8 @@ function remoteProvider(
     parseReferences: (...args: Parameters<ForgeProvider["parseReferences"]>) =>
       local?.parseReferences(...args) ?? [],
   }
+  // Built from `CAPABILITY_TABLE` at runtime, so its verbs can't be typed one by one; tests cover the surface.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   return provider as unknown as ForgeProvider
 }
 
@@ -224,14 +254,16 @@ function localProvider(info: RemoteIndex["providers"][number]): ForgeProvider | 
 
 /** Rebuilds the error class the proxy reports, with its fields, without running its constructor. */
 async function toError(response: Response, origin: object): Promise<Error> {
-  const body = (await response.json().catch(() => undefined)) as
-    | { error?: { name?: string; message?: string } & Record<string, unknown> }
-    | undefined
-  const { name = "ForgeApiError", message = response.statusText, ...fields } = body?.error ?? {}
+  const body = v.safeParse(ErrorBody, await response.json().catch(() => undefined))
+  const {
+    name = "ForgeApiError",
+    message = response.statusText,
+    ...fields
+  } = body.success ? body.output.error : {}
   const Class = ERRORS.get(name)
   if (!Class) {
     return new forges.ForgeApiError(message, response.status, "", origin)
   }
-  const error = Reflect.construct(Error, [message], Class) as Error
+  const error = Reflect.construct(Error, [message], Class)
   return Object.assign(error, forges.reviveDates(fields), { name })
 }

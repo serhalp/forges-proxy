@@ -104,7 +104,7 @@ export function generateManifest(): Manifest {
     checker.getAliasedSymbol(exports.find((symbol) => symbol.name === name)!)
   const schemas = schemaGenerator(program, {
     listing: exported("ForgeListing"),
-    page: exported("Page").declarations![0]!,
+    page: exported("Page").declarations![0],
   })
 
   // The published declarations are bundled without `export` keywords, so the generator names every type it meets.
@@ -141,7 +141,7 @@ export function generateManifest(): Manifest {
       const overloads = checker
         .getTypeOfSymbol(symbol)
         .getCallSignatures()
-        .map((signature) => signature.getDeclaration() as TS.SignatureDeclaration)
+        .map((signature) => signature.getDeclaration())
       const params: Array<Omit<ManifestParam, "schema"> & { types: TS.TypeNode[] }> = []
       for (const overload of overloads) {
         overload.parameters.forEach((declaration, index) => {
@@ -194,9 +194,9 @@ export function generateManifest(): Manifest {
   const reached = new Set<string>()
   const reach = (value: unknown): void => {
     for (const [, name] of JSON.stringify(value).matchAll(/"#\/components\/schemas\/([^"]+)"/g)) {
-      if (!reached.has(name!)) {
-        reached.add(name!)
-        reach(components[name!])
+      if (!reached.has(name)) {
+        reached.add(name)
+        reach(components[name])
       }
     }
   }
@@ -207,7 +207,7 @@ export function generateManifest(): Manifest {
       readFileSync(new URL("../package.json", import.meta.resolve("forges")), "utf8"),
     ).version,
     verbs,
-    schemas: Object.fromEntries([...reached].sort().map((name) => [name, components[name]!])),
+    schemas: Object.fromEntries([...reached].toSorted().map((name) => [name, components[name]])),
   }
 }
 
@@ -222,7 +222,7 @@ function docOf(declaration: TS.ParameterDeclaration): { description?: string } {
 /** The type a `Promise<T>` return resolves with. */
 function awaited(program: TS.Program, node: TS.TypeNode): TS.TypeNode {
   return ts.isTypeReferenceNode(node) && isLib(program, node, "Promise") && node.typeArguments
-    ? node.typeArguments[0]!
+    ? node.typeArguments[0]
     : node
 }
 
@@ -270,11 +270,11 @@ class WireTypes implements SubNodeParser, SubTypeFormatter {
 
   createType(node: TS.Node, context: Context): BaseType {
     if (this.isListing(node)) {
-      const page = new Context(node as never)
+      const page = new Context(node)
       for (const argument of (node as TS.TypeReferenceNode).typeArguments ?? []) {
-        page.pushArgument(this.chain.createType(argument as never, context))
+        page.pushArgument(this.chain.createType(argument, context))
       }
-      return this.chain.createType(this.forges.page as never, page)
+      return this.chain.createType(this.forges.page, page)
     }
     const name = this.lib(node)
     return name === "Uint8Array"
@@ -289,7 +289,7 @@ class WireTypes implements SubNodeParser, SubTypeFormatter {
   }
 
   getDefinition(type: BaseType): Definition {
-    return (type instanceof BytesType ? BYTES : STREAM) as Definition
+    return type instanceof BytesType ? BYTES : STREAM
   }
 
   getChildren(): BaseType[] {
@@ -340,7 +340,7 @@ function schemaGenerator(program: TS.Program, forges: ForgesTypes) {
   }
   const wire = new WireTypes(program, forges)
   let chain!: ChainNodeParser
-  const parser = createParser(program as never, config, (mutable) => {
+  const parser = createParser(program, config, (mutable) => {
     chain = mutable as ChainNodeParser
     wire.chain = chain
     chain.addNodeParser(wire)
@@ -353,7 +353,7 @@ function schemaGenerator(program: TS.Program, forges: ForgesTypes) {
     /** The schema of one of `nodes`: overloads give a parameter several. */
     of(nodes: TS.TypeNode[]): Schema {
       const branches = nodes.map((node) => {
-        const type = chain.createType(node as never, new Context())
+        const type = chain.createType(node, new Context())
         // The generator only catches a name clash within one call, and keeps the first type otherwise.
         for (const child of this.typeFormatter.getChildren(type)) {
           if (child instanceof DefinitionType) {
@@ -369,9 +369,9 @@ function schemaGenerator(program: TS.Program, forges: ForgesTypes) {
         return this.typeFormatter.getDefinition(type) as Schema
       })
       const distinct = [...new Map(branches.map((b) => [JSON.stringify(b), b])).values()]
-      return distinct.length === 1 ? distinct[0]! : { anyOf: distinct }
+      return distinct.length === 1 ? distinct[0] : { anyOf: distinct }
     }
-  })(program as never, parser, formatter, config)
+  })(program, parser, formatter, config)
 }
 
 /** OpenAPI component names allow only `[A-Za-z0-9._-]`: `Page<Repo>` becomes `PageOfRepo`. */

@@ -45,20 +45,27 @@ function reposIn(value: unknown, found = new Set<RepoRef>()): Set<RepoRef> {
       reposIn(item, found)
     }
   } else if (value && typeof value === "object" && !(value instanceof Date)) {
-    const record = value as Record<string, unknown>
-    if (
-      typeof record.forge === "string" &&
-      typeof record.instance === "string" &&
-      typeof record.owner === "string" &&
-      typeof record.name === "string"
-    ) {
-      found.add(record as unknown as RepoRef)
+    if (isRepoRef(value)) {
+      found.add(value)
     }
-    for (const [key, item] of Object.entries(record)) {
+    for (const [key, item] of Object.entries(value)) {
       if (key !== "raw" && key !== "payload") {
         reposIn(item, found)
       }
     }
   }
   return found
+}
+
+function isRepoRef(value: object): value is RepoRef {
+  return (
+    "forge" in value &&
+    typeof value.forge === "string" &&
+    "instance" in value &&
+    typeof value.instance === "string" &&
+    "owner" in value &&
+    typeof value.owner === "string" &&
+    "name" in value &&
+    typeof value.name === "string"
+  )
 }

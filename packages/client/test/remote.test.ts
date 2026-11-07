@@ -4,19 +4,20 @@ import type { ForgeProvider } from "forges"
 import {
   createForges,
   ForbiddenError,
-  github,
+  github as githubForge,
   NotFoundError,
   RateLimitedError,
   reviveDates,
   UnsupportedOperationError,
 } from "forges"
-import { fake } from "forges/fake"
+import { fake as fakeForge } from "forges/fake"
 import { connect } from "#src/remote.ts"
 import { FORGES_VERSION } from "#src/version.ts"
 import { serialise } from "../../server/src/wire.ts"
 import { createProxy, env } from "../../server/test/support/proxy.ts"
+import * as v from "valibot"
 
-const direct = fake({
+const direct = fakeForge({
   seed: {
     repos: [{ repo: "acme/widgets", description: "Widgets" }],
     files: [{ repo: "acme/widgets", path: "logo.png", content: new Uint8Array([0, 255, 1]) }],
@@ -28,7 +29,7 @@ const direct = fake({
     runs: [{ repo: "acme/widgets", name: "ci", jobs: [{ name: "test", log: "ok\n" }] }],
   },
 })
-const app = createProxy(createForges([direct, github()]))
+const app = createProxy(createForges([direct, githubForge()]))
 // In-process h3 ignores an aborted signal, where a real `fetch` rejects with it.
 const fetch = async (url: string, init?: RequestInit) => {
   init?.signal?.throwIfAborted()
@@ -43,7 +44,7 @@ const overTheWire = <T>(value: T): T => reviveDates(JSON.parse(serialise(value, 
 
 async function remote(secret?: string): Promise<{ fake: ForgeProvider; github: ForgeProvider }> {
   const [fakeProvider, githubProvider] = await connect({ url: "http://proxy.test", secret, fetch })
-  return { fake: fakeProvider!, github: githubProvider! }
+  return { fake: fakeProvider, github: githubProvider }
 }
 
 describe("connect", () => {
@@ -67,7 +68,7 @@ describe("connect", () => {
       secret: "s3cret",
       fetch: mounted,
     })
-    assert.equal((await provider!.repos.get(repo)).description, "Widgets")
+    assert.equal((await provider.repos.get(repo)).description, "Widgets")
   })
 
   it("warns when the proxy runs an incompatible forges", async (t) => {
@@ -75,7 +76,7 @@ describe("connect", () => {
     const runs = (version: string) => async (url: string, init?: RequestInit) => {
       const response = await fetch(url, init)
       return new URL(url).pathname === "/"
-        ? Response.json({ ...((await response.json()) as object), forges: version })
+        ? Response.json({ ...v.parse(v.looseObject({}), await response.json()), forges: version })
         : response
     }
     for (const version of [FORGES_VERSION, "0.3.9"]) {
@@ -84,7 +85,7 @@ describe("connect", () => {
     assert.equal(warn.mock.callCount(), 0)
     await connect({ url: "http://proxy.test", secret: "s3cret", fetch: runs("0.4.0") })
     assert.match(
-      String(warn.mock.calls[0]!.arguments[0]),
+      String(warn.mock.calls[0].arguments[0]),
       /runs forges 0\.4\.0, but this client was built against/,
     )
   })
@@ -152,8 +153,8 @@ describe("remote provider", () => {
   it("streams job logs", async () => {
     const { fake } = await remote("s3cret")
     const [run] = (await fake.ci.runs(repo).page()).items
-    const [job] = (await fake.ci.jobs(run!.ref).page()).items
-    assert.equal(await new Response(await fake.ci.log(job!.ref)).text(), "ok\n")
+    const [job] = (await fake.ci.jobs(run.ref).page()).items
+    assert.equal(await new Response(await fake.ci.log(job.ref)).text(), "ok\n")
   })
 
   it("resolves with nothing where the provider does", async () => {

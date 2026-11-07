@@ -1,4 +1,5 @@
 import type { EventHandler } from "h3"
+import { getRouterParams } from "h3"
 import type { Context } from "#src/context.ts"
 import { errorResponse, proxyError } from "#src/errors.ts"
 import { purgeTags } from "#src/tags.ts"
@@ -7,9 +8,9 @@ import { purgeTags } from "#src/tags.ts"
  * Receives a forge's webhook deliveries, verified with the provider's `WEBHOOK_SECRET`, and purges the cached responses
  * of every repository they concern. Point the forge's webhook at `/webhooks/:forge/:instance`.
  */
-export function webhook(context: Context): EventHandler {
+export function webhookRoute(context: Context): EventHandler {
   return async (event) => {
-    const { forge, instance } = event.context.params as { forge: string; instance: string }
+    const { forge, instance } = getRouterParams(event, { decode: true })
     const provider = context.forges().for({ forge, instance })
     if (!provider) {
       return proxyError(404, `No provider is configured for ${forge} on ${instance}`)

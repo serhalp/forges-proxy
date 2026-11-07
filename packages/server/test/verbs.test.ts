@@ -5,6 +5,7 @@ import { fake } from "forges/fake"
 import { manifest } from "#src/manifest.ts"
 import { callVerb, routedVerb, withSignal } from "#src/verbs.ts"
 import { routableVerbs } from "#scripts/generate-manifest.ts"
+import * as v from "valibot"
 
 const VERBS = routableVerbs()
 
@@ -53,9 +54,10 @@ describe("callVerb", () => {
       fake({ seed: { repos: [{ repo: "acme/widgets", description: "Widgets" }] } }),
     ])
     const ref = { forge: "fake", instance: "fake.test", owner: "acme", name: "widgets" }
-    const repo = (await callVerb(forges.providers[0]!, "repos.get", {}, [ref])) as {
-      description: string
-    }
+    const repo = v.parse(
+      v.object({ description: v.string() }),
+      await callVerb(forges.providers[0], "repos.get", {}, [ref]),
+    )
     assert.equal(repo.description, "Widgets")
   })
 
@@ -67,9 +69,10 @@ describe("callVerb", () => {
       },
     })
     const ref = { forge: "fake", instance: "fake.test", owner: "acme", name: "widgets" }
-    const page = (await callVerb(provider, "threads.list", { listing: true }, [ref])) as {
-      items: Array<{ title: string }>
-    }
+    const page = v.parse(
+      v.object({ items: v.array(v.object({ title: v.string() })) }),
+      await callVerb(provider, "threads.list", { listing: true }, [ref]),
+    )
     assert.deepEqual(
       page.items.map((thread) => thread.title),
       ["Bug"],
@@ -78,7 +81,7 @@ describe("callVerb", () => {
 })
 
 describe("withSignal", () => {
-  const verb = (name: string) => manifest.verbs[name]!
+  const verb = (name: string) => manifest.verbs[name]
   const signal = new AbortController().signal
   const repo = { forge: "fake", instance: "fake.test", owner: "acme", name: "widgets" }
 
@@ -98,7 +101,7 @@ describe("withSignal", () => {
 
   it("leaves arguments it can't add to alone", () => {
     assert.deepEqual(withSignal(verb("repos.get"), [repo, "nope"], signal), [repo, "nope"])
-    const noOptions = { ...verb("repos.get"), params: [verb("repos.get").params[0]!] }
+    const noOptions = { ...verb("repos.get"), params: [verb("repos.get").params[0]] }
     assert.deepEqual(withSignal(noOptions, [repo], signal), [repo])
   })
 })

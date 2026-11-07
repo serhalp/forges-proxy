@@ -6,6 +6,7 @@ import assert from "node:assert/strict"
 import process from "node:process"
 import { connect } from "@forges-proxy/client"
 import { createForges } from "forges"
+import * as v from "valibot"
 
 const [url, secret] = process.argv.slice(2)
 if (!url) {
@@ -25,7 +26,10 @@ await check("index", async () => {
     secret ? { headers: { authorization: `Bearer ${secret}` } } : {},
   )
   assert.equal(response.status, 200)
-  const index = (await response.json()) as { forges: string; providers: unknown[] }
+  const index = v.parse(
+    v.object({ forges: v.string(), providers: v.array(v.unknown()) }),
+    await response.json(),
+  )
   assert.match(index.forges, /^\d+\.\d+\.\d+/)
   assert.ok(index.providers.length > 0)
 })
@@ -33,10 +37,11 @@ await check("docs and OpenAPI", async () => {
   const docs = await fetch(new URL("docs", base))
   assert.equal(docs.status, 200)
   assert.match(await docs.text(), /data-url="openapi.json"/)
-  const openapi = (await (await fetch(new URL("openapi.json", base))).json()) as {
-    servers: Array<{ url: string }>
-  }
-  assert.equal(openapi.servers[0]!.url, ".")
+  const openapi = v.parse(
+    v.object({ servers: v.array(v.object({ url: v.string() })) }),
+    await (await fetch(new URL("openapi.json", base))).json(),
+  )
+  assert.equal(openapi.servers[0].url, ".")
 })
 await check("CORS preflight", async () => {
   const response = await fetch(new URL("github/github.com/repos.get", base), {
@@ -68,7 +73,8 @@ if (secret) {
     })
     assert.equal(response.status, 400)
     assert.match(
-      ((await response.json()) as { error: { message: string } }).error.message,
+      v.parse(v.object({ error: v.object({ message: v.string() }) }), await response.json()).error
+        .message,
       /names gitlab/,
     )
   })

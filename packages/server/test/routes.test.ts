@@ -3,6 +3,7 @@ import { describe, it } from "node:test"
 import { createForges, RateLimitedError } from "forges"
 import { fake } from "forges/fake"
 import { createProxy, env } from "./support/proxy.ts"
+import * as v from "valibot"
 
 const factory = fake({
   seed: {
@@ -39,7 +40,7 @@ function call(path: string, init: RequestInit & { args?: unknown[] } = {}): Prom
 
 const read = (name: string, args: unknown[], headers?: HeadersInit) =>
   call(`/fake/fake.test/${name}`, { args, headers })
-const write = (name: string, args: unknown[], headers?: HeadersInit) =>
+const write = (name: string, args: unknown[], headers?: Record<string, string>) =>
   call(`/fake/fake.test/${name}`, {
     method: "POST",
     args,
@@ -47,7 +48,10 @@ const write = (name: string, args: unknown[], headers?: HeadersInit) =>
   })
 
 async function errorOf(response: Response): Promise<{ name: string; message: string }> {
-  return ((await response.json()) as { error: { name: string; message: string } }).error
+  return v.parse(
+    v.object({ error: v.object({ name: v.string(), message: v.string() }) }),
+    await response.json(),
+  ).error
 }
 
 describe("configuration", () => {
@@ -111,24 +115,30 @@ describe("private mode", () => {
     assert.equal(response.headers.get("cache-control"), "private, no-store")
     assert.equal(response.headers.get("cdn-cache-control"), null)
     assert.equal(response.headers.get("etag"), null)
-    assert.equal(((await response.json()) as { description: string }).description, "Widgets")
+    assert.equal(
+      v.parse(v.object({ description: v.string() }), await response.json()).description,
+      "Widgets",
+    )
   })
 
   it("routes writes and account verbs", async () => {
     const response = await write("threads.createComment", [issue, "Thanks"], authorization)
     assert.equal(response.status, 200)
-    assert.equal(((await response.json()) as { body: string }).body, "Thanks")
+    assert.equal(v.parse(v.object({ body: v.string() }), await response.json()).body, "Thanks")
     assert.equal((await read("users.me", [], authorization)).status, 200)
   })
 
   it("lists every verb and the skipped env sets", async (t) => {
     process.env.FORGES_GITLAB_BASE_URL = "https://git.example"
     t.after(() => delete process.env.FORGES_GITLAB_BASE_URL)
-    const body = (await (await call("/", { headers: authorization })).json()) as {
-      mode: string
-      verbs: Array<{ name: string }>
-      skipped: unknown[]
-    }
+    const body = v.parse(
+      v.object({
+        mode: v.string(),
+        verbs: v.array(v.object({ name: v.string() })),
+        skipped: v.array(v.unknown()),
+      }),
+      await (await call("/", { headers: authorization })).json(),
+    )
     assert.equal(body.mode, "private")
     assert.ok(body.verbs.some((verb) => verb.name === "threads.createComment"))
     assert.deepEqual(body.skipped, [
@@ -183,9 +193,11 @@ describe("public mode", () => {
   })
 
   it("lists only public verbs and hides the skipped env sets", async () => {
-    const body = (await (await call("/")).json()) as {
-      verbs: Array<{ write: boolean; account: boolean }>
-    }
+    // Loose, so the `skipped` check below sees every key.
+    const body = v.parse(
+      v.looseObject({ verbs: v.array(v.object({ write: v.boolean(), account: v.boolean() })) }),
+      await (await call("/")).json(),
+    )
     assert.ok(body.verbs.length > 0)
     assert.ok(body.verbs.every((verb) => !verb.write && !verb.account))
     assert.equal("skipped" in body, false)
@@ -222,6 +234,11 @@ describe("dispatch", () => {
       })
       assert.equal(response.status, 400, args)
     }
+    const repeated = `args=${encodeURIComponent(JSON.stringify([repo]))}`
+    const response = await call(`/fake/fake.test/repos.get?${repeated}&${repeated}`, {
+      headers: authorization,
+    })
+    assert.equal(response.status, 400)
   })
 
   it("400s for args that don't fit the verb's signature, naming where", async () => {
@@ -261,7 +278,10 @@ describe("dispatch", () => {
 
   it("sends file bytes tagged as base64", async () => {
     const response = await read("contents.getFile", [repo, "README.md"], authorization)
-    const file = (await response.json()) as { encoding: string; content: { $bytes: string } }
+    const file = v.parse(
+      v.object({ encoding: v.string(), content: v.object({ $bytes: v.string() }) }),
+      await response.json(),
+    )
     assert.equal(file.encoding, "binary")
     assert.equal(Buffer.from(file.content.$bytes, "base64").toString(), "hi")
   })
@@ -274,7 +294,13 @@ describe("dispatch", () => {
         authorization,
       )
       assert.equal(response.status, 200)
-      return (await response.json()) as { items: Array<{ title: string }>; cursor?: unknown }
+      return v.parse(
+        v.object({
+          items: v.array(v.object({ title: v.string() })),
+          cursor: v.optional(v.unknown()),
+        }),
+        await response.json(),
+      )
     }
     const first = await page()
     assert.equal(first.items.length, 1)
@@ -290,10 +316,10 @@ describe("dispatch", () => {
   })
 
   it("streams job logs", async () => {
-    const provider = forges.providers[0]!
+    const provider = forges.providers[0]
     const [run] = (await provider.ci.runs(repo).page()).items
-    const [job] = (await provider.ci.jobs(run!.ref).page()).items
-    const response = await read("ci.log", [job!.ref], authorization)
+    const [job] = (await provider.ci.jobs(run.ref).page()).items
+    const response = await read("ci.log", [job.ref], authorization)
     assert.equal(response.headers.get("content-type"), "application/octet-stream")
     assert.equal(await response.text(), "ok\n")
   })
@@ -307,19 +333,22 @@ describe("dispatch", () => {
         authorization,
       )
       assert.equal(response.status, 200)
-      return ((await response.json()) as { items: unknown[] }).items.length
+      return v.parse(v.object({ items: v.array(v.unknown()) }), await response.json()).items.length
     }
     assert.equal(await search(new Date(0)), 2)
     assert.equal(await search(new Date(Date.now() + 86_400_000)), 0)
   })
 
   it("passes the request's signal to the verb", async (t) => {
-    const get = t.mock.method(forges.providers[0]!.repos, "get")
+    const get = t.mock.method(forges.providers[0].repos, "get")
     const controller = new AbortController()
     const url = new URL("/fake/fake.test/repos.get", "http://proxy.test")
     url.searchParams.set("args", JSON.stringify([repo]))
     await app.fetch(new Request(url, { headers: authorization, signal: controller.signal }))
-    const { signal } = get.mock.calls[0]!.arguments[1] as { signal: AbortSignal }
+    const { signal } = v.parse(
+      v.object({ signal: v.instance(AbortSignal) }),
+      get.mock.calls[0].arguments[1],
+    )
     controller.abort()
     assert.equal(signal.aborted, true)
   })

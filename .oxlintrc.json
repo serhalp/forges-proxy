@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "node", "promise"],
+  "categories": { "correctness": "error", "suspicious": "error" },
+  "options": { "typeAware": true, "reportUnusedDisableDirectives": "error" },
+  "rules": {
+    // `node:test` runs what `describe` and `it` return.
+    "typescript/no-floating-promises": [
+      "error",
+      {
+        "allowForKnownSafeCalls": [
+          { "from": "package", "package": "node:test", "name": ["describe", "it", "test"] }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      // Test helpers sit next to the one test that uses them.
+      "files": ["**/test/**"],
+      "rules": { "unicorn/consistent-function-scoping": "off" }
+    },
+    {
+      // TypeScript compiler API plumbing, over the types of our own dependency.
+      "files": ["packages/server/scripts/generate-manifest.ts"],
+      "rules": { "typescript/no-unsafe-type-assertion": "off" }
+    }
+  ]
+}

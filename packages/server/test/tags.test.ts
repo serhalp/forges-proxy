@@ -32,6 +32,8 @@ describe("responseTags", () => {
 
 describe("purgeTags", () => {
   it("includes what affectedKeys names, and both keys of each repository", () => {
+    // Partial events: `purgeTags` reads only these fields.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     const event = {
       kind: "comment",
       repo: { ...repo, externalId: "42" },
@@ -45,6 +47,7 @@ describe("purgeTags", () => {
   })
 
   it("covers both paths of a renamed repository", () => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     const event = {
       kind: "repo",
       repo: { ...repo, name: "gadgets", externalId: "42" },

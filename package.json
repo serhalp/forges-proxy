@@ -7,6 +7,7 @@
   "scripts": {
     "build": "pnpm --filter './packages/*' build",
     "typecheck": "tsc --noEmit && pnpm -r typecheck",
+    "lint": "oxlint",
     "test": "pnpm -r test",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
@@ -18,7 +19,10 @@
     "@types/node": "26.6.6",
     "forges": "0.3.2",
     "oxfmt": "0.77.0",
-    "typescript": "7.0.2"
+    "oxlint": "1.92.0",
+    "oxlint-tsgolint": "7.0.2006",
+    "typescript": "7.0.2",
+    "valibot": "1.5.0"
   },
   "devEngines": {
     "packageManager": {

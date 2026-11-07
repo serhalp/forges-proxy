@@ -4,3 +4,5 @@ node_modules
 
 # Netlify CLI state: the site link here, and builds in each Netlify demo
 .netlify
+.vercel
+.env*

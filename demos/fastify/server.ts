@@ -5,6 +5,7 @@ import Fastify from "fastify"
 import { toNodeHandler } from "srvx/node"
 
 // srvx types it for HTTP/1 and HTTP/2 at once; Fastify here is HTTP/1.
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion
 const proxy = toNodeHandler(server.fetch) as (req: IncomingMessage, res: ServerResponse) => unknown
 const app = Fastify()
 app.get("/", async () => "An app with a forges proxy at /forges/")

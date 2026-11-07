@@ -14,8 +14,6 @@ export function routedVerb(name: string, mode: AccessMode): ManifestVerb | undef
   return verb && isRouted(verb, mode) ? verb : undefined
 }
 
-type Namespaces = Record<string, Record<string, (...args: unknown[]) => unknown>>
-
 /** Calls `name` on `provider`; a listing answers with the page its options' cursor names. */
 export function callVerb(
   provider: ForgeProvider,
@@ -23,9 +21,20 @@ export function callVerb(
   verb: Pick<ManifestVerb, "listing">,
   args: unknown[],
 ): unknown {
-  const [namespace, method] = name.split(".") as [string, string]
-  const result = (provider as unknown as Namespaces)[namespace]![method]!(...args)
-  return verb.listing ? (result as ForgeListing<unknown>).page() : result
+  const [namespace, method] = name.split(".")
+  const target: unknown = Reflect.get(provider, namespace)
+  const fn: unknown = typeof target === "object" && target ? Reflect.get(target, method) : undefined
+  if (typeof fn !== "function") {
+    throw new TypeError(`${name} is not a verb of ${provider.forge}`)
+  }
+  const result: unknown = Reflect.apply(fn, target, args)
+  if (!verb.listing) {
+    return result
+  }
+  if (!isListing(result)) {
+    throw new TypeError(`${name} returned no listing`)
+  }
+  return result.page()
 }
 
 /** `args` with `signal` in the verb's options, so that a dropped request stops its upstream requests. */
@@ -37,5 +46,14 @@ export function withSignal(verb: ManifestVerb, args: unknown[], signal: AbortSig
   }
   return Array.from({ length: Math.max(args.length, index + 1) }, (_, at) =>
     at === index ? { ...options, signal } : args[at],
+  )
+}
+
+function isListing(value: unknown): value is ForgeListing<unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "page" in value &&
+    typeof value.page === "function"
   )
 }

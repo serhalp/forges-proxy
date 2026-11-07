@@ -3,7 +3,7 @@ import { accessMode } from "#src/access.ts"
 import type { Context } from "#src/context.ts"
 import { openApi } from "#src/openapi.ts"
 
-export function openapi(context: Context): EventHandler {
+export function openapiRoute(context: Context): EventHandler {
   return (event) => {
     const mode = accessMode(context.env)
     event.res.headers.set(

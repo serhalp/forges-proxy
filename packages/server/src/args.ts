@@ -1,4 +1,5 @@
 import { Validator } from "@cfworker/json-schema"
+import * as v from "valibot"
 import type { H3Event } from "h3"
 import { getQuery, readBody } from "h3"
 import type { ManifestVerb } from "#src/manifest.ts"
@@ -6,6 +7,9 @@ import { argsSchema, manifest } from "#src/manifest.ts"
 import { reviveArgs } from "#src/wire.ts"
 
 const validators = new Map<string, Validator>()
+
+// Anything else in the body, or a missing body, is left for the `args` check to name.
+const Body = v.fallback(v.object({ args: v.optional(v.unknown()) }), {})
 
 /**
  * The call's arguments, revived, from `?args=` on reads and `{ args }` on writes; or why they can't be passed to the
@@ -18,7 +22,7 @@ export async function readArgs(
   origin: { forge: string; instance: string },
 ): Promise<{ args: unknown[] } | { problem: string }> {
   const wire = verb.write
-    ? ((await readBody<{ args?: unknown }>(event))?.args ?? [])
+    ? (v.parse(Body, await readBody(event)).args ?? [])
     : parseArgs(getQuery(event).args)
   if (!Array.isArray(wire)) {
     return { problem: "`args` must be a JSON array" }
@@ -28,15 +32,19 @@ export async function readArgs(
     return { problem }
   }
   // JSON has no `undefined`, so a skipped optional argument arrives as `null`.
-  return { args: reviveArgs(wire.map((arg) => arg ?? undefined)) as unknown[] }
+  return { args: wire.map((arg) => reviveArgs(arg ?? undefined)) }
 }
 
 function parseArgs(value: unknown): unknown {
   if (value === undefined) {
     return []
   }
+  // A repeated `?args=` arrives as an array, which is no JSON.
+  if (typeof value !== "string") {
+    return undefined
+  }
   try {
-    return JSON.parse(String(value))
+    return JSON.parse(value)
   } catch {
     return undefined
   }

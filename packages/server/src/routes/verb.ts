@@ -1,4 +1,5 @@
 import type { EventHandler } from "h3"
+import { getRouterParams } from "h3"
 import { accessMode } from "#src/access.ts"
 import { readArgs } from "#src/args.ts"
 import type { Context } from "#src/context.ts"
@@ -12,13 +13,9 @@ import { callVerb, routedVerb, withSignal } from "#src/verbs.ts"
  * Calls one provider verb. Reads are `GET ?args=<json array>`, writes are `POST { args }`, with the arguments
  * positional, as the verb takes them.
  */
-export function verb(context: Context): EventHandler {
+export function verbRoute(context: Context): EventHandler {
   return async (event) => {
-    const {
-      forge,
-      instance,
-      verb: name,
-    } = event.context.params as { forge: string; instance: string; verb: string }
+    const { forge, instance, verb: name } = getRouterParams(event, { decode: true })
     const mode = accessMode(context.env)
     const verb = routedVerb(name, mode)
     if (!verb) {

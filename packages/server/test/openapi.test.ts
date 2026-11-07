@@ -3,18 +3,23 @@ import { describe, it } from "node:test"
 import { createForges } from "forges"
 import { fake } from "forges/fake"
 import { createProxy, env } from "./support/proxy.ts"
+import * as v from "valibot"
 
 const app = createProxy(createForges([fake()]))
 
-interface Document {
-  paths: Record<string, Record<string, any>>
-  components: { schemas: Record<string, unknown>; securitySchemes?: unknown }
-  security?: unknown
-}
+const Document = v.object({
+  paths: v.record(v.string(), v.record(v.string(), v.any())),
+  components: v.object({
+    schemas: v.record(v.string(), v.unknown()),
+    securitySchemes: v.optional(v.unknown()),
+  }),
+  security: v.optional(v.unknown()),
+})
+type Document = v.InferOutput<typeof Document>
 
 async function document(): Promise<{ response: Response; doc: Document }> {
   const response = await app.fetch(new Request("http://proxy.test/openapi.json"))
-  return { response, doc: (await response.json()) as Document }
+  return { response, doc: v.parse(Document, await response.json()) }
 }
 
 describe("GET /openapi.json", () => {
@@ -27,7 +32,7 @@ describe("GET /openapi.json", () => {
       assert.ok(doc.paths["/{forge}/{instance}/repos.get"]?.get)
       assert.equal(doc.paths["/{forge}/{instance}/threads.createComment"], undefined)
       assert.equal(doc.paths["/{forge}/{instance}/users.me"], undefined)
-      const [forge, instance] = doc.paths["/{forge}/{instance}/repos.get"]!.parameters
+      const [forge, instance] = doc.paths["/{forge}/{instance}/repos.get"].parameters
       assert.deepEqual(forge.schema.enum, ["fake"])
       assert.deepEqual(instance.schema.enum, ["fake.test"])
       assert.equal(doc.security, undefined)
@@ -35,7 +40,7 @@ describe("GET /openapi.json", () => {
 
     it("takes reads' arguments as a JSON tuple in `args`", async () => {
       const { doc } = await document()
-      const { parameters } = doc.paths["/{forge}/{instance}/repos.get"]!.get
+      const { parameters } = doc.paths["/{forge}/{instance}/repos.get"].get
       const args = parameters.find((param: { name: string }) => param.name === "args")
       assert.equal(args.required, true)
       assert.equal(args.description, "`[ref, options?]`")
@@ -49,7 +54,7 @@ describe("GET /openapi.json", () => {
 
     it("documents streams, empty results and errors", async () => {
       const { doc } = await document()
-      const path = (verb: string) => doc.paths[`/{forge}/{instance}/${verb}`]!.get.responses
+      const path = (verb: string) => doc.paths[`/{forge}/{instance}/${verb}`].get.responses
       assert.ok(path("ci.log")[200].content["application/octet-stream"])
       assert.equal(path("ci.log")[200].content["application/json"], undefined)
       assert.ok(path("releases.latest")[204])
@@ -62,7 +67,7 @@ describe("GET /openapi.json", () => {
       for (const [, ref] of JSON.stringify(doc).matchAll(
         /"\$ref":"#\/components\/schemas\/([^"]+)"/g,
       )) {
-        assert.ok(doc.components.schemas[ref!], ref)
+        assert.ok(doc.components.schemas[ref], ref)
       }
     })
   })
@@ -73,14 +78,14 @@ describe("GET /openapi.json", () => {
     it("documents writes as POSTs, behind the secret", async () => {
       const { response, doc } = await document()
       assert.equal(response.headers.get("cache-control"), "private, no-store")
-      const comment = doc.paths["/{forge}/{instance}/threads.createComment"]!
+      const comment = doc.paths["/{forge}/{instance}/threads.createComment"]
       assert.ok(comment.post.requestBody.content["application/json"].schema.properties.args)
       assert.equal(comment.get, undefined)
       assert.ok(doc.components.securitySchemes)
       assert.deepEqual(doc.security, [{ secret: [] }])
       // Writes with nothing to return answer 204 only.
       assert.deepEqual(
-        Object.keys(doc.paths["/{forge}/{instance}/threads.deleteComment"]!.post.responses),
+        Object.keys(doc.paths["/{forge}/{instance}/threads.deleteComment"].post.responses),
         ["204", "default"],
       )
     })

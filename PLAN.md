@@ -35,9 +35,8 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 - [x] `connect()` client (`@forges-proxy/client`): one `ForgeProvider` per proxied forge
 - [x] pnpm workspace: `@forges-proxy/server` (a Fetchable), `@forges-proxy/client`, `docs` placeholder, `demos/netlify-serverless` (verified live as a draft)
 - [x] Drop Nitro: `createServer(options)` on h3 returns a Fetchable; platform specifics (`cdnHeaders`, `purge`, `upstreamStore`) are options, so purging is pluggable. Built with tsdown.
-- [x] Demos, smoke-tested with `pnpm smoke` through the client: node, hono, fastify, nitro, docker (local, public and private), cloudflare-workers (`wrangler dev`), vercel (`vercel build`, then the built function served locally), netlify-serverless (live draft)
+- [x] Demos, smoke-tested with `pnpm smoke` through the client: node, hono, fastify, nitro, docker (local, public and private), cloudflare-workers (`wrangler dev`), vercel (live), netlify-serverless (live draft)
 - [ ] netlify-edge: runs under `netlify serve`, but deployed drafts never invoke it. Neither does a hello-world edge function on the same site, so it's the site or the deploy path. (The edge bundler resolves npm modules from the repository root, where pnpm doesn't link workspace packages, hence the root `package.json`'s dependency on `@forges-proxy/server`.)
-- [ ] vercel: deploy, to confirm the runtime calls `default.fetch` and the rewrite keeps the original path
 - [ ] cloudflare-workers: deploy
 - [ ] Publish the packages: release tooling (npm scope `@forges-proxy` is registered)
 - [ ] Client: report `rateLimits()` and `refreshCapabilities()` through the proxy

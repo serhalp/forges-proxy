@@ -1,3 +1,4 @@
+import * as v from "valibot"
 import generated from "#src/manifest.json" with { type: "json" }
 
 export type Schema = Record<string, unknown>
@@ -32,7 +33,35 @@ export interface Manifest {
   schemas: Record<string, Schema>
 }
 
-export const manifest = generated as Manifest
+const SchemaObject = v.record(v.string(), v.unknown())
+
+// Checked against the interfaces above, which carry the docs.
+const ManifestSchema: v.GenericSchema<Manifest> = v.object({
+  forges: v.string(),
+  verbs: v.record(
+    v.string(),
+    v.object({
+      summary: v.optional(v.string()),
+      write: v.boolean(),
+      account: v.boolean(),
+      listing: v.optional(v.literal(true)),
+      params: v.array(
+        v.object({
+          name: v.string(),
+          optional: v.boolean(),
+          options: v.optional(v.literal(true)),
+          description: v.optional(v.string()),
+          schema: SchemaObject,
+        }),
+      ),
+      stream: v.optional(v.literal(true)),
+      result: SchemaObject,
+    }),
+  ),
+  schemas: v.record(v.string(), SchemaObject),
+})
+
+export const manifest = v.parse(ManifestSchema, generated)
 
 /**
  * The positional arguments as a tuple. Trailing optional ones may be left out, and any optional one may be `null`,
