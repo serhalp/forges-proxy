@@ -1,5 +1,7 @@
-import server from "@forges-proxy/server"
+import { createServer } from "@forges-proxy/server"
 import { defineHandler } from "nitro"
+
+const server = createServer({ anonymousForges: true })
 
 // The proxy answers at its own root, so it sees the path without the prefix.
 export default defineHandler((event) => {

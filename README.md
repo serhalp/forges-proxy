@@ -48,7 +48,7 @@ Check a deployment end to end with `pnpm smoke <url> [secret]`.
 
 ## Configure
 
-Providers come from `FORGES_<KIND>_<FIELD>[_<SUFFIX>]` variables, as `forgesFromEnv()` reads them (e.g. `FORGES_GITHUB_TOKEN`, `FORGES_GITLAB_ENABLED=1`).
+Providers come from `FORGES_<KIND>_<FIELD>[_<SUFFIX>]` variables, as `forgesFromEnv()` reads them (e.g. `FORGES_GITHUB_TOKEN`, `FORGES_GITLAB_ENABLED=1`). With `createServer({ anonymousForges: true })`, every forge the env doesn't mention that can be read without credentials is served too, anonymously: GitHub, GitLab, Codeberg, gitea.com, Bitbucket, Gitee, Tangled, Cursor Origin and Pushin today. The demos turn it on.
 
 Set exactly one of:
 

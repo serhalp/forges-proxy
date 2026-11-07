@@ -29,7 +29,7 @@ It's plain [h3](https://h3.dev), built with tsdown, with `forges` as a regular d
 
 ### Single tenant, credentials only in the environment
 
-Forge credentials come from `FORGES_*` variables via `providersFromEnv()`; callers never send forge tokens. Access is either a bearer secret (`FORGES_PROXY_SECRET`, private) or public mode (`FORGES_PROXY_PUBLIC=1`), which routes no write or account verbs. Both or neither is a 503, so a misconfigured instance fails closed.
+Forge credentials come from `FORGES_*` variables via `providersFromEnv()`; callers never send forge tokens. `anonymousForges` adds every forge the env doesn't mention that `forges` can read without credentials, by trying `ENABLED` for each and keeping what builds. Access is either a bearer secret (`FORGES_PROXY_SECRET`, private) or public mode (`FORGES_PROXY_PUBLIC=1`), which routes no write or account verbs. Both or neither is a 503, so a misconfigured instance fails closed.
 
 ### RPC over the provider surface, not REST
 

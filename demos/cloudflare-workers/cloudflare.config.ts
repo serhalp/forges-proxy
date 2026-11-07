@@ -9,7 +9,6 @@ export default defineConfig({
     compatibilityFlags: ["nodejs_compat"],
     env: {
       FORGES_PROXY_PUBLIC: bindings.text("1"),
-      FORGES_GITHUB_ENABLED: bindings.text("1"),
       // `cf deploy --secrets-file <file>`; locally, `.dev.vars`.
       FORGES_GITHUB_TOKEN: bindings.secret(),
     },

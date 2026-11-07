@@ -1,12 +1,15 @@
 import type { IncomingMessage, ServerResponse } from "node:http"
 import process from "node:process"
-import server from "@forges-proxy/server"
+import { createServer } from "@forges-proxy/server"
 import Fastify from "fastify"
 import { toNodeHandler } from "srvx/node"
 
 // srvx types it for HTTP/1 and HTTP/2 at once; Fastify here is HTTP/1.
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-const proxy = toNodeHandler(server.fetch) as (req: IncomingMessage, res: ServerResponse) => unknown
+const proxy = toNodeHandler(createServer({ anonymousForges: true }).fetch) as (
+  req: IncomingMessage,
+  res: ServerResponse,
+) => unknown
 const app = Fastify()
 app.get("/", async () => "An app with a forges proxy at /forges/")
 await app.register(

@@ -1,8 +1,8 @@
 import type { Forges } from "forges"
-import { forgesFromEnv } from "forges/env"
 import { H3, handleCors } from "h3"
 import { auth } from "#src/auth.ts"
 import type { CdnHeaders, Env, Purge } from "#src/context.ts"
+import { providers } from "#src/providers.ts"
 import { standardCdnHeaders } from "#src/response.ts"
 import { docsRoute } from "#src/routes/docs.ts"
 import { indexRoute } from "#src/routes/index.ts"
@@ -21,6 +21,11 @@ export { cacheApiStore, cachingFetch, memoryStore } from "#src/upstream-cache.ts
 export interface ServerOptions {
   /** `FORGES_*` and `FORGES_PROXY_*` variables, read on every request. @default process.env */
   env?: Env
+  /**
+   * Also serve, anonymously, every forge `env` doesn't mention that can be read without credentials at its default
+   * instance. For public instances. @default false
+   */
+  anonymousForges?: boolean
   /** Providers to serve instead of those `env` configures. Give them `upstream` as their `fetch`, so webhooks expire it. */
   forges?: Forges
   /** The caching `fetch` behind the providers. @default cachingFetch(fetch, { store: upstreamStore }) */
@@ -51,7 +56,8 @@ export function createServer(options: ServerOptions = {}): Server {
   let forges = options.forges
   const context = {
     env,
-    forges: () => (forges ??= forgesFromEnv(env, { fetch: upstream })),
+    forges: () =>
+      (forges ??= providers(env, { fetch: upstream, anonymous: options.anonymousForges ?? false })),
     expireUpstream: () => upstream.expire(),
     purge: options.purge,
     cdnHeaders: options.cdnHeaders ?? standardCdnHeaders,

@@ -1,5 +1,8 @@
 import process from "node:process"
-import server from "@forges-proxy/server"
+import { createServer } from "@forges-proxy/server"
 import { serve } from "srvx"
 
-serve({ fetch: server.fetch, port: Number(process.env.PORT ?? 3000) })
+serve({
+  fetch: createServer({ anonymousForges: true }).fetch,
+  port: Number(process.env.PORT ?? 3000),
+})

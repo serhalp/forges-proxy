@@ -3,6 +3,7 @@ import type { Config } from "@netlify/functions"
 import { purgeCache } from "@netlify/functions"
 
 export default createServer({
+  anonymousForges: true,
   // Shared by every function instance in a region, and purged by the same cache tags as the CDN.
   upstreamStore: cacheApiStore(() => caches.open("upstream")),
   purge: (tags) => purgeCache({ tags }),
