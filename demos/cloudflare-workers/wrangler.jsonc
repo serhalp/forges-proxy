@@ -1,7 +1,0 @@
-{
-  "name": "forges-proxy",
-  "main": "src/index.ts",
-  "compatibility_date": "2026-10-01",
-  // For `node:async_hooks` and a `process.env` filled from vars.
-  "compatibility_flags": ["nodejs_compat"],
-}

@@ -11,7 +11,7 @@
     "test": "pnpm -r test",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "smoke": "node scripts/smoke.ts"
+    "smoke": "node --conditions=@forges-proxy/source scripts/smoke.ts"
   },
   "devDependencies": {
     "@forges-proxy/client": "workspace:*",
