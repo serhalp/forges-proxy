@@ -1,0 +1,12 @@
+{
+  "name": "@forges-proxy/demo-netlify-edge",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@forges-proxy/server": "workspace:*",
+    "@netlify/edge-functions": "4.0.4"
+  }
+}

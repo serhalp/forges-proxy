@@ -1,0 +1,68 @@
+{
+  "name": "@forges-proxy/client",
+  "version": "0.0.0",
+  "description": "Use a forges-proxy credential broker as forges providers",
+  "keywords": [
+    "azure-devops",
+    "bitbucket",
+    "client",
+    "cloudflare-artifacts",
+    "credential-broker",
+    "cursor-origin",
+    "entire",
+    "forgejo",
+    "forges",
+    "git",
+    "gitbucket",
+    "gitea",
+    "gitee",
+    "github",
+    "gitlab",
+    "proxy",
+    "pushin",
+    "sourcehut",
+    "tangled"
+  ],
+  "homepage": "https://github.com/serhalp/forges-proxy/tree/main/packages/client#readme",
+  "bugs": "https://github.com/serhalp/forges-proxy/issues",
+  "license": "MIT",
+  "author": "Philippe Serhal <philippe.serhal@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/serhalp/forges-proxy.git",
+    "directory": "packages/client"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "imports": {
+    "#*": "./*"
+  },
+  "exports": {
+    ".": {
+      "@forges-proxy/source": "./src/remote.ts",
+      "types": "./dist/remote.d.ts",
+      "default": "./dist/remote.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "node --conditions=@forges-proxy/source --test \"test/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "forges": "0.3.2",
+    "tsdown": "0.23.7"
+  },
+  "peerDependencies": {
+    "forges": "~0.3.2"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

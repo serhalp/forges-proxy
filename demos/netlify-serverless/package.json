@@ -1,0 +1,12 @@
+{
+  "name": "@forges-proxy/demo-netlify-serverless",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@forges-proxy/server": "workspace:*",
+    "@netlify/functions": "6.1.1"
+  }
+}

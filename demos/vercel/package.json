@@ -1,0 +1,11 @@
+{
+  "name": "@forges-proxy/demo-vercel",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@forges-proxy/server": "workspace:*"
+  }
+}

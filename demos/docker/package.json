@@ -1,0 +1,13 @@
+{
+  "name": "@forges-proxy/demo-docker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@forges-proxy/server": "workspace:*",
+    "srvx": "1.0.8"
+  }
+}

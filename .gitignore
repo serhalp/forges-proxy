@@ -1,11 +1,6 @@
 node_modules
-dist
-.data
-.nitro
-.cache
-.output
 .env
 .env.local
 
-# Local Netlify folder
+# Netlify CLI state: the site link here, and builds in each Netlify demo
 .netlify

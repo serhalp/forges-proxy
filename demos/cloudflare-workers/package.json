@@ -1,0 +1,15 @@
+{
+  "name": "@forges-proxy/demo-cloudflare-workers",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@forges-proxy/server": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "4.158.0"
+  }
+}

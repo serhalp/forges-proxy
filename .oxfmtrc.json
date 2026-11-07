@@ -1,4 +1,4 @@
 {
   "semi": false,
-  "ignorePatterns": [".claude", "server/manifest.json"]
+  "ignorePatterns": [".claude", "packages/server/src/manifest.json"]
 }

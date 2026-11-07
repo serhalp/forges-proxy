@@ -1,0 +1,3 @@
+[build]
+command = "pnpm --filter @forges-proxy/demo-netlify-edge... build"
+publish = "demos/netlify-edge/public"

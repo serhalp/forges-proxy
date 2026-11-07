@@ -1,5 +1,9 @@
-minimumReleaseAgeExclude:
-  - forges@0.3.2
+packages:
+  - packages/*
+  - demos/*
+allowBuilds:
+  esbuild: true
+  workerd: true
 overrides:
   # The manifest script hands it a TypeScript 6 program; one compiler, or SyntaxKinds disagree.
   ts-json-schema-generator>typescript: npm:typescript@6.0.3

@@ -1,0 +1,14 @@
+{
+  "name": "@forges-proxy/demo-fastify",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@forges-proxy/server": "workspace:*",
+    "fastify": "5.12.8",
+    "srvx": "1.0.8"
+  }
+}

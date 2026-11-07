@@ -1,0 +1,15 @@
+{
+  "name": "@forges-proxy/demo-nitro",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nitro build",
+    "dev": "nitro dev",
+    "start": "node .output/server/index.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@forges-proxy/server": "workspace:*",
+    "nitro": "3.0.260903-beta"
+  }
+}

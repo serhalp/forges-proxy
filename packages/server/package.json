@@ -1,0 +1,75 @@
+{
+  "name": "@forges-proxy/server",
+  "version": "0.0.0",
+  "description": "A self-hostable credential broker and cache for forges, over HTTP",
+  "keywords": [
+    "api-gateway",
+    "azure-devops",
+    "bitbucket",
+    "cloudflare-artifacts",
+    "credential-broker",
+    "cursor-origin",
+    "entire",
+    "forgejo",
+    "forges",
+    "git",
+    "gitbucket",
+    "gitea",
+    "gitee",
+    "github",
+    "gitlab",
+    "proxy",
+    "pushin",
+    "sourcehut",
+    "tangled"
+  ],
+  "homepage": "https://github.com/serhalp/forges-proxy/tree/main/packages/server#readme",
+  "bugs": "https://github.com/serhalp/forges-proxy/issues",
+  "license": "MIT",
+  "author": "Philippe Serhal <philippe.serhal@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/serhalp/forges-proxy.git",
+    "directory": "packages/server"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "imports": {
+    "#*": "./*"
+  },
+  "exports": {
+    ".": {
+      "@forges-proxy/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "srvx --watch --prod=false ./dev.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --conditions=@forges-proxy/source --test \"test/**/*.test.ts\"",
+    "test:coverage": "node --conditions=@forges-proxy/source --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test \"test/**/*.test.ts\"",
+    "manifest": "node --conditions=@forges-proxy/source scripts/generate-manifest.ts"
+  },
+  "dependencies": {
+    "@cfworker/json-schema": "^4.1.6",
+    "forges": "^0.3.2",
+    "h3": "^2.0.8"
+  },
+  "devDependencies": {
+    "srvx": "1.0.8",
+    "ts-json-schema-generator": "2.9.0",
+    "tsdown": "0.23.7",
+    "typescript-6": "npm:typescript@6.0.3"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

@@ -1,6 +1,6 @@
 # Architecture
 
-A self-hostable, single-tenant HTTP service that exposes `forges` providers over HTTP, configured entirely from its environment, and caches what it can at every layer.
+A self-hostable, single-tenant service that exposes `forges` providers over HTTP. Providers and access come from the environment; platform specifics come from the deployment's options. It caches at the CDN and upstream.
 
 ## Request path
 
@@ -10,14 +10,22 @@ client ──▶ CDN ──▶ auth middleware ──▶ verb route ──▶ fo
             ETag)     public mode)      call, tag)                        memory)
 ```
 
-- **CDN.** Public reads carry `CDN-Cache-Control` / `Netlify-CDN-Cache-Control` (60 s fresh, 10 min stale-while-revalidate, durable), a weak `ETag`, and `Netlify-Cache-Tag`. Private instances and writes are `private, no-store`.
-- **Verb route** (`server/routes/[forge]/[instance]/[verb].ts`). Checks the arguments against the operations manifest, revives dates and bytes, passes the request's signal into the verb's options, calls the provider and tags the response with every repository in its arguments and result.
-- **Upstream cache** (`server/utils/upstream-cache.ts`). A `fetch` wrapper given to every provider. It serves fresh JSON, revalidates stale JSON with `If-None-Match` (a GitHub 304 is free for authenticated requests), and stands in with a stored response while upstream is rate-limited or failing. Entries carry the proxy response's tags, so a purge reaches them too.
-- **Webhooks** (`POST /webhooks/:forge/:instance`). Verified by the provider, turned into repository tags with `affectedKeys()`, purged from the Netlify CDN and the upstream cache.
-- **Operations manifest** (`server/manifest.json`, from `scripts/generate-manifest.ts`). Each routed verb's parameters, result and docs as JSON Schemas, read from the `forges` types. The server's only list of verbs: it drives routing, validation, the signal passthrough, `/`, `/openapi.json` and `/docs`.
-- **Client** (`client/remote.ts`). `connect()` turns a proxy back into `ForgeProvider`s, finding each verb's options where `/` says they are. Shares the bytes encoding with the server (`shared/wire.ts`).
+- **CDN.** Public reads carry `CDN-Cache-Control` (60 s fresh, 10 min stale-while-revalidate), a weak `ETag` and `Cache-Tag`, or whatever the deployment's `cdnHeaders` returns instead (the Netlify demos add `durable`). Private instances and writes are `private, no-store`.
+- **Verb route** (`packages/server/src/routes/verb.ts`). Checks the arguments against the operations manifest, revives dates and bytes, passes the request's signal into the verb's options, calls the provider and tags the response with every repository in its arguments and result.
+- **Upstream cache** (`packages/server/src/upstream-cache.ts`). A `fetch` wrapper given to every provider. It serves fresh JSON, revalidates stale JSON with `If-None-Match` (a GitHub 304 is free for authenticated requests), and stands in with a stored response while upstream is rate-limited or failing. Entries carry the proxy response's tags, so a purge reaches them too.
+- **Webhooks** (`POST /webhooks/:forge/:instance`). Verified by the provider and turned into repository tags with `affectedKeys()`. Expires the upstream cache and purges the tags through the deployment's `purge` option.
+- **Operations manifest** (`packages/server/src/manifest.json`, from `packages/server/scripts/generate-manifest.ts`). Each routed verb's parameters, result and docs as JSON Schemas, read from the `forges` types. The server's only list of verbs: it drives routing, validation, the signal passthrough, `/`, `/openapi.json` and `/docs`.
+- **Client** (`@forges-proxy/client`). `connect()` turns a proxy back into `ForgeProvider`s, finding each verb's options where `/` says they are. It warns when `/` reports a `forges` version incompatible with its own.
 
 ## Decisions
+
+### Published as a package, deployed by a wrapper
+
+The server is the `@forges-proxy/server` package: `createServer(options)` returns a [Fetchable](https://fetchable.org) (`{ fetch }`), and the default export is one configured from `process.env`. Deployments depend on it and hand it to their platform, so updates are a version bump rather than merging upstream into a fork.
+
+Nothing in the package names a platform. Anything platform-specific is an option the deployment passes: CDN header names (`cdnHeaders`), purging (`purge`) and where upstream responses live (`upstreamStore`). Each demo in `demos/` is a deployment, smoke-tested through the client with `pnpm smoke <url>`.
+
+It's plain [h3](https://h3.dev), built with tsdown, with `forges` as a regular dependency. We dropped Nitro: its file routing was ten lines of `app.get()`, its presets only wrote platform entries a Fetchable doesn't need, and bundling a library would have pinned `forges`. The packages don't depend on each other: each has its own copy of the `$bytes` encoding (the client's tests round-trip bytes through the server), and the server reports the `forges` version its manifest was generated from.
 
 ### Single tenant, credentials only in the environment
 
@@ -58,7 +66,11 @@ Routes sit at the root (`/:forge/:instance/:verb`), not under `/v1`. The API mir
 
 ### HTTP caching first
 
-Caching is expressed as response headers so the platform CDN does the work; the origin never stores responses itself. Nitro's `defineCachedHandler` was rejected because it stores at the origin, and the Netlify preset's `isr` route rule because it overwrites handler-set headers and applies to error responses too.
+Caching is response headers, so the CDN does the work. The proxy never stores its own responses; it only keeps upstream ones, for revalidation.
+
+### Rate limiting is the platform's job
+
+Public instances need protecting from callers who burn the forge budget. Per-client throttling is left to the platform or whatever sits in front: it sees clients before the proxy runs, and needs no state here.
 
 ### No registry-level fan-out route (`/_all/...`)
 
@@ -76,9 +88,9 @@ Caching is expressed as response headers so the platform CDN does the work; the 
 
 **Revisit if** npmx needs fewer browser round trips, or a non-TypeScript consumer needs cross-forge search. The shape would be `GET /_all/search.threads?args=...` with a base64 JSON cursor of per-provider cursors and offsets, and `POST /_all/threads.getMany`.
 
-### Shared upstream store through the Cache API
+### Upstream store: memory, or the Cache API
 
-On Netlify the upstream cache lives in the platform's Cache API: shared by every instance in a region, cleared on redeploy, and purgeable by tag globally. Elsewhere it is an in-memory LRU. Entries are written only once the verb has returned, so they carry the tags of the repositories in its result, not just its arguments.
+By default the upstream cache is an in-memory LRU per instance. A deployment can pass `cacheApiStore()` where the platform has the Cache API (the Netlify Functions and Workers demos do): shared by every instance in a region, and purgeable by tag. Entries are written only once the verb has returned, so they carry the tags of the repositories in its result, not just its arguments.
 
 ### Manifest generated from the `forges` types
 
