@@ -4,7 +4,7 @@ import { fromBase64, toBase64 } from "forges/kit"
  * Bytes on the wire, both ways. A tagged object rather than a bare base64 string, since a string is text where a field
  * takes either (`FileChange.content`).
  */
-export function isBytes(value: object): value is { $bytes: string } {
+function isBytes(value: object): value is { $bytes: string } {
   return Object.keys(value).length === 1 && "$bytes" in value && typeof value.$bytes === "string"
 }
 

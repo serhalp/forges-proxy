@@ -9,7 +9,7 @@ A pnpm workspace:
 - `packages/docs`: placeholder.
 - `demos/*`: one deployment per platform or framework. Nothing platform-specific goes in the packages; it's an option a demo passes.
 
-Workspace packages resolve to each other's source through the `@forges-proxy/source` export condition (tests, typecheck, scripts); demos consume the built `dist/`, so run `pnpm build` before running them. `pnpm smoke <url> [secret]` checks a running deployment. Before finishing a change: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm format`.
+Workspace packages resolve to each other's source through the `@forges-proxy/source` export condition (tests, typecheck, scripts); demos consume the built `dist/`, so run `pnpm build` before running them. `pnpm smoke <url> [secret]` checks a running deployment. Before finishing a change: `pnpm typecheck`, `pnpm lint`, `pnpm knip`, `pnpm test`, `pnpm format`. After touching `.github/`: `pnpm zizmor`.
 
 ## Conventions
 

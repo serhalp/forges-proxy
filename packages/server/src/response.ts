@@ -10,7 +10,7 @@ const CDN_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=600"
  * Only public reads go to shared caches. Private instances send `no-store` until CDN caching can vary on the proxy
  * secret.
  */
-export function isCacheable(verb: ManifestVerb, mode: AccessMode): boolean {
+function isCacheable(verb: ManifestVerb, mode: AccessMode): boolean {
   return mode === "public" && !verb.write
 }
 
