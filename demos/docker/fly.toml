@@ -1,0 +1,26 @@
+# fly.toml app configuration file generated for forges-proxy-demo on 2026-11-07T14:13:44-05:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'forges-proxy-demo'
+primary_region = 'ewr'
+
+# Deploy from the repository root: flyctl deploy --config demos/docker/fly.toml .
+[build]
+dockerfile = 'Dockerfile'
+# Fly uploads the context itself and only reads a root `.dockerignore` otherwise.
+ignorefile = 'Dockerfile.dockerignore'
+
+[http_service]
+internal_port = 3000
+force_https = true
+auto_stop_machines = 'stop'
+auto_start_machines = true
+min_machines_running = 0
+processes = ['app']
+
+[[vm]]
+memory = '256mb'
+cpu_kind = 'shared'
+cpus = 1

@@ -36,7 +36,7 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 - [x] pnpm workspace: `@forges-proxy/server` (a Fetchable), `@forges-proxy/client`, `docs` placeholder, `demos/netlify-serverless` (verified live as a draft)
 - [x] Drop Nitro: `createServer(options)` on h3 returns a Fetchable; platform specifics (`cdnHeaders`, `purge`, `upstreamStore`) are options, so purging is pluggable. Built with tsdown.
 - [x] Demos, smoke-tested with `pnpm smoke` through the client: node, hono, fastify, nitro, docker (local, public and private), cloudflare-workers (live, `workers.dev`), vercel (live), netlify-serverless (live draft)
-- [ ] netlify-edge: runs under `netlify serve`, but deployed drafts never invoke it. Neither does a hello-world edge function on the same site, so it's the site or the deploy path. (The edge bundler resolves npm modules from the repository root, where pnpm doesn't link workspace packages, hence the root `package.json`'s dependency on `@forges-proxy/server`.)
+- [ ] netlify-edge: verify live. Edge Functions don't take a Fetchable yet, so the demo wraps it in a handler (TODO in the demo). The edge bundler resolves npm modules from the repository root, where pnpm doesn't link workspace packages, hence the root `package.json`'s dependency on `@forges-proxy/server`.
 - [ ] Publish the packages: release tooling (npm scope `@forges-proxy` is registered)
 - [ ] Client: report `rateLimits()` and `refreshCapabilities()` through the proxy
 
@@ -53,6 +53,7 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 
 ## Notes
 
+- The Workers demo's `cacheApiStore` does nothing on `workers.dev` (the Cache API needs a custom domain), and it passes no `purge`, so a webhook only expires the isolate that received it.
 - Cloudflare Workers define `WorkerGlobalScope`, so `forges` 0.3.2 takes them for a browser and sends no `user-agent`; GitHub answers 403, which surfaces as `InsufficientScopeError`. Fixed on `forges` main; until it's released, the server's default upstream `fetch` adds one (`withUserAgent` in `packages/server/src/index.ts`). Drop that after the next `forges` release.
 - `DATE_FIELDS` / `reviveDates` cover output models only. Input options have `since`, `until`, `createdAfter`, `before`; the proxy revives those itself (`packages/server/src/wire.ts`).
 - Error messages embed the upstream URL (e.g. `NotFoundError`), so leaving out `error.url` doesn't keep it private.
