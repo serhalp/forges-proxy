@@ -26,7 +26,7 @@ export function openApi(
   mode: AccessMode,
   providers: Array<{ forge: string; instance: string }>,
 ): Record<string, unknown> {
-  const verbs = Object.entries(manifest.verbs).filter(([, verb]) => isRouted(verb, mode))
+  const verbs = Object.entries(manifest.verbs).filter(([name, verb]) => isRouted(name, verb, mode))
   const enumOf = (values: string[]) =>
     mode === "public" && values.length ? { enum: [...new Set(values)] } : {}
   const pathParams = [

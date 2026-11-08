@@ -55,6 +55,10 @@ describe("errorResponse", () => {
     assert.equal(errorResponse(new ForgeApiError("Down", 503, "", context)).status, 502)
   })
 
+  it("maps an upstream 401 to 502, so it doesn't read as a wrong proxy secret", () => {
+    assert.equal(errorResponse(new ForgeApiError("Bad credentials", 401, "", context)).status, 502)
+  })
+
   it("hides anything that is not a forge error", async () => {
     const consoleError = mock.method(console, "error", () => {})
     const response = errorResponse(new Error("database password is hunter2"))

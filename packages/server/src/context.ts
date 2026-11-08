@@ -10,7 +10,7 @@ export type CdnHeaders = (read: { cacheControl: string; tags: string[] }) => Rec
 
 /** The server's resolved options, as routes see them. */
 export interface Context {
-  /** Read on every request, so a changed variable applies without a new server. */
+  /** `FORGES_PROXY_*` are read on every request; providers are built from the rest once. */
   env: Env
   forges: () => Forges
   /** Makes the providers revalidate every upstream response they hold. */

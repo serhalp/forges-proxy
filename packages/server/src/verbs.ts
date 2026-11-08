@@ -3,15 +3,31 @@ import type { AccessMode } from "#src/access.ts"
 import type { ManifestVerb } from "#src/manifest.ts"
 import { manifest } from "#src/manifest.ts"
 
-/** Public instances route no writes or account verbs, so their tokens only ever read public data. */
-export function isRouted(verb: Pick<ManifestVerb, "write" | "account">, mode: AccessMode): boolean {
-  return mode === "private" || !(verb.write || verb.account)
+// Reads that need more than public access (security alerts, who can push, admin settings), so a token with too much
+// scope can't expose them to anyone.
+const PRIVILEGED = new Set([
+  "securityAlerts.list",
+  "repos.collaborators",
+  "repos.permissionFor",
+  "repos.assignableUsers",
+  "repos.reviewerCandidates",
+  "repos.branchRules",
+  "orgs.teams",
+])
+
+/** Public instances route no writes, account verbs or privileged reads. */
+export function isRouted(
+  name: string,
+  verb: Pick<ManifestVerb, "write" | "account">,
+  mode: AccessMode,
+): boolean {
+  return mode === "private" || !(verb.write || verb.account || PRIVILEGED.has(name))
 }
 
 /** The verb, when this instance routes it. */
 export function routedVerb(name: string, mode: AccessMode): ManifestVerb | undefined {
   const verb = Object.hasOwn(manifest.verbs, name) ? manifest.verbs[name] : undefined
-  return verb && isRouted(verb, mode) ? verb : undefined
+  return verb && isRouted(name, verb, mode) ? verb : undefined
 }
 
 /** Calls `name` on `provider`; a listing answers with the page its options' cursor names. */

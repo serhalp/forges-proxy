@@ -23,7 +23,7 @@ export function indexRoute(context: Context): EventHandler {
         capabilities: provider.capabilities,
       })),
       verbs: Object.entries(manifest.verbs)
-        .filter(([, verb]) => isRouted(verb, mode))
+        .filter(([name, verb]) => isRouted(name, verb, mode))
         .map(([name, verb]) => ({
           name,
           write: verb.write,

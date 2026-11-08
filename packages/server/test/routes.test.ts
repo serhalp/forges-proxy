@@ -55,8 +55,11 @@ async function errorOf(response: Response): Promise<{ name: string; message: str
 }
 
 describe("configuration", () => {
-  it("refuses to serve without an access mode", async () => {
-    assert.equal((await read("repos.get", [repo])).status, 503)
+  it("refuses to serve without an access mode, in the proxy's error shape", async () => {
+    const response = await read("repos.get", [repo])
+    assert.equal(response.status, 503)
+    assert.equal(response.headers.get("cache-control"), "no-store")
+    assert.equal((await errorOf(response)).name, "ProxyError")
   })
 
   describe("with both a secret and public mode", () => {
@@ -107,6 +110,9 @@ describe("private mode", () => {
     assert.equal((await call("/docs")).status, 200)
     assert.equal((await call("/openapi.json")).status, 200)
     assert.equal((await call("/docsx")).status, 401)
+    // Only a delivery: POST to /webhooks/:forge/:instance.
+    assert.equal((await call("/webhooks/fake/fake.test")).status, 401)
+    assert.equal((await call("/webhooks/fake/fake.test/x", { method: "POST" })).status, 401)
   })
 
   it("serves reads uncached", async () => {
@@ -190,6 +196,11 @@ describe("public mode", () => {
     assert.equal((await read("users.me", [])).status, 404)
     assert.equal((await read("notifications.list", [])).status, 404)
     assert.equal(comments(), before)
+  })
+
+  it("does not route reads that need more than public access", async () => {
+    assert.equal((await read("securityAlerts.list", [repo])).status, 404)
+    assert.equal((await read("repos.collaborators", [repo])).status, 404)
   })
 
   it("lists only public verbs and hides the skipped env sets", async () => {

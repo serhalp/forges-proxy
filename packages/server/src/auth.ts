@@ -4,12 +4,15 @@ import { accessMode } from "#src/access.ts"
 import type { Context } from "#src/context.ts"
 import { proxyError } from "#src/errors.ts"
 
-// Webhooks are verified by their signatures instead.
-const OPEN = /^\/(?:docs|openapi\.json)$|^\/webhooks\//
+const OPEN = /^\/(?:docs|openapi\.json)$/
+// Verified by their signatures instead.
+const WEBHOOK = /^\/webhooks\/[^/]+\/[^/]+$/
 
 export function auth(context: Context): Middleware {
   return (event) => {
-    if (OPEN.test(event.url.pathname) || accessMode(context.env) === "public") {
+    const { pathname } = event.url
+    const open = OPEN.test(pathname) || (event.req.method === "POST" && WEBHOOK.test(pathname))
+    if (open || accessMode(context.env) === "public") {
       return undefined
     }
     const header = event.req.headers.get("authorization") ?? ""

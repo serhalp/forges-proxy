@@ -56,6 +56,22 @@ const url = "https://api.github.com/repos/acme/widgets"
 const auth = (token: string) => ({ headers: { authorization: `Bearer ${token}` } })
 
 describe("cachingFetch", () => {
+  it("treats a failing store as a miss, and its writes as best-effort", async () => {
+    const forge = upstream()
+    const broken: UpstreamStore = {
+      get: () => {
+        throw new Error("store down")
+      },
+      set: () => Promise.reject(new Error("store down")),
+    }
+    const fetch = cachingFetch(forge.fetch, { store: broken })
+    assert.equal((await fetch(url, auth("a"))).status, 200)
+    const scope = upstreamScope()
+    await scope.run(() => fetch(url, auth("a")))
+    await scope.commit(["tag"])
+    assert.equal(forge.sent.length, 2)
+  })
+
   it("serves a fresh response without a request, and without its stale rate limit", async () => {
     const forge = upstream()
     const time = clock()

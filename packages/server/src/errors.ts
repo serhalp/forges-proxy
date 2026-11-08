@@ -26,6 +26,10 @@ export function errorResponse(error: unknown): Response {
   if (error instanceof WebhookVerificationError) {
     return json(401, body)
   }
+  // The proxy's own forge credential failed; a 401 would read as a wrong proxy secret.
+  if (error instanceof ForgeApiError && error.status === 401) {
+    return json(502, body)
+  }
   if (error instanceof UnsupportedOperationError) {
     return json(501, body)
   }

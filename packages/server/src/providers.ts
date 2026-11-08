@@ -3,8 +3,9 @@ import { createForges } from "forges"
 import { providersFromEnv } from "forges/env"
 import type { Env } from "#src/context.ts"
 
-// Every kind `forges` knows; the `satisfies` breaks the build when it gains one.
-const KINDS = Object.keys({
+// Every kind `forges` knows; the `satisfies` breaks the build when it gains one. `false` keeps a kind out of the
+// anonymous defaults: Tangled reads hosts that callers name (`did:web:`), so it'd let anyone aim the proxy anywhere.
+const KINDS = Object.entries({
   "azure-devops": 0,
   bitbucket: 0,
   "cloudflare-artifacts": 0,
@@ -18,8 +19,10 @@ const KINDS = Object.keys({
   gitlab: 0,
   pushin: 0,
   sourcehut: 0,
-  tangled: 0,
-} satisfies Record<KnownForgeKind, 0>)
+  tangled: false,
+} satisfies Record<KnownForgeKind, 0 | false>).flatMap(([kind, include]) =>
+  include === false ? [] : [kind],
+)
 
 /**
  * The providers `env` configures. With `anonymous`, also every forge the env doesn't mention that `forges` can reach

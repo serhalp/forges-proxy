@@ -18,6 +18,8 @@ describe("providers", () => {
     for (const name of ["github:github.com", "gitlab:gitlab.com", "forgejo:codeberg.org"]) {
       assert.ok(all.includes(name), name)
     }
+    // Its reads go to hosts that callers name.
+    assert.ok(!all.some((name) => name.startsWith("tangled:")))
   })
 
   it("leaves a forge the env mentions as the env says", () => {

@@ -54,7 +54,10 @@ export function upstreamScope(): UpstreamScope {
     async commit(tags) {
       const writes = [...state.pending]
       state.pending.clear()
-      await Promise.all(writes.map(async ([key, { store, entry }]) => store.set(key, entry, tags)))
+      // Best-effort: the verb already succeeded, and a lost entry is only a later miss.
+      await Promise.allSettled(
+        writes.map(async ([key, { store, entry }]) => store.set(key, entry, tags)),
+      )
     },
     outcomes: state.outcomes,
   }
@@ -92,13 +95,24 @@ export function cachingFetch(fetch: FetchLike, options: UpstreamCacheOptions = {
   // A write may change anything its credential reads, so later reads revalidate instead of trusting `max-age`.
   const lastWrite = new Map<string, number>()
   let expiredAt = -Infinity
-  const get = (key: string) => scopes.getStore()?.pending.get(key)?.entry ?? store.get(key)
+  // A store that fails, or holds something unreadable, is a miss.
+  const get = async (key: string) => {
+    const pending = scopes.getStore()?.pending.get(key)?.entry
+    if (pending) {
+      return pending
+    }
+    try {
+      return await store.get(key)
+    } catch {
+      return undefined
+    }
+  }
   const set = async (key: string, entry: StoredResponse) => {
     const scope = scopes.getStore()
     if (scope) {
       scope.pending.set(key, { store, entry })
     } else {
-      await store.set(key, entry)
+      await Promise.resolve(store.set(key, entry)).catch(() => undefined)
     }
   }
 

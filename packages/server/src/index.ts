@@ -1,6 +1,7 @@
 import type { Forges } from "forges"
 import { H3, handleCors } from "h3"
 import { auth } from "#src/auth.ts"
+import { proxyError } from "#src/errors.ts"
 import type { CdnHeaders, Env, Purge } from "#src/context.ts"
 import { providers } from "#src/providers.ts"
 import { standardCdnHeaders } from "#src/response.ts"
@@ -19,7 +20,10 @@ export type { CachingFetch, StoredResponse, UpstreamStore } from "#src/upstream-
 export { cacheApiStore, cachingFetch, memoryStore } from "#src/upstream-cache.ts"
 
 export interface ServerOptions {
-  /** `FORGES_*` and `FORGES_PROXY_*` variables, read on every request. @default process.env */
+  /**
+   * `FORGES_*` and `FORGES_PROXY_*` variables. `FORGES_PROXY_*` are read on every request; providers are built from
+   * the rest on the first. @default process.env
+   */
   env?: Env
   /**
    * Also serve, anonymously, every forge `env` doesn't mention that can be read without credentials at its default
@@ -62,7 +66,8 @@ export function createServer(options: ServerOptions = {}): Server {
     purge: options.purge,
     cdnHeaders: options.cdnHeaders ?? standardCdnHeaders,
   }
-  const app = new H3()
+  // h3's own errors (a misconfigured mode, a body that isn't JSON) in the proxy's error shape, never cached.
+  const app = new H3({ onError: (error) => proxyError(error.status, error.message) })
     // Before auth, so preflights pass and errors stay readable.
     .use((event) => handleCors(event, { ...CORS, methods: [...CORS.methods] }) || undefined)
     .use(auth(context))
