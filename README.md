@@ -1,4 +1,4 @@
-# forges-proxy
+# forges-proxy hello
 
 A self-hostable, public or single-tenant caching proxy and credential broker for [`forges`](https://forges.link): one API, one cache, and one set of credentials in front of every forge you configure. Callers authenticate to the proxy; it holds the forge tokens. Design in [ARCHITECTURE.md](./ARCHITECTURE.md), next steps in [PLAN.md](./PLAN.md).
 
