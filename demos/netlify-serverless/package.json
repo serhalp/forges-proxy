@@ -6,7 +6,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@forges-proxy/server": "workspace:*",
+    "@forges-proxy/server": "^0.0.0",
     "@netlify/functions": "6.1.1"
   }
 }

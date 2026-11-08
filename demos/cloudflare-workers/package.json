@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@forges-proxy/server": "workspace:*"
+    "@forges-proxy/server": "^0.0.0"
   },
   "devDependencies": {
     "cf": "1.0.0-beta.28",

@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@forges-proxy/server": "workspace:*",
+    "@forges-proxy/server": "^0.0.0",
     "nitro": "3.0.260903-beta"
   }
 }

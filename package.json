@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "build": "pnpm --filter './packages/*' build",
-    "typecheck": "tsc --noEmit && pnpm -r typecheck",
+    "typecheck": "pnpm typecheck:src && pnpm typecheck:demos",
+    "typecheck:src": "tsc --noEmit && pnpm --filter './packages/*' typecheck",
+    "typecheck:demos": "pnpm build && pnpm --filter './demos/*' typecheck",
     "lint": "oxlint",
     "knip": "knip",
     "test": "pnpm -r test",

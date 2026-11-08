@@ -1,3 +1,7 @@
 [build]
-command = "pnpm --filter @forges-proxy/demo-netlify-serverless... build"
-publish = "demos/netlify-serverless/public"
+publish = "public"
+
+# The Deploy to Netlify form.
+[template.environment]
+FORGES_PROXY_PUBLIC = "1 for a public, read-only instance. For a private one, set FORGES_PROXY_SECRET instead, after deploying."
+FORGES_GITHUB_TOKEN = "Optional. A token that can only read public repositories, e.g. a fine-grained token with no permissions."
