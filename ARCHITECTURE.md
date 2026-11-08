@@ -1,19 +1,18 @@
 # Architecture
 
-A self-hostable, single-tenant service that exposes `forges` providers over HTTP. Providers and access come from the environment; platform specifics come from the deployment's options. It caches at the CDN and upstream.
+A self-hostable, single-tenant service that exposes `forges` providers over HTTP. Providers and access come from the environment; platform specifics come from the deployment's options. It caches at the CDN.
 
 ## Request path
 
 ```
-client ──▶ CDN ──▶ auth middleware ──▶ verb route ──▶ forges provider ──▶ upstream cache ──▶ forge API
+client ──▶ CDN ──▶ auth middleware ──▶ verb route ──▶ forges provider ──▶ forge API
            (tags,    (secret, or       (validate,                        (Cache API or
             ETag)     public mode)      call, tag)                        memory)
 ```
 
 - **CDN.** Public reads carry `CDN-Cache-Control` (60 s fresh, 10 min stale-while-revalidate), a weak `ETag` and `Cache-Tag`, or whatever the deployment's `cdnHeaders` returns instead (the Netlify demos add `durable`). Private instances and writes are `private, no-store`.
 - **Verb route** (`packages/server/src/routes/verb.ts`). Checks the arguments against the operations manifest, revives dates and bytes, passes the request's signal into the verb's options, calls the provider and tags the response with every repository in its arguments and result.
-- **Upstream cache** (`packages/server/src/upstream-cache.ts`). A `fetch` wrapper given to every provider. It serves fresh JSON, revalidates stale JSON with `If-None-Match` (a GitHub 304 is free for authenticated requests), and stands in with a stored response while upstream is rate-limited or failing. Entries carry the proxy response's tags, so a purge reaches them too.
-- **Webhooks** (`POST /webhooks/:forge/:instance`). Verified by the provider and turned into repository tags with `affectedKeys()`. Expires the upstream cache and purges the tags through the deployment's `purge` option.
+- **Webhooks** (`POST /webhooks/:forge/:instance`). Verified by the provider and turned into repository tags with `affectedKeys()`. Purges the tags through the deployment's `purge` option.
 - **Operations manifest** (`packages/server/src/manifest.json`, from `packages/server/scripts/generate-manifest.ts`). Each routed verb's parameters, result and docs as JSON Schemas, read from the `forges` types. The server's only list of verbs: it drives routing, validation, the signal passthrough, `/`, `/openapi.json` and `/docs`.
 - **Client** (`@forges-proxy/client`). `connect()` turns a proxy back into `ForgeProvider`s, finding each verb's options where `/` says they are. It warns when `/` reports a `forges` version incompatible with its own.
 
@@ -23,7 +22,7 @@ client ──▶ CDN ──▶ auth middleware ──▶ verb route ──▶ fo
 
 The server is the `@forges-proxy/server` package: `createServer(options)` returns a [Fetchable](https://fetchable.org) (`{ fetch }`), and the default export is one configured from `process.env`. Deployments depend on it and hand it to their platform, so updates are a version bump rather than merging upstream into a fork.
 
-Nothing in the package names a platform. Anything platform-specific is an option the deployment passes: CDN header names (`cdnHeaders`), purging (`purge`) and where upstream responses live (`upstreamStore`). Each demo in `demos/` is a deployment, smoke-tested through the client with `pnpm smoke <url>`.
+Nothing in the package names a platform. Anything platform-specific is an option the deployment passes: CDN header names (`cdnHeaders`), purging (`purge`) and the `fetch` behind the providers (`upstream`). Each demo in `demos/` is a deployment, smoke-tested through the client with `pnpm smoke <url>`.
 
 It's plain [h3](https://h3.dev), built with tsdown, with `forges` as a regular dependency. We dropped Nitro: its file routing was ten lines of `app.get()`, its presets only wrote platform entries a Fetchable doesn't need, and bundling a library would have pinned `forges`. The packages don't depend on each other: each has its own copy of the `$bytes` encoding (the client's tests round-trip bytes through the server), and the server reports the `forges` version its manifest was generated from.
 
@@ -37,11 +36,11 @@ Forge credentials come from `FORGES_*` variables via `providersFromEnv()`; calle
 
 On the wire: `null` for a skipped optional argument, bytes as `{ "$bytes": "<base64>" }` both ways (a bare string is text where a field takes either), `raw` dropped unless `?raw=1`, `undefined` as 204, streams as `application/octet-stream`. Errors are `{ "error": { name, message, ...fields } }`, which the client rebuilds into the `ForgeError` class.
 
-### Under consideration: a transparent forge-API proxy instead of RPC
+### RPC, not a transparent forge-API proxy
 
 **Context.** The RPC design runs `forges` twice, in the proxy and in the client (`connect()`), and the two must agree on its version: the proxy reports it in `GET /` and `connect()` warns on a mismatch. The alternative runs `forges` only in the client and makes the proxy a caching, credential-adding pass-through for each forge's own API.
 
-**Shape.** The client passes a `fetch` that rewrites forge URLs onto the proxy, e.g. `github({ fetch: via("https://proxy.example") })` sending `https://api.github.com/repos/a/b` as `/api.github.com/repos/a/b`. Not `baseUrl`: `forges` derives the instance from it, so refs, keys and web links would name the proxy's host. The proxy forwards to an allowlist of configured hosts (otherwise it's an open proxy), adds the token, and keeps the CDN, upstream cache, stale-if-error and webhook purging.
+**Shape.** The client passes a `fetch` that rewrites forge URLs onto the proxy, e.g. `github({ fetch: via("https://proxy.example") })` sending `https://api.github.com/repos/a/b` as `/api.github.com/repos/a/b`. Not `baseUrl`: `forges` derives the instance from it, so refs, keys and web links would name the proxy's host. The proxy forwards to an allowlist of configured hosts (otherwise it's an open proxy), adds the token, and keeps the CDN and webhook purging.
 
 **Gains.**
 
@@ -52,13 +51,13 @@ On the wire: `null` for a skipped optional argument, bytes as `{ "$bytes": "<bas
 **Costs.**
 
 - Public mode needs per-forge rules for which requests are reads and need no account, instead of the manifest's verb classes. Methods help (GET is a read) but not entirely: GitHub reads like discussion listings are GraphQL `POST`s, so the proxy would parse documents to refuse mutations.
-- GraphQL reads are `POST`s, which CDNs don't cache; they'd rely on the upstream cache alone.
+- GraphQL reads are `POST`s, which CDNs don't cache.
 - Cache tags come from URL paths per forge (`/repos/:owner/:name/...` on GitHub) rather than refs in arguments and results.
 - A verb that makes several upstream requests is several browser round trips instead of one call, each through the CDN.
 - Argument validation, the OpenAPI document and `/docs` go away.
 - Responses are each forge's raw payloads, so the CDN stores more and browsers download more than the normalised models.
 
-**Open questions.** How much of npmx's traffic is GraphQL. Whether per-forge read rules are small enough to keep correct. Whether both could coexist: pass-through for `forges` clients, RPC for everyone else.
+**Decision.** RPC. Public read-only instances and non-JS callers need the proxy to know verbs, and a verb's upstream fan-out should stay one call from the app.
 
 ### No version prefix
 
@@ -66,7 +65,7 @@ Routes sit at the root (`/:forge/:instance/:verb`), not under `/v1`. The API mir
 
 ### HTTP caching first
 
-Caching is response headers, so the CDN does the work. The proxy never stores its own responses; it only keeps upstream ones, for revalidation.
+Caching is response headers, so the CDN does the work. The proxy stores nothing itself.
 
 ### Rate limiting is the platform's job
 
@@ -88,9 +87,13 @@ Public instances need protecting from callers who burn the forge budget. Per-cli
 
 **Revisit if** npmx needs fewer browser round trips, or a non-TypeScript consumer needs cross-forge search. The shape would be `GET /_all/search.threads?args=...` with a base64 JSON cursor of per-provider cursors and offsets, and `POST /_all/threads.getMany`.
 
-### Upstream store: memory, or the Cache API
+### No built-in upstream cache
 
-By default the upstream cache is an in-memory LRU per instance. A deployment can pass `cacheApiStore()` where the platform has the Cache API (the Netlify Functions and Workers demos do): shared by every instance in a region, and purgeable by tag. Entries are written only once the verb has returned, so they carry the tags of the repositories in its result, not just its arguments.
+**Context.** The proxy had an etag-revalidating upstream cache, with stale-if-error and a shared Cache API store tagged for purging: about 360 lines, a second cache under the CDN. On serverless an in-memory store is mostly cold, and the shared store needs a custom domain on Workers.
+
+**Decision.** Removed. The CDN absorbs repeated public reads. A deployment that needs fewer upstream requests passes its own `fetch` as `upstream`.
+
+**Revisit if** a deployment runs out of upstream rate limit despite the CDN.
 
 ### Manifest generated from the `forges` types
 

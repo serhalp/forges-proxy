@@ -28,11 +28,10 @@ export { default } from "@forges-proxy/server"
 Platform specifics are options. On Netlify (see the demo):
 
 ```ts
-import { cacheApiStore, createServer } from "@forges-proxy/server"
+import { createServer } from "@forges-proxy/server"
 import { purgeCache } from "@netlify/functions"
 
 export default createServer({
-  upstreamStore: cacheApiStore(() => caches.open("upstream")),
   purge: (tags) => purgeCache({ tags }),
   cdnHeaders: ({ cacheControl, tags }) => ({
     "netlify-cdn-cache-control": `${cacheControl}, durable`,
@@ -97,11 +96,11 @@ Every verb is present. Listings read one page per request, whether iterated or t
 
 ## Webhooks and purging
 
-Point a forge's webhook at `/webhooks/:forge/:instance` and set the provider's `FORGES_<KIND>_WEBHOOK_SECRET`. Each verified delivery expires the upstream cache and, with a `purge` option (the Netlify Functions demo passes Netlify's), purges the CDN entries of every repository it concerns by cache tag. Without one, CDN entries expire by age: fresh for 60 seconds, then served stale for up to 10 minutes while they refresh.
+Point a forge's webhook at `/webhooks/:forge/:instance` and set the provider's `FORGES_<KIND>_WEBHOOK_SECRET`. With a `purge` option (the Netlify Functions demo passes Netlify's), each verified delivery purges the CDN entries of every repository it concerns by cache tag. Without one, CDN entries expire by age: fresh for 60 seconds, then served stale for up to 10 minutes while they refresh.
 
-## Upstream cache
+## Upstream requests
 
-The proxy keeps upstream JSON responses and revalidates them with their `etag`, so a CDN miss usually costs a `304` (free on GitHub's rate limit when authenticated) or nothing. By default they're in memory. With `upstreamStore: cacheApiStore(...)` on a platform with the Cache API (Netlify Functions, Cloudflare Workers), every instance in a region shares them, and the same cache tags purge them. While upstream is rate-limited or failing, a stored response stands in for up to a day past its freshness. Each response's `x-upstream-cache` header says what happened to its upstream requests: `fresh`, `revalidated`, `fetched` or `stale`.
+The CDN absorbs repeated public reads; each miss is a request upstream. To cache upstream responses as well, pass your own `fetch` as `upstream`.
 
 ## Operations manifest
 

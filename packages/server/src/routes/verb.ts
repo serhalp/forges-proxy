@@ -6,7 +6,6 @@ import type { Context } from "#src/context.ts"
 import { errorResponse, proxyError } from "#src/errors.ts"
 import { resultResponse } from "#src/response.ts"
 import { responseTags } from "#src/tags.ts"
-import { upstreamScope } from "#src/upstream-cache.ts"
 import { callVerb, routedVerb, withSignal } from "#src/verbs.ts"
 
 /**
@@ -34,12 +33,9 @@ export function verbRoute(context: Context): EventHandler {
       return proxyError(400, read.problem)
     }
 
-    const upstream = upstreamScope()
     let result: unknown
     try {
-      result = await upstream.run(async () =>
-        callVerb(provider, name, verb, withSignal(verb, read.args, event.req.signal)),
-      )
+      result = await callVerb(provider, name, verb, withSignal(verb, read.args, event.req.signal))
     } catch (error) {
       return errorResponse(error)
     }
@@ -49,13 +45,10 @@ export function verbRoute(context: Context): EventHandler {
       read.args,
       result instanceof ReadableStream ? undefined : result,
     )
-    // Upstream entries carry the response's tags, so a webhook purge reaches them along with the CDN's copy.
-    await upstream.commit(tags)
     return resultResponse(event.req, result, {
       verb,
       mode,
       tags,
-      outcomes: upstream.outcomes,
       cdnHeaders: context.cdnHeaders,
     })
   }

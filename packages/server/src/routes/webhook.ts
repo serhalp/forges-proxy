@@ -25,8 +25,6 @@ export function webhookRoute(context: Context): EventHandler {
     } catch (error) {
       return errorResponse(error)
     }
-    // Otherwise a refill of the purged entries could come from upstream responses the proxy still holds as fresh.
-    context.expireUpstream()
     if (context.purge && tags.length) {
       await context.purge(tags)
     }

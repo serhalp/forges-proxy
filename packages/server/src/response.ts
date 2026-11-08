@@ -25,21 +25,17 @@ export async function resultResponse(
     verb: ManifestVerb
     mode: AccessMode
     tags: string[]
-    outcomes: string[]
     cdnHeaders: CdnHeaders
   },
 ): Promise<Response> {
   const cacheable = isCacheable(context.verb, context.mode)
-  const headers = {
-    ...(cacheable
-      ? {
-          // Browsers always revalidate; the CDN keeps a read briefly and is purged by tag.
-          "cache-control": "public, max-age=0, must-revalidate",
-          ...context.cdnHeaders({ cacheControl: CDN_CACHE_CONTROL, tags: context.tags }),
-        }
-      : { "cache-control": "private, no-store" }),
-    ...(context.outcomes.length ? { "x-upstream-cache": context.outcomes.join(", ") } : {}),
-  }
+  const headers = cacheable
+    ? {
+        // Browsers always revalidate; the CDN keeps a read briefly and is purged by tag.
+        "cache-control": "public, max-age=0, must-revalidate",
+        ...context.cdnHeaders({ cacheControl: CDN_CACHE_CONTROL, tags: context.tags }),
+      }
+    : { "cache-control": "private, no-store" }
   if (result instanceof ReadableStream) {
     return new Response(result, {
       headers: { "content-type": "application/octet-stream", ...headers },

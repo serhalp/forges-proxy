@@ -4,10 +4,9 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 
 ## Open questions
 
-- RPC or a transparent forge-API proxy? See [ARCHITECTURE.md](ARCHITECTURE.md#under-consideration-a-transparent-forge-api-proxy-instead-of-rpc).
 - Forges whose hosts aren't known in advance (Tangled authors' servers and knots, self-hosted instances, Radicle nodes). The proxy only serves instances configured in the env. How should it serve the rest, and what stops hosts named by user data from reaching the proxy's own network?
 - What else to build on the manifest? Hey API client generation, an MCP server.
-- Should the manifest and `connect()` move into `forges` (e.g. `forges/remote`), where the types live? Or the whole project, as `@forges/server` and `@forges/client`? Ask the `forges` team.
+- Should the manifest and `connect()` move into `forges` (e.g. `forges/remote`), where the types live? `forges/schema` already ships model schemas from the same generator; verb signatures (params, result, class, options position) would retire `generate-manifest.ts`, its TS 6 dependency and name-based date revival. Or the whole project, as `@forges/server` and `@forges/client`? Ask the `forges` team.
 
 ## TODO
 
@@ -20,11 +19,8 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 - [x] `GET /status` with `rateLimits()` (per server instance)
 - [x] Pass the request signal through to verbs, into the options parameter the manifest names
 - [ ] SSE for `sources.stream`
-- [x] Upstream ETag fetch cache (`packages/server/src/upstream-cache.ts`), in-memory LRU store
-- [x] Shared upstream store on the Cache API (`cacheApiStore`), per region and tagged like the response. `x-upstream-cache` reports what it did per request.
-- [x] Cache tags on public reads; `POST /webhooks/:forge/:instance` purges them through the `purge` option and expires the upstream cache
+- [x] Cache tags on public reads; `POST /webhooks/:forge/:instance` purges them through the `purge` option
 - [x] Weak `ETag` on public JSON reads, with a 304 for a matching `If-None-Match` (verified live: Netlify's edge answers revalidations with it)
-- [x] Stale-if-error upstream: a stored response stands in (up to a day past fresh) on 5xx, 429, a rate-limit 403 or a network error, not when the caller aborted
 - [x] CORS: any origin (the secret is a header, never a cookie), preflights cached for a day
 - [ ] Evaluate [`cdn-cache-control`](https://github.com/ascorbic/cdn-cache-control) for `cdnHeaders` (per-CDN header names). Gotchas: `.swr()` resets the TTL (call `.ttl()` after), and it sends only the CDN-specific header, not `CDN-Cache-Control` too.
 - [ ] Finer tags (per thread, per release) so an active repo doesn't purge all of its entries on every event
@@ -34,7 +30,7 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 - [x] Client: find options where the manifest puts them (via `/`), not by a heuristic
 - [x] `connect()` client (`@forges-proxy/client`): one `ForgeProvider` per proxied forge
 - [x] pnpm workspace: `@forges-proxy/server` (a Fetchable), `@forges-proxy/client`, `docs` placeholder, `demos/netlify-serverless` (verified live as a draft)
-- [x] Drop Nitro: `createServer(options)` on h3 returns a Fetchable; platform specifics (`cdnHeaders`, `purge`, `upstreamStore`) are options, so purging is pluggable. Built with tsdown.
+- [x] Drop Nitro: `createServer(options)` on h3 returns a Fetchable; platform specifics (`cdnHeaders`, `purge`, `upstream`) are options, so purging is pluggable. Built with tsdown.
 - [x] Demos, smoke-tested with `pnpm smoke` through the client: node, hono, fastify, nitro, docker (local, public and private), cloudflare-workers (live, `workers.dev`), vercel (live), netlify-serverless (live draft)
 - [ ] netlify-edge: verify live. Edge Functions don't take a Fetchable yet, so the demo wraps it in a handler (TODO in the demo). The edge bundler resolves npm modules from the repository root, where pnpm doesn't link workspace packages, hence the root `package.json`'s dependency on `@forges-proxy/server`.
 - [ ] Publish the packages: release tooling (npm scope `@forges-proxy` is registered)
@@ -53,14 +49,10 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 
 ## Notes
 
-- The Workers demo's `cacheApiStore` does nothing on `workers.dev` (the Cache API needs a custom domain), and it passes no `purge`, so a webhook only expires the isolate that received it.
 - Cloudflare Workers define `WorkerGlobalScope`, so `forges` 0.3.2 takes them for a browser and sends no `user-agent`; GitHub answers 403, which surfaces as `InsufficientScopeError`. Fixed on `forges` main; until it's released, the server's default upstream `fetch` adds one (`withUserAgent` in `packages/server/src/index.ts`). Drop that after the next `forges` release.
 - `DATE_FIELDS` / `reviveDates` cover output models only. Input options have `since`, `until`, `createdAfter`, `before`; the proxy revives those itself (`packages/server/src/wire.ts`).
 - Error messages embed the upstream URL (e.g. `NotFoundError`), so leaving out `error.url` doesn't keep it private.
-- Upstream cache, verified live: GitHub answers revalidation with a real 304, but an _anonymous_ 304 still costs a request (53 → 52). GitHub documents 304s as free only for authenticated requests, so the public instance should run with a public-read token, not anonymous.
 - Errors cross the wire with every field their class sets except `url` and `body`; the client rebuilds the class with `Reflect.construct`.
 - Tags are per repository, by both `repoKey` forms (path and `externalId`), since request refs usually lack the id that webhook refs carry and `repoKey` prefers it. Worth considering in `forges`: a helper that returns every key of a ref, for caches to index by.
-- A webhook expires the whole upstream cache (not just the affected repos, whose entries are keyed by request hash), so a CDN refill can't come from an upstream copy the proxy still holds as fresh. Revalidations are 304s, so it's cheap.
-- Verified live on Netlify: after a purge, the next read fetched, and 20 concurrent reads across instances were all fresh. A purge deletes Cache API entries rather than marking them stale, so the next read is a full request, not a 304. Netlify allows 20 cache writes per invocation, so a verb that fans out further stores only the first 20. `expire()` and the per-credential write timestamps are per instance.
 - Manifest details beyond ARCHITECTURE.md: overloads (`releases.downloadAsset`) become unions, `Page<T>` components are renamed `PageOfT` (OpenAPI names allow no `<>`), and every verb has exactly one parameter carrying `signal`, which is how the manifest marks options.
 - OpenAPI is built at runtime, since it depends on the access mode (public leaves out writes and account verbs and enumerates the configured forges and instances). Scalar doesn't render `prefixItems`, so `args` also carries the signature as text (`[ref, options?]`). Valid per `redocly lint --extends=spec`.

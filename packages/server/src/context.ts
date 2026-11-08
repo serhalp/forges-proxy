@@ -13,8 +13,6 @@ export interface Context {
   /** `FORGES_PROXY_*` are read on every request; providers are built from the rest once. */
   env: Env
   forges: () => Forges
-  /** Makes the providers revalidate every upstream response they hold. */
-  expireUpstream: () => void
   purge?: Purge
   cdnHeaders: CdnHeaders
 }

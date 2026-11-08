@@ -38,12 +38,11 @@ async function deliver(
 }
 
 describe("webhooks", () => {
-  it("purges both keys of every repository a delivery concerns, and expires upstream responses", async () => {
+  it("purges both keys of every repository a delivery concerns", async () => {
     const body = JSON.stringify([event])
     const response = await deliver(body, await signDelivery("fake", body, "whsec"))
     assert.equal(response.status, 200)
     assert.deepEqual(recorded.purges, [["fake:fake.test/@42", "fake:fake.test/acme/widgets"]])
-    assert.equal(recorded.expiries, 1)
   })
 
   it("rejects a delivery with a bad signature, purging nothing", async () => {
@@ -56,7 +55,6 @@ describe("webhooks", () => {
       "WebhookVerificationError",
     )
     assert.deepEqual(recorded.purges, [])
-    assert.equal(recorded.expiries, 0)
   })
 
   it("404s for a forge the proxy doesn't serve", async () => {
