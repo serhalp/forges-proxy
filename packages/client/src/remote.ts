@@ -6,6 +6,7 @@ import type {
   ForgeProvider,
   ForgeVerb,
   Page,
+  RateLimit,
 } from "forges"
 import {
   can,
@@ -61,6 +62,10 @@ const RemoteIndex = v.object({
 })
 type RemoteIndex = v.InferOutput<typeof RemoteIndex>
 
+// The server's view of a provider's budgets, as its latest upstream responses reported them.
+const RATE_LIMITS_HEADER = "forges-rate-limits"
+const RateLimits = v.array(v.custom<RateLimit>(isObject))
+
 const ErrorBody = v.object({
   error: v.looseObject({ name: v.optional(v.string()), message: v.optional(v.string()) }),
 })
@@ -111,6 +116,33 @@ function remoteProvider(
   const routed = (verb: string) => verbs.has(verb)
   const unsupported = (verb: string) =>
     new UnsupportedOperationError(`The proxy does not route ${verb}`, origin)
+  let capabilities = info.capabilities
+  let budgets: RateLimit[] = []
+
+  /** Keeps the budgets a verb response reports, the latest the server instance that answered had seen. */
+  function remember(response: Response): void {
+    const header = response.headers.get(RATE_LIMITS_HEADER)
+    if (!header) return
+    try {
+      budgets = v.parse(RateLimits, reviveDates(JSON.parse(header)))
+    } catch {
+      // A malformed header leaves the last budgets in place.
+    }
+  }
+
+  /** Re-reads `/`, where the proxy reports capabilities refined by the instance's version. */
+  async function refreshCapabilities(): Promise<ForgeCapabilities> {
+    const response = await options.fetch(options.url, { headers: options.headers })
+    if (!response.ok) {
+      throw await toError(response, origin)
+    }
+    const index = v.parse(RemoteIndex, await response.json())
+    const own = index.providers.find(
+      (entry) => entry.forge === forge && entry.instance === instance,
+    )
+    capabilities = own?.capabilities ?? capabilities
+    return capabilities
+  }
 
   async function call(verb: string, args: unknown[]): Promise<unknown> {
     const { write, options: at } = verbs.get(verb)!
@@ -136,6 +168,7 @@ function remoteProvider(
       ...(write ? { body: JSON.stringify({ args: sent }, encodeBytes) } : {}),
       signal,
     })
+    remember(response)
     if (!response.ok) {
       throw await toError(response, origin)
     }
@@ -246,14 +279,19 @@ function remoteProvider(
     instance,
     baseUrl: info.baseUrl,
     authKind: info.authKind,
-    capabilities: info.capabilities,
-    refreshCapabilities: async () => info.capabilities,
-    rateLimits: () => [],
+    get capabilities() {
+      return capabilities
+    },
+    refreshCapabilities,
+    // The budgets of this provider's latest response: the token's budget, or for anonymous requests that of the
+    // server's IP, which can differ between the instances of a serverless deployment.
+    rateLimits: () =>
+      budgets.filter((budget) => !budget.resetAt || budget.resetAt.getTime() > Date.now()),
     request: () => Promise.reject(unsupported("request")),
     can: (verb: ForgeVerb, kind?: Parameters<ForgeProvider["can"]>[1]) =>
-      routed(verb) && can(info.capabilities, verb, kind),
+      routed(verb) && can(capabilities, verb, kind),
     support: (verb: ForgeVerb, kind?: Parameters<ForgeProvider["support"]>[1]) =>
-      routed(verb) ? support(info.capabilities, verb, kind) : false,
+      routed(verb) ? support(capabilities, verb, kind) : false,
     normaliseMarkdown: (body: string) => local?.normaliseMarkdown(body) ?? body,
     urlFor: (target: Parameters<ForgeProvider["urlFor"]>[0]) => local?.urlFor(target),
     webOrigin: local?.webOrigin,

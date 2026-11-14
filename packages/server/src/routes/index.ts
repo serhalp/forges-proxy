@@ -1,26 +1,50 @@
 import { providersFromEnv } from "forges/env"
+import type { ForgeCapabilities, ForgeProvider } from "forges"
 import type { EventHandler } from "h3"
 import { accessMode } from "../access.ts"
 import type { Context } from "../context.ts"
 import { manifest } from "../manifest.ts"
 import { isRouted } from "../verbs.ts"
 
+const RETRY_MS = 5 * 60_000
+
 /**
  * The `forges` version, the configured providers with their capabilities, and the verbs this instance routes, each
  * with the position of its options, where clients put `signal` and a listing's cursor.
  */
 export function indexRoute(context: Context): EventHandler {
-  return () => {
+  // Refined by the instance's version, which `refreshCapabilities()` requests on every call: once per provider and
+  // server instance, then. A forge that doesn't answer keeps its static capabilities, and is asked again later.
+  const refreshed = new WeakMap<
+    ForgeProvider,
+    { at: number; capabilities: Promise<ForgeCapabilities> }
+  >()
+  const capabilitiesOf = (provider: ForgeProvider) => {
+    const cached = refreshed.get(provider)
+    if (cached && (cached.at === Infinity || Date.now() - cached.at < RETRY_MS)) {
+      return cached.capabilities
+    }
+    const entry = { at: Infinity, capabilities: provider.refreshCapabilities() }
+    entry.capabilities = entry.capabilities.catch(() => {
+      entry.at = Date.now()
+      return provider.capabilities
+    })
+    refreshed.set(provider, entry)
+    return entry.capabilities
+  }
+  return async () => {
     const mode = accessMode(context.env)
+    const { providers } = context.forges()
+    const capabilities = await Promise.all(providers.map(capabilitiesOf))
     return {
       mode,
       forges: manifest.forges,
-      providers: context.forges().providers.map((provider) => ({
+      providers: providers.map((provider, index) => ({
         forge: provider.forge,
         instance: provider.instance,
         baseUrl: provider.baseUrl,
         authKind: provider.authKind,
-        capabilities: provider.capabilities,
+        capabilities: capabilities[index],
       })),
       verbs: Object.entries(manifest.verbs)
         .filter(([name, verb]) => isRouted(name, verb, mode))

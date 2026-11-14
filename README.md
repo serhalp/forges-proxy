@@ -63,9 +63,9 @@ pnpm build
 pnpm --filter @forges-proxy/server dev
 ```
 
-- `GET /`: configured providers, their capabilities, and the routed verbs with the position of their options.
+- `GET /`: configured providers, their capabilities (refined by each instance's version, once per server instance), and the routed verbs with the position of their options.
 - `GET /docs`: API reference (Scalar), from `GET /openapi.json` (OpenAPI 3.1).
-- `GET /status`: each provider's rate-limit budgets, as the server instance that answers last saw them.
+- `GET /status`: each provider's rate-limit budgets, as the server instance that answers last saw them. Verb responses carry the same in a `forges-rate-limits` header.
 - `GET /:forge/:instance/:verb?args=<json array>`: a read, e.g. `repos.get`, `threads.list`.
 - `POST /:forge/:instance/:verb` with `{ "args": [...] }`: a write.
 - `GET /:forge/:instance/sources.stream`: the forge's live events (`sources.stream()`, Tangled only today) as [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events). Each event's `id` is its cursor; resume with `Last-Event-ID`, as `EventSource` does on reconnect, or `?cursor=`. A failure ends the stream with an `error` event. Serverless platforms end long responses at their time limit, so expect to reconnect. Browsers' `EventSource` can't send the proxy secret, so on a private instance use the client or `fetch`.
@@ -97,6 +97,13 @@ const repo = await forges.repos.get({
 For the sync helpers (`urlFor()`, `parseUrl()`, ...), pass the factories of the forges you use, such as `connect({ url, secret, factories: [github] })` with `github` from `forges/github`, or every forge's with `allFactories` from `@forges-proxy/client/all`. Without one, a forge's helpers return nothing, and your bundle carries none of its code.
 
 Every verb is present. Listings read one page per request, whether iterated or through `page()`. `sources.stream()` follows the proxy's event stream and, as with any provider, ends with `StreamClosedError` and the last cursor when the connection closes, including at a serverless time limit; call it again with that cursor. Errors come back as the same classes. Verbs the proxy doesn't route reject with `UnsupportedOperationError`, and `can()` says so.
+
+`rateLimits()` returns the budgets reported with the provider's latest response, which are the proxy's, not the client's. Read them with these caveats:
+
+- They're the budgets of the server instance that answered, as of its latest upstream response. Instances of a serverless deployment each keep their own.
+- An authenticated budget is the forge account's (on GitHub, the user's or the app installation's), shared with anything else using it. An anonymous budget is usually the server's IP's, which can differ between instances.
+- A response the CDN served carries the budgets from when it was cached.
+- Limits the forge doesn't report in headers, such as GitHub's secondary limits, aren't in them.
 
 ## Webhooks
 

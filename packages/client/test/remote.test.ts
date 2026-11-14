@@ -240,6 +240,48 @@ describe("remote provider", () => {
   })
 })
 
+describe("remote provider state", () => {
+  env({ FORGES_PROXY_SECRET: "s3cret" })
+
+  it("reports the budgets of its latest response", async () => {
+    const { fake } = await remote("s3cret")
+    assert.deepEqual(fake.rateLimits(), [])
+    direct.setRateLimit({ limit: 10 })
+    try {
+      await fake.repos.get(repo)
+      assert.equal(fake.rateLimits()[0]?.limit, 10)
+    } finally {
+      direct.setRateLimit(undefined)
+    }
+  })
+
+  it("refreshes its capabilities from the proxy", async () => {
+    let reads = 0
+    // The second read of `/` reports no stream, as a proxy that has since refined its capabilities would.
+    const refining = async (url: string, init?: RequestInit) => {
+      const response = await fetch(url, init)
+      if (new URL(url).pathname !== "/" || ++reads === 1) return response
+      const body = v.parse(
+        v.looseObject({ providers: v.array(v.looseObject({ capabilities: v.looseObject({}) })) }),
+        await response.json(),
+      )
+      return Response.json({
+        ...body,
+        providers: body.providers.map((entry) => ({
+          ...entry,
+          capabilities: { ...entry.capabilities, sources: { stream: false } },
+        })),
+      })
+    }
+    const [fake] = await connect({ url: "http://proxy.test", secret: "s3cret", fetch: refining })
+    assert.equal(fake.can("sources.stream"), true)
+    const refreshed = await fake.refreshCapabilities()
+    assert.equal(refreshed.sources.stream, false)
+    assert.equal(fake.capabilities.sources.stream, false)
+    assert.equal(fake.can("sources.stream"), false)
+  })
+})
+
 describe("remote event stream", () => {
   env({ FORGES_PROXY_SECRET: "s3cret" })
 
