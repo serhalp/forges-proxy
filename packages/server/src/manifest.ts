@@ -1,9 +1,11 @@
+import { models, verbs } from "forges/schema"
+import forgesPackage from "forges/package.json" with { type: "json" }
 import * as v from "valibot"
-import generated from "./manifest.json" with { type: "json" }
 
 export type Schema = Record<string, unknown>
 
-export interface ManifestParam {
+/** A verb's parameter and the schema the proxy validates it with. */
+interface ManifestParam {
   name: string
   optional: boolean
   /** The verb's options: where the proxy puts the request's `signal`. */
@@ -24,7 +26,7 @@ export interface ManifestVerb {
   result: Schema
 }
 
-/** Each routed verb's signature and schemas, generated from the `forges` types by `scripts/generate-manifest.ts`. */
+/** Each routed verb's signature and schemas, from `forges/schema`. */
 export interface Manifest {
   /** The `forges` version the manifest was generated from, which the proxy reports to clients. */
   forges: string
@@ -61,7 +63,21 @@ const ManifestSchema: v.GenericSchema<Manifest> = v.object({
   schemas: v.record(v.string(), SchemaObject),
 })
 
-export const manifest = v.parse(ManifestSchema, generated)
+/** Verbs with no safe or meaningful HTTP form: credentials, live providers, and webhook/push ingestion. */
+const NON_ROUTABLE = new Set([
+  "installations.token",
+  "installations.provider",
+  "installations.providers",
+  "webhooks.verify",
+  "webhooks.ingest",
+  "sources.stream",
+])
+
+export const manifest = v.parse(ManifestSchema, {
+  forges: forgesPackage.version,
+  verbs: Object.fromEntries(Object.entries(verbs).filter(([name]) => !NON_ROUTABLE.has(name))),
+  schemas: models,
+})
 
 /**
  * The positional arguments as a tuple. Trailing optional ones may be left out, and any optional one may be `null`,

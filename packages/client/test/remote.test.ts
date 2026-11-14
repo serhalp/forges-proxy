@@ -7,9 +7,9 @@ import {
   github as githubForge,
   NotFoundError,
   RateLimitedError,
-  reviveDates,
   UnsupportedOperationError,
 } from "forges"
+import { decode } from "forges/wire"
 import { fake as fakeForge } from "forges/fake"
 import { github as githubFactory } from "forges/github"
 import { gitlab as gitlabFactory } from "forges/gitlab"
@@ -48,7 +48,9 @@ const repo = { forge: "fake", instance: "fake.test", owner: "acme", name: "widge
 const issue = { forge: "fake", instance: "fake.test", repo, kind: "issue" as const, number: "1" }
 
 /** What a direct call's result looks like once it has crossed the wire. */
-const overTheWire = <T>(value: T): T => reviveDates(JSON.parse(serialise(value, { raw: false })))
+const overTheWire = <T>(value: T): T =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+  decode(JSON.parse(serialise(value, { raw: false }))) as T
 
 async function remote(secret?: string): Promise<{ fake: ForgeProvider; github: ForgeProvider }> {
   const [fakeProvider, githubProvider] = await connect({
@@ -84,8 +86,7 @@ describe("connect", () => {
     assert.equal((await provider.repos.get(repo)).description, "Widgets")
   })
 
-  it("warns when the proxy runs an incompatible forges", async (t) => {
-    const warn = t.mock.method(console, "warn", () => {})
+  it("throws when the proxy runs an incompatible forges", async () => {
     const runs = (version: string) => async (url: string, init?: RequestInit) => {
       const response = await fetch(url, init)
       return new URL(url).pathname === "/"
@@ -95,10 +96,8 @@ describe("connect", () => {
     for (const version of [FORGES_VERSION, "0.3.9"]) {
       await connect({ url: "http://proxy.test", secret: "s3cret", fetch: runs(version) })
     }
-    assert.equal(warn.mock.callCount(), 0)
-    await connect({ url: "http://proxy.test", secret: "s3cret", fetch: runs("0.4.0") })
-    assert.match(
-      String(warn.mock.calls[0].arguments[0]),
+    await assert.rejects(
+      connect({ url: "http://proxy.test", secret: "s3cret", fetch: runs("0.4.0") }),
       /runs forges 0\.4\.0, but this client was built against/,
     )
   })

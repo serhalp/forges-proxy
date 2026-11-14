@@ -6,6 +6,7 @@ import {
   UnsupportedOperationError,
   WebhookVerificationError,
 } from "forges"
+import { encode } from "forges/wire"
 import type { Logger } from "./context.ts"
 
 /** The response for an error thrown by a verb, without leaking anything that is not a forge error. */
@@ -56,7 +57,7 @@ export function proxyError(
 }
 
 function json(status: number, error: object, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify({ error }), {
+  return new Response(JSON.stringify(encode({ error })), {
     status,
     headers: { "content-type": "application/json", "cache-control": "no-store", ...headers },
   })

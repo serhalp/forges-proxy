@@ -11,11 +11,11 @@ client ──▶ CDN ──▶ auth middleware ──▶ verb route ──▶ fo
 ```
 
 - **CDN.** Public reads carry `CDN-Cache-Control` (60 s fresh, 10 min stale-while-revalidate), a weak `ETag` and `Cache-Tag`, or whatever the deployment's `cdnHeaders` returns instead (the Netlify demos add `durable`). Private instances and writes are `private, no-store`.
-- **Verb route** (`packages/server/src/routes/verb.ts`). Checks the arguments against the operations manifest, revives dates and bytes, passes the request's signal into the verb's options, calls the provider and tags the response with every repository in its arguments and result.
+- **Verb route** (`packages/server/src/routes/verb.ts`). Checks the arguments against the operations manifest, decodes dates and bytes, passes the request's signal into the verb's options, calls the provider and tags the response with every repository in its arguments and result.
 - **Event stream** (`GET /:forge/:instance/sources.stream`). The provider's `sources.stream()` as server-sent events, outside the manifest since it answers with a stream rather than JSON. Cursors are the event ids, so `EventSource` resumes on its own. Never cached.
 - **Webhooks** (`POST /webhooks/:forge/:instance`). Verified by the provider and turned into repository tags with `affectedKeys()`. Purges the tags through the deployment's `purge` option, then awaits its `handleEvents` with the events. A failure answers 500, so the forge's delivery log shows it.
-- **Operations manifest** (`packages/server/src/manifest.json`, from `packages/server/scripts/generate-manifest.ts`). Each routed verb's parameters, result and docs as JSON Schemas, read from the `forges` types. The server's only list of verbs: it drives routing, validation, the signal passthrough, `/`, `/openapi.json` and `/docs`.
-- **Client** (`@forges-proxy/client`). `connect()` turns a proxy back into `ForgeProvider`s, finding each verb's options where `/` says they are. It warns when `/` reports a `forges` version incompatible with its own.
+- **Operations manifest** (`packages/server/src/manifest.ts`). Re-exports the routed verbs and model schemas from `forges/schema`. The server's only list of verbs: it drives routing, validation, the signal passthrough, `/`, `/openapi.json` and `/docs`.
+- **Client** (`@forges-proxy/client`). `connect()` turns a proxy back into `ForgeProvider`s, finding each verb's options where `/` says they are. It throws when `/` reports an incompatible `forges` version.
 
 ## Decisions
 
@@ -25,7 +25,7 @@ The server is the `@forges-proxy/server` package: `createServer(options)` return
 
 Nothing in the package names a platform. Anything platform-specific is an option the deployment passes: CDN header names (`cdnHeaders`), purging (`purge`) and the `fetch` behind the providers (`upstream`). Each demo in `demos/` is a deployment, smoke-tested through the client with `pnpm smoke <url>`.
 
-It's plain [h3](https://h3.dev), built with tsdown, with `forges` as a regular dependency. We dropped Nitro: its file routing was ten lines of `app.get()`, its presets only wrote platform entries a Fetchable doesn't need, and bundling a library would have pinned `forges`. The packages don't depend on each other: each has its own copy of the `$bytes` encoding (the client's tests round-trip bytes through the server), and the server reports the `forges` version its manifest was generated from.
+It's plain [h3](https://h3.dev), built with tsdown, with `forges` as a regular dependency. We dropped Nitro: its file routing was ten lines of `app.get()`, its presets only wrote platform entries a Fetchable doesn't need, and bundling a library would have pinned `forges`. Both packages use `forges/wire` for dates and bytes, and the server reports the `forges` version it runs against.
 
 ### Single tenant, credentials only in the environment
 
@@ -33,9 +33,9 @@ Forge credentials come from `FORGES_*` variables via `providersFromEnv()`; calle
 
 ### RPC over the provider surface, not REST
 
-`GET /:forge/:instance/:verb?args=<json array>` for reads, `POST` with `{ "args": [...] }` for writes. Arguments are positional, as the method takes them. The manifest generator takes verbs and their classes (write, account, listing) from `CAPABILITY_TABLE`, so new verbs need no proxy change beyond regenerating it. A listing answers with the page its options' `cursor` names (`listing.page()`); clients rebuild the iterable with `iteratePages`. `provider.request` (takes absolute URLs, so SSRF), `installations.token` and `installations.provider(s)` are never routed.
+`GET /:forge/:instance/:verb?args=<json array>` for reads, `POST` with `{ "args": [...] }` for writes. Arguments are positional, as the method takes them. Verb classes (write, account, listing) come from `forges/schema`, so new verbs need no proxy change. A listing answers with the page its options' `cursor` names (`listing.page()`); clients rebuild the iterable with `iteratePages`. `provider.request` (takes absolute URLs, so SSRF), `installations.token` and `installations.provider(s)` are never routed.
 
-On the wire: `null` for a skipped optional argument, bytes as `{ "$bytes": "<base64>" }` both ways (a bare string is text where a field takes either), `raw` dropped unless `?raw=1`, `undefined` as 204, streams as `application/octet-stream`. Errors are `{ "error": { name, message, ...fields } }`, which the client rebuilds into the `ForgeError` class.
+On the wire: `null` for a skipped optional argument, bytes as `{ "$bytes": "<base64>" }`, dates as `{ "$date": "<ISO 8601>" }`, `raw` dropped unless `?raw=1`, `undefined` as 204, streams as `application/octet-stream`. Errors are `{ "error": { name, message, ...fields } }`, which the client rebuilds into the `ForgeError` class.
 
 ### RPC, not a transparent forge-API proxy
 
@@ -96,6 +96,6 @@ Public instances need protecting from callers who burn the forge budget. Per-cli
 
 **Revisit if** a deployment runs out of upstream rate limit despite the CDN.
 
-### Manifest generated from the `forges` types
+### Manifest from `forges/schema`
 
-`ts-json-schema-generator` can't evaluate `Parameters<>`, so the script finds each verb's signature with the TypeScript checker and hands the declared parameter and result type nodes straight to the generator's parser, in one program. Lib types the wire carries differently are parsed by a custom parser, matched by symbol rather than by name: `Uint8Array` is `{ $bytes }`, `ReadableStream` the binary response, `AbortSignal` nothing, and `ForgeListing<T>` the `Page<T>` a listing answers with. The published declarations are bundled without `export` keywords, so every named type is parsed as a definition; only the types `forges` exports become components, and the rest are inlined. Everything runs on TypeScript 6 (`typescript-6`, and the generator's own `typescript` overridden to it in `pnpm-workspace.yaml`), the version `forges` is written in, since the root TypeScript 7 has no compiler API. A test fails while the checked-in manifest is stale. Candidate for upstreaming next to `forges`' `schemas.json`.
+The server imports `verbs` and `models` from `forges/schema`; there is no proxy-side generator. `forges/wire` provides the tagged dates and bytes used on every request and response, so the client and server share one codec.

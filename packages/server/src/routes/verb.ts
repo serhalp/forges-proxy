@@ -1,4 +1,5 @@
 import type { ForgeProvider } from "forges"
+import { encode } from "forges/wire"
 import type { EventHandler } from "h3"
 import { getRouterParams } from "h3"
 import { accessMode } from "../access.ts"
@@ -62,7 +63,7 @@ export function verbRoute(context: Context): EventHandler {
 function withRateLimits(response: Response, provider: ForgeProvider): Response {
   const budgets = provider.rateLimits()
   if (budgets.length) {
-    response.headers.set(RATE_LIMITS_HEADER, JSON.stringify(budgets))
+    response.headers.set(RATE_LIMITS_HEADER, JSON.stringify(encode(budgets)))
   }
   return response
 }

@@ -8,20 +8,13 @@ import type {
   Page,
   RateLimit,
 } from "forges"
-import {
-  can,
-  ForgeApiError,
-  reviveDates,
-  StreamClosedError,
-  support,
-  UnsupportedOperationError,
-} from "forges"
+import { can, ForgeApiError, StreamClosedError, support, UnsupportedOperationError } from "forges"
 import { CAPABILITY_TABLE, forgeIterable, iteratePages } from "forges/kit"
+import { decode, encode } from "forges/wire"
 import { EventSourceParserStream } from "eventsource-parser/stream"
 import * as v from "valibot"
 import { compatible, FORGES_VERSION } from "./version.ts"
 import { ERRORS } from "./errors.ts"
-import { decodeBytes, encodeBytes } from "./wire.ts"
 
 export interface RemoteOptions {
   /** Where the proxy answers, such as `https://forges.example.com` or `https://example.com/forges/`. */
@@ -95,8 +88,8 @@ export async function connect(options: RemoteOptions): Promise<ForgeProvider[]> 
   const index = v.parse(RemoteIndex, await response.json())
   // A warning, not a rejection: most verbs survive a mismatch, and unrouted ones already reject.
   if (index.forges && !compatible(index.forges, FORGES_VERSION)) {
-    console.warn(
-      `forges-proxy: ${options.url} runs forges ${index.forges}, but this client was built against ${FORGES_VERSION}. Verbs whose arguments or results changed between them may fail.`,
+    throw new Error(
+      `forges-proxy: ${options.url} runs forges ${index.forges}, but this client was built against ${FORGES_VERSION}. Update both to the same wire format.`,
     )
   }
   const verbs = new Map(index.verbs.map(({ name, ...verb }) => [name, verb]))
@@ -124,7 +117,7 @@ function remoteProvider(
     const header = response.headers.get(RATE_LIMITS_HEADER)
     if (!header) return
     try {
-      budgets = v.parse(RateLimits, reviveDates(JSON.parse(header)))
+      budgets = v.parse(RateLimits, decode(JSON.parse(header)))
     } catch {
       // A malformed header leaves the last budgets in place.
     }
@@ -160,12 +153,12 @@ function remoteProvider(
       options.url,
     )
     if (!write) {
-      url.searchParams.set("args", JSON.stringify(sent, encodeBytes))
+      url.searchParams.set("args", JSON.stringify(encode(sent)))
     }
     const response = await options.fetch(url.href, {
       method: write ? "POST" : "GET",
       headers: write ? { ...options.headers, "content-type": "application/json" } : options.headers,
-      ...(write ? { body: JSON.stringify({ args: sent }, encodeBytes) } : {}),
+      ...(write ? { body: JSON.stringify({ args: encode(sent) }) } : {}),
       signal,
     })
     remember(response)
@@ -178,8 +171,7 @@ function remoteProvider(
     if (response.headers.get("content-type") === "application/octet-stream") {
       return response.body
     }
-    // Bytes after dates, since `reviveDates` would take a `Uint8Array` apart.
-    return decodeBytes(reviveDates(await response.json()))
+    return decode(await response.json())
   }
 
   /** A listing: each page is a request, with the cursor in the options. */
@@ -219,7 +211,7 @@ function remoteProvider(
           throw errorFrom(JSON.parse(message.data), 502, origin)
         }
         cursor = message.id ?? cursor
-        yield { event: reviveDates(JSON.parse(message.data)), cursor }
+        yield { event: decode(JSON.parse(message.data)), cursor }
       }
     } catch (error) {
       // Aborting ends iteration without an error, as `sources.stream()` does.
@@ -346,5 +338,5 @@ function errorFrom(json: unknown, status: number, origin: object): Error {
     return new ForgeApiError(message, status, "", origin)
   }
   const error = Reflect.construct(Error, [message], Class)
-  return Object.assign(error, reviveDates(fields), { name })
+  return Object.assign(error, decode(fields), { name })
 }

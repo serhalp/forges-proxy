@@ -2,31 +2,33 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { createForges } from "forges"
 import { fake } from "forges/fake"
+import * as v from "valibot"
 import { manifest } from "./manifest.ts"
 import { callVerb, routedVerb, withSignal } from "./verbs.ts"
-import { routableVerbs } from "../scripts/generate-manifest.ts"
-import * as v from "valibot"
 
-const VERBS = routableVerbs()
-
-describe("routableVerbs", () => {
+describe("manifest", () => {
   it("leaves out verbs with no safe HTTP form", () => {
     for (const verb of [
       "installations.token",
       "installations.provider",
+      "installations.providers",
+      "webhooks.verify",
       "webhooks.ingest",
       "sources.stream",
     ]) {
-      assert.equal(VERBS.has(verb), false, verb)
+      assert.equal(manifest.verbs[verb], undefined, verb)
     }
   })
 
-  it("classifies listings, writes and account verbs from the capability table", () => {
-    const plain = { write: false, account: false, listing: false }
-    assert.deepEqual(VERBS.get("repos.get"), plain)
-    assert.deepEqual(VERBS.get("threads.list"), { ...plain, listing: true })
-    assert.deepEqual(VERBS.get("threads.createComment"), { ...plain, write: true })
-    assert.deepEqual(VERBS.get("users.me"), { ...plain, account: true })
+  it("classifies listings, writes and account verbs", () => {
+    const kind = (name: string) => {
+      const { write, account, listing = false } = manifest.verbs[name]
+      return { write, account, listing }
+    }
+    assert.deepEqual(kind("repos.get"), { write: false, account: false, listing: false })
+    assert.deepEqual(kind("threads.list"), { write: false, account: false, listing: true })
+    assert.deepEqual(kind("threads.create"), { write: true, account: false, listing: false })
+    assert.deepEqual(kind("users.me"), { write: false, account: true, listing: false })
   })
 })
 

@@ -2,9 +2,9 @@ import { Validator } from "@cfworker/json-schema"
 import * as v from "valibot"
 import type { H3Event } from "h3"
 import { getQuery, readBody } from "h3"
+import { decode } from "forges/wire"
 import type { ManifestVerb } from "./manifest.ts"
 import { argsSchema, manifest } from "./manifest.ts"
-import { reviveArgs } from "./wire.ts"
 
 const validators = new Map<string, Validator>()
 
@@ -32,7 +32,15 @@ export async function readArgs(
     return { problem }
   }
   // JSON has no `undefined`, so a skipped optional argument arrives as `null`.
-  return { args: wire.map((arg) => reviveArgs(arg ?? undefined)) }
+  try {
+    const args = decode(wire.map((arg) => arg ?? undefined))
+    if (!Array.isArray(args)) {
+      return { problem: "`args` must be a JSON array" }
+    }
+    return { args }
+  } catch (error) {
+    return { problem: error instanceof Error ? error.message : "Invalid wire value" }
+  }
 }
 
 function parseArgs(value: unknown): unknown {

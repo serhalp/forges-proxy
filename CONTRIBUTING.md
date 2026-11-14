@@ -11,7 +11,7 @@ pnpm --filter @forges-proxy/server dev    # the proxy from `process.env`, on htt
 
 A pnpm workspace. The server is [h3](https://h3.dev/) v2, built with [tsdown](https://tsdown.dev/).
 
-- `packages/server`: the proxy. `src/index.ts` (`createServer()`) wires the routes (`src/routes/`) and middleware. `scripts/generate-manifest.ts` writes `src/manifest.json` (`pnpm --filter @forges-proxy/server manifest`); a test fails when it's stale.
+- `packages/server`: the proxy. `src/index.ts` (`createServer()`) wires the routes (`src/routes/`) and middleware. `src/manifest.ts` re-exports the verbs and model schemas from `forges/schema`.
 - `packages/client`: `connect()`.
 - `packages/docs`: placeholder.
 - `demos/*`: one deployment per platform or framework. Nothing platform-specific goes in the packages; it's an option a demo passes.

@@ -19,11 +19,6 @@
       // Test helpers sit next to the one test that uses them.
       "files": ["**/test/**", "**/*.test.ts"],
       "rules": { "unicorn/consistent-function-scoping": "off" }
-    },
-    {
-      // TypeScript compiler API plumbing, over the types of our own dependency.
-      "files": ["packages/server/scripts/generate-manifest.ts"],
-      "rules": { "typescript/no-unsafe-type-assertion": "off" }
     }
   ]
 }

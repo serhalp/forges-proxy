@@ -50,7 +50,6 @@
   "scripts": {
     "build": "tsdown",
     "dev": "srvx --watch --prod=false ./dev.ts",
-    "manifest": "node --conditions=@forges-proxy/source scripts/generate-manifest.ts",
     "test": "node --conditions=@forges-proxy/source --test \"src/**/*.test.ts\" \"test/**/*.test.ts\"",
     "test:coverage": "node --conditions=@forges-proxy/source --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test-coverage-exclude=\"src/**/*.test.ts\" --test \"src/**/*.test.ts\" \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
@@ -63,9 +62,7 @@
   },
   "devDependencies": {
     "srvx": "1.0.8",
-    "ts-json-schema-generator": "2.9.0",
-    "tsdown": "0.23.7",
-    "typescript-6": "npm:typescript@6.0.3"
+    "tsdown": "0.23.7"
   },
   "engines": {
     "node": ">=22.18"

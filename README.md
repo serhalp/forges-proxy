@@ -96,7 +96,7 @@ const repo = await forges.repos.get({
 
 For the sync helpers (`urlFor()`, `parseUrl()`, ...), pass the factories of the forges you use, such as `connect({ url, secret, factories: [github] })` with `github` from `forges/github`, or every forge's with `allFactories` from `@forges-proxy/client/all`. Without one, a forge's helpers return nothing, and your bundle carries none of its code.
 
-Every verb is present. Listings read one page per request, whether iterated or through `page()`. `sources.stream()` follows the proxy's event stream and, as with any provider, ends with `StreamClosedError` and the last cursor when the connection closes, including at a serverless time limit; call it again with that cursor. Errors come back as the same classes. Verbs the proxy doesn't route reject with `UnsupportedOperationError`, and `can()` says so.
+Every verb is present. Listings read one page per request, whether iterated or through `page()`. `sources.stream()` follows the proxy's event stream and, as with any provider, ends with `StreamClosedError` and the last cursor when the connection closes, including at a serverless time limit; call it again with that cursor. Errors come back as the same classes. Verbs the proxy doesn't route reject with `UnsupportedOperationError`, and `can()` says so. `refreshCapabilities()` re-reads the proxy's capabilities.
 
 `rateLimits()` returns the budgets reported with the provider's latest response, which are the proxy's, not the client's. Read them with these caveats:
 
@@ -141,10 +141,4 @@ By default the server logs only its own failures, such as a verb's unexpected er
 
 ## Operations manifest
 
-`packages/server/src/manifest.json` describes every routed verb: parameters, result and docs, as JSON Schemas read from the `forges` types. The OpenAPI document, argument validation and signal passthrough all come from it. Regenerate it after changing `forges`:
-
-```sh
-pnpm --filter @forges-proxy/server manifest
-```
-
-A test fails while it's stale.
+`packages/server/src/manifest.ts` re-exports the routed verbs and model schemas from `forges/schema`. The OpenAPI document, argument validation and signal passthrough all come from it. Update the `forges` dependency to pick up new verbs; there is no proxy-side generator.

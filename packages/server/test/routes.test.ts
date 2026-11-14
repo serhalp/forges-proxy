@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { createForges, RateLimitedError } from "forges"
 import { fake } from "forges/fake"
+import { encode } from "forges/wire"
 import { createProxy, env } from "./support/proxy.ts"
 import * as v from "valibot"
 
@@ -286,7 +287,7 @@ describe("dispatch", () => {
       assert.ok((await errorOf(response)).message.startsWith(message), message)
     }
     const since = await read("search.threads", [{ repo, since: "yesterday" }], authorization)
-    assert.match((await errorOf(since)).message, /^args\/0\/since: .*date-time/)
+    assert.match((await errorOf(since)).message, /^args\/0\/since:/)
   })
 
   it("takes null for a skipped optional argument", async () => {
@@ -360,11 +361,9 @@ describe("dispatch", () => {
   it("revives dates in arguments", async () => {
     // The fake calls `since.getTime()`, so a string left unrevived would fail the request.
     const search = async (since: Date) => {
-      const response = await read(
-        "search.threads",
-        [{ repo, since: since.toISOString() }],
-        authorization,
-      )
+      const args = encode([{ repo, since }])
+      assert.ok(Array.isArray(args))
+      const response = await read("search.threads", args, authorization)
       assert.equal(response.status, 200)
       return v.parse(v.object({ items: v.array(v.unknown()) }), await response.json()).items.length
     }
