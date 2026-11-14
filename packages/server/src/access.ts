@@ -2,7 +2,7 @@ import { HTTPError } from "h3"
 import type { Env } from "./context.ts"
 
 /**
- * `private`: callers present `FORGES_PROXY_SECRET`. `public`: anyone may call, and only verbs that need neither
+ * `private`: callers present `FORGES_PROXY_SECRET`, or `FORGES_PROXY_PREVIOUS_SECRET` while they move over to a new one. `public`: anyone may call, and only verbs that need neither
  * an account nor write access are routed, so the instance's tokens should only be able to read public data.
  */
 export type AccessMode = "private" | "public"
@@ -11,6 +11,14 @@ export function accessMode(env: Env): AccessMode {
   const secret = env.FORGES_PROXY_SECRET
   const isPublic = env.FORGES_PROXY_PUBLIC === "1" || env.FORGES_PROXY_PUBLIC === "true"
   // Refuse to guess: an instance with neither would hand the env's tokens to anyone who finds it.
+  if (env.FORGES_PROXY_PREVIOUS_SECRET && !secret) {
+    throw new HTTPError(
+      "FORGES_PROXY_PREVIOUS_SECRET needs FORGES_PROXY_SECRET, the secret that replaces it",
+      {
+        status: 503,
+      },
+    )
+  }
   if (secret && isPublic) {
     throw new HTTPError("Set only one of FORGES_PROXY_SECRET and FORGES_PROXY_PUBLIC", {
       status: 503,

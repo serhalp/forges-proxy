@@ -14,6 +14,8 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 - [x] Generic dispatcher: providers from env, GET reads / POST writes, error mapping
 - [x] Cache headers per verb class (public reads only; private is `no-store` until the parked issue is solved)
 - [x] Proxy access secret (`FORGES_PROXY_SECRET`) or public mode (`FORGES_PROXY_PUBLIC=1`); both or neither is a 503
+- [x] Secret rotation: `FORGES_PROXY_PREVIOUS_SECRET` is accepted alongside the new secret while callers move over
+- [x] `sources.stream` in `/openapi.json`
 - [x] `GET /`: providers, capabilities, routed verbs
 - [x] Tests: `node:test` (Node 26) with `forges/fake` passed to `createServer`; unit and route tests
 - [x] `GET /status` with `rateLimits()` (per server instance)
@@ -41,7 +43,6 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 
 ## Parked
 
-- Secret rotation without downtime: accept a second secret alongside `FORGES_PROXY_SECRET` while callers move over. Important.
 - A very short CDN TTL (e.g. 5s) on public 404s, so floods of missing repos don't all reach the forge.
 - An MCP server (read verbs as tools), as a workspace package.
 - CDN caching for private instances, which send `no-store` because the CDN answers before auth runs. Likely fix: vary on `authorization` (`Netlify-Vary: header=authorization` or the platform's equivalent).

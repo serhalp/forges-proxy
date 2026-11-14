@@ -17,7 +17,11 @@ export function auth(context: Context): Middleware {
     }
     const header = event.req.headers.get("authorization") ?? ""
     const token = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : ""
-    if (!token || !timingSafeEqual(token, context.env.FORGES_PROXY_SECRET!)) {
+    // Both compared every time, so the timing doesn't say which one matched.
+    const accepted = [context.env.FORGES_PROXY_SECRET, context.env.FORGES_PROXY_PREVIOUS_SECRET]
+      .filter((secret) => !!secret)
+      .map((secret) => timingSafeEqual(token, secret!))
+    if (!token || !accepted.includes(true)) {
       return proxyError(401, "Unauthorized", { "www-authenticate": "Bearer" })
     }
     return undefined

@@ -62,11 +62,33 @@ describe("configuration", () => {
     assert.equal((await errorOf(response)).name, "ProxyError")
   })
 
+  describe("with a previous secret but no current one", () => {
+    env({ FORGES_PROXY_PREVIOUS_SECRET: "old", FORGES_PROXY_PUBLIC: "1" })
+    it("refuses to serve", async () => {
+      assert.equal((await read("repos.get", [repo])).status, 503)
+    })
+  })
+
   describe("with both a secret and public mode", () => {
     env({ FORGES_PROXY_SECRET: "s3cret", FORGES_PROXY_PUBLIC: "1" })
     it("refuses to serve", async () => {
       assert.equal((await read("repos.get", [repo])).status, 503)
     })
+  })
+})
+
+describe("rotating the secret", () => {
+  env({ FORGES_PROXY_SECRET: "new", FORGES_PROXY_PREVIOUS_SECRET: "old" })
+
+  it("accepts the current and the previous secret, and nothing else", async () => {
+    for (const [secret, status] of [
+      ["new", 200],
+      ["old", 200],
+      ["nope", 401],
+    ] as const) {
+      const response = await read("repos.get", [repo], { authorization: `Bearer ${secret}` })
+      assert.equal(response.status, status, secret)
+    }
   })
 })
 

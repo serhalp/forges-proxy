@@ -52,7 +52,7 @@ Providers come from `FORGES_<KIND>_<FIELD>[_<SUFFIX>]` variables, as `forgesFrom
 
 Set exactly one of:
 
-- `FORGES_PROXY_SECRET`: private instance. Callers send `Authorization: Bearer <secret>` to everything but `/docs`, `/openapi.json` and webhooks. Every verb is routed.
+- `FORGES_PROXY_SECRET`: private instance. Callers send `Authorization: Bearer <secret>` to everything but `/docs`, `/openapi.json` and webhooks. Every verb is routed. To rotate it without downtime, move the old one to `FORGES_PROXY_PREVIOUS_SECRET`, set the new one, and unset the old one once every caller has moved over; both are accepted meanwhile.
 - `FORGES_PROXY_PUBLIC=1`: public instance. No auth, and only reads that need neither an account nor elevated access are routed (no writes, no security alerts, collaborators or admin settings). Still, give it tokens that can only read public data, e.g. a GitHub fine-grained token limited to public repositories.
 
 ## Use
