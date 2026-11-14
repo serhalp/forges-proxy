@@ -1,0 +1,12 @@
+{
+  "name": "@forges-proxy/demo-netlify-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@forges-proxy/server": "^0.0.0",
+    "@netlify/cache": "4.2.1"
+  }
+}

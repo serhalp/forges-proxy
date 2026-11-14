@@ -258,6 +258,15 @@ importers:
         specifier: 4.0.4
         version: 4.0.4
 
+  demos/netlify-server:
+    dependencies:
+      '@forges-proxy/server':
+        specifier: ^0.0.0
+        version: link:../../packages/server
+      '@netlify/cache':
+        specifier: 4.2.1
+        version: 4.2.1
+
   demos/netlify-serverless:
     dependencies:
       '@forges-proxy/server':

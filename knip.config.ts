@@ -15,6 +15,7 @@ export default {
       ignoreDependencies: ["wrangler"],
     },
     "demos/netlify-edge": { entry: ["netlify/edge-functions/*.ts"] },
+    "demos/netlify-server": { entry: ["netlify/server/index.ts"] },
     "demos/nitro": { entry: ["server/routes/**/*.ts"] },
     "demos/vercel": { entry: ["api/*.ts"] },
   },

@@ -15,8 +15,8 @@ A self-hostable, public or single-tenant caching proxy and credential broker for
 - [`packages/server`](packages/server) (`@forges-proxy/server`): the proxy as a [Fetchable](https://fetchable.org). `createServer(options)` returns `{ fetch(request) }`, and the default export is one configured from `process.env`.
 - [`packages/client`](packages/client) (`@forges-proxy/client`): `connect()`, which turns a proxy back into drop-in `forges` providers.
 - [`packages/docs`](packages/docs): placeholder for the documentation site.
-- [`demos/`](demos): one deployment per platform, each a few lines: [Netlify Functions](demos/netlify-serverless) (canonical), [Netlify Edge Functions](demos/netlify-edge), [Cloudflare Workers](demos/cloudflare-workers), [Vercel](demos/vercel), [Node](demos/node), [Docker](demos/docker), and mounted under `/forges` in [Hono](demos/hono), [Nitro](demos/nitro) and [Fastify](demos/fastify).
-  Live, as public read-only instances: [Netlify Functions](https://forges-proxy-demo.netlify.app/), [Netlify Edge Functions](https://forges-proxy-edge-demo.netlify.app/), [Cloudflare Workers](https://demo.forges-proxy.workers.dev/), [Vercel](https://forges-proxy-demo.vercel.app/), [Docker on Fly.io](https://forges-proxy-demo.fly.dev/).
+- [`demos/`](demos): one deployment per platform, each a few lines: [Netlify Functions](demos/netlify-serverless) (canonical), [Netlify Edge Functions](demos/netlify-edge), [Netlify Server](demos/netlify-server), [Cloudflare Workers](demos/cloudflare-workers), [Vercel](demos/vercel), [Node](demos/node), [Docker](demos/docker), and mounted under `/forges` in [Hono](demos/hono), [Nitro](demos/nitro) and [Fastify](demos/fastify).
+  Live, as public read-only instances: [Netlify Functions](https://forges-proxy-demo.netlify.app/), [Netlify Edge Functions](https://forges-proxy-edge-demo.netlify.app/), [Netlify Server](https://forges-proxy-server-demo.netlify.app/), [Cloudflare Workers](https://demo.forges-proxy.workers.dev/), [Vercel](https://forges-proxy-demo.vercel.app/), [Docker on Fly.io](https://forges-proxy-demo.fly.dev/).
 
 ## Deploy
 
