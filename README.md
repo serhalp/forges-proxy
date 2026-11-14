@@ -68,6 +68,7 @@ pnpm --filter @forges-proxy/server dev
 - `GET /status`: each provider's rate-limit budgets, as the server instance that answers last saw them.
 - `GET /:forge/:instance/:verb?args=<json array>`: a read, e.g. `repos.get`, `threads.list`.
 - `POST /:forge/:instance/:verb` with `{ "args": [...] }`: a write.
+- `GET /:forge/:instance/sources.stream`: the forge's live events (`sources.stream()`, Tangled only today) as [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events). Each event's `id` is its cursor; resume with `Last-Event-ID`, as `EventSource` does on reconnect, or `?cursor=`. A failure ends the stream with an `error` event. Serverless platforms end long responses at their time limit, so expect to reconnect. Browsers' `EventSource` can't send the proxy secret, so on a private instance use the client or `fetch`.
 
 Arguments are positional, as the `ForgeProvider` method takes them, and are validated against the verb's signature (see `/docs`). Pass `null` for a skipped optional argument. Bytes travel as `{ "$bytes": "<base64>" }` in both directions. A listing answers with one page; pass its `cursor` back in the options to read the next.
 
@@ -93,15 +94,43 @@ const repo = await forges.repos.get({
 })
 ```
 
-Every verb is present. Listings read one page per request, whether iterated or through `page()`. Errors come back as the same classes. Verbs the proxy doesn't route reject with `UnsupportedOperationError`, and `can()` says so.
+For the sync helpers (`urlFor()`, `parseUrl()`, ...), pass the factories of the forges you use, such as `connect({ url, secret, factories: [github] })` with `github` from `forges/github`, or every forge's with `allFactories` from `@forges-proxy/client/all`. Without one, a forge's helpers return nothing, and your bundle carries none of its code.
 
-## Webhooks and purging
+Every verb is present. Listings read one page per request, whether iterated or through `page()`. `sources.stream()` follows the proxy's event stream and, as with any provider, ends with `StreamClosedError` and the last cursor when the connection closes, including at a serverless time limit; call it again with that cursor. Errors come back as the same classes. Verbs the proxy doesn't route reject with `UnsupportedOperationError`, and `can()` says so.
 
-Point a forge's webhook at `/webhooks/:forge/:instance` and set the provider's `FORGES_<KIND>_WEBHOOK_SECRET`. With a `purge` option (the Netlify Functions demo passes Netlify's), each verified delivery purges the CDN entries of every repository it concerns by cache tag. Without one, CDN entries expire by age: fresh for 60 seconds, then served stale for up to 10 minutes while they refresh.
+## Webhooks
+
+A forge's webhooks, pointed at the proxy, keep its cache fresh and hand the forge's events to your code.
+
+Without webhooks, CDN entries expire by age: fresh for 60 seconds, then served stale for up to 10 minutes while they refresh. With them, and a `purge` option (the Netlify Functions and Netlify Server demos pass Netlify's), each verified delivery purges the CDN entries of every repository it concerns, by cache tag.
+
+With a `handleEvents` option, the proxy then calls it with the delivery's events, normalised as `forges` [`ForgeEvent`s](https://forges.link/concepts/events), and the forge and instance that sent them:
+
+```ts
+createServer({
+  handleEvents: async (events, { forge, instance }) => {
+    await queue.send(events)
+  },
+})
+```
+
+The response waits for it. If it throws, the forge gets a `500` and logs the delivery as failed; most forges don't retry on their own, so redeliver it from the forge's settings or with `webhooks.redeliver()`, which private instances route too. Forges give up after a few seconds (GitHub after 10), so hand slow work to a queue or to your platform's `waitUntil` (on Workers, `import { waitUntil } from "cloudflare:workers"`). The demos log each event.
+
+To set one up:
+
+1. Pick a secret and set it as the provider's `FORGES_<KIND>_WEBHOOK_SECRET`, e.g. `FORGES_GITHUB_WEBHOOK_SECRET`. The provider has to exist: on a public instance with no token, also set `FORGES_<KIND>_ENABLED=1`, since setting any `FORGES_<KIND>_*` variable turns off its anonymous default. Redeploy if your platform reads the env at deploy time.
+2. On the forge, add a webhook to the repository or organisation with the URL `https://<proxy>/webhooks/<forge>/<instance>` (e.g. `/webhooks/github/github.com`), the same secret, a JSON payload, and the events you read or handle. Every event that names a repository purges it, so subscribing to everything is simplest for caching. Or create it from code with [`webhooks.create()`](https://forges.link/guides/webhooks#register-a-webhook).
+3. Check the forge's delivery log. A verified delivery answers `200` with the tags it purged (`{ "purged": [...] }`); a bad signature answers `401`, and a forge or instance the proxy doesn't serve `404`.
+
+Webhook URLs need no proxy secret; the forge's signature is what authenticates them. For what each forge sends and signs, and which events it can deliver, see the `forges` [webhooks guide](https://forges.link/guides/webhooks) and its [provider pages](https://forges.link/providers).
 
 ## Upstream requests
 
 The CDN absorbs repeated public reads; each miss is a request upstream. To cache upstream responses as well, pass your own `fetch` as `upstream`.
+
+## Logging
+
+By default the server logs only its own failures, such as a verb's unexpected error or a `handleEvents` that throws, to `console.error`. Pass a `logger` to choose where logs go, and to log each request at info: `{ message: "request", method, path, status, durationMs }`. Anything with `error()` and, optionally, `info()` methods that take an object fits, such as `console`, pino or [evlog](https://evlog.dev)'s `log`; its levels decide what's kept. Pass the logger itself rather than its methods, so it keeps its `this`. Reads the CDN answers never reach the server, so they aren't logged. The platform and Docker demos use evlog.
 
 ## Operations manifest
 

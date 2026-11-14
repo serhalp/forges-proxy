@@ -1,5 +1,5 @@
 import * as v from "valibot"
-import generated from "#src/manifest.json" with { type: "json" }
+import generated from "./manifest.json" with { type: "json" }
 
 export type Schema = Record<string, unknown>
 

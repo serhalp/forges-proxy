@@ -1,12 +1,12 @@
 import type { EventHandler } from "h3"
 import { getRouterParams } from "h3"
-import { accessMode } from "#src/access.ts"
-import { readArgs } from "#src/args.ts"
-import type { Context } from "#src/context.ts"
-import { errorResponse, proxyError } from "#src/errors.ts"
-import { resultResponse } from "#src/response.ts"
-import { responseTags } from "#src/tags.ts"
-import { callVerb, routedVerb, withSignal } from "#src/verbs.ts"
+import { accessMode } from "../access.ts"
+import { readArgs } from "../args.ts"
+import type { Context } from "../context.ts"
+import { errorResponse, proxyError } from "../errors.ts"
+import { resultResponse } from "../response.ts"
+import { responseTags } from "../tags.ts"
+import { callVerb, routedVerb, withSignal } from "../verbs.ts"
 
 /**
  * Calls one provider verb. Reads are `GET ?args=<json array>`, writes are `POST { args }`, with the arguments
@@ -37,7 +37,7 @@ export function verbRoute(context: Context): EventHandler {
     try {
       result = await callVerb(provider, name, verb, withSignal(verb, read.args, event.req.signal))
     } catch (error) {
-      return errorResponse(error)
+      return errorResponse(error, context.logger)
     }
     const tags = responseTags(
       forge,

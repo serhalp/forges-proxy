@@ -1,7 +1,7 @@
 import type { EventHandler } from "h3"
-import { accessMode } from "#src/access.ts"
-import type { Context } from "#src/context.ts"
-import { openApi } from "#src/openapi.ts"
+import { accessMode } from "../access.ts"
+import type { Context } from "../context.ts"
+import { openApi } from "../openapi.ts"
 
 export function openapiRoute(context: Context): EventHandler {
   return (event) => {

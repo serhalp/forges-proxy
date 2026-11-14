@@ -1,9 +1,9 @@
 import { providersFromEnv } from "forges/env"
 import type { EventHandler } from "h3"
-import { accessMode } from "#src/access.ts"
-import type { Context } from "#src/context.ts"
-import { manifest } from "#src/manifest.ts"
-import { isRouted } from "#src/verbs.ts"
+import { accessMode } from "../access.ts"
+import type { Context } from "../context.ts"
+import { manifest } from "../manifest.ts"
+import { isRouted } from "../verbs.ts"
 
 /**
  * The `forges` version, the configured providers with their capabilities, and the verbs this instance routes, each
@@ -30,7 +30,15 @@ export function indexRoute(context: Context): EventHandler {
           account: verb.account,
           listing: !!verb.listing,
           options: verb.params.findIndex((param) => param.options),
-        })),
+        }))
+        // Not in the manifest: it answers with server-sent events rather than JSON.
+        .concat({
+          name: "sources.stream",
+          write: false,
+          account: false,
+          listing: false,
+          options: 0,
+        }),
       // Only a private instance says which env sets were skipped; it describes the operator's configuration.
       ...(mode === "private" ? { skipped: skippedProviders(context) } : {}),
     }

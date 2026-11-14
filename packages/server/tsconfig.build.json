@@ -2,5 +2,6 @@
   "extends": "../../tsconfig.base.json",
   // tsdown's declaration build; without an `outDir` it writes `.d.ts` files next to the sources.
   "compilerOptions": { "outDir": "node_modules/.cache/dts" },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
 }

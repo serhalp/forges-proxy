@@ -1,9 +1,9 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { DATE_FIELDS } from "forges"
-import { manifest } from "#src/manifest.ts"
-import { INPUT_DATE_FIELDS } from "#src/wire.ts"
-import { generateManifest, routableVerbs } from "#scripts/generate-manifest.ts"
+import { manifest } from "./manifest.ts"
+import { INPUT_DATE_FIELDS } from "./wire.ts"
+import { generateManifest, routableVerbs } from "../scripts/generate-manifest.ts"
 
 describe("manifest", () => {
   it("is fresh for the forges it's built against", () => {

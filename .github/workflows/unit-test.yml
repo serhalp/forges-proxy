@@ -34,4 +34,4 @@ jobs:
         run: sfw pnpm ci
 
       # Not `pnpm test`: pnpm runs scripts on the `devEngines` Node, whichever one the job installed.
-      - run: node --conditions=@forges-proxy/source --test "packages/*/test/**/*.test.ts"
+      - run: node --conditions=@forges-proxy/source --test "packages/*/src/**/*.test.ts" "packages/*/test/**/*.test.ts"

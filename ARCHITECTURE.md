@@ -12,7 +12,8 @@ client ──▶ CDN ──▶ auth middleware ──▶ verb route ──▶ fo
 
 - **CDN.** Public reads carry `CDN-Cache-Control` (60 s fresh, 10 min stale-while-revalidate), a weak `ETag` and `Cache-Tag`, or whatever the deployment's `cdnHeaders` returns instead (the Netlify demos add `durable`). Private instances and writes are `private, no-store`.
 - **Verb route** (`packages/server/src/routes/verb.ts`). Checks the arguments against the operations manifest, revives dates and bytes, passes the request's signal into the verb's options, calls the provider and tags the response with every repository in its arguments and result.
-- **Webhooks** (`POST /webhooks/:forge/:instance`). Verified by the provider and turned into repository tags with `affectedKeys()`. Purges the tags through the deployment's `purge` option.
+- **Event stream** (`GET /:forge/:instance/sources.stream`). The provider's `sources.stream()` as server-sent events, outside the manifest since it answers with a stream rather than JSON. Cursors are the event ids, so `EventSource` resumes on its own. Never cached.
+- **Webhooks** (`POST /webhooks/:forge/:instance`). Verified by the provider and turned into repository tags with `affectedKeys()`. Purges the tags through the deployment's `purge` option, then awaits its `handleEvents` with the events. A failure answers 500, so the forge's delivery log shows it.
 - **Operations manifest** (`packages/server/src/manifest.json`, from `packages/server/scripts/generate-manifest.ts`). Each routed verb's parameters, result and docs as JSON Schemas, read from the `forges` types. The server's only list of verbs: it drives routing, validation, the signal passthrough, `/`, `/openapi.json` and `/docs`.
 - **Client** (`@forges-proxy/client`). `connect()` turns a proxy back into `ForgeProvider`s, finding each verb's options where `/` says they are. It warns when `/` reports a `forges` version incompatible with its own.
 

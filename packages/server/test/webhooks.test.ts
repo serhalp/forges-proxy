@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { describe, it } from "node:test"
+import { beforeEach, describe, it } from "node:test"
 import { createForges } from "forges"
 import { fake } from "forges/fake"
 import { signDelivery } from "forges/testing"
@@ -70,6 +70,56 @@ describe("webhooks", () => {
       const body = JSON.stringify([event])
       assert.equal((await deliver(body, await signDelivery("fake", body, "whsec"))).status, 200)
     })
+  })
+})
+
+describe("handleEvents", () => {
+  const calls: { events: unknown[]; source: unknown; purgedBefore: number }[] = []
+  const logged: Record<string, unknown>[] = []
+  let fail = false
+  const handling = createProxy(createForges([factory]), {
+    logger: { error: (entry) => void logged.push(entry) },
+    handleEvents: (events, source) => {
+      calls.push({ events, source, purgedBefore: recorded.purges.length })
+      if (fail) throw new Error("queue down")
+    },
+  })
+  beforeEach(() => {
+    calls.length = 0
+    logged.length = 0
+    fail = false
+  })
+
+  async function deliverTo(body: string, headers: Record<string, string>) {
+    return handling.fetch(
+      new Request("http://proxy.test/webhooks/fake/fake.test", { method: "POST", headers, body }),
+    )
+  }
+
+  it("gets a delivery's events and its source, after the purge", async () => {
+    const body = JSON.stringify([event])
+    const response = await deliverTo(body, await signDelivery("fake", body, "whsec"))
+    assert.equal(response.status, 200)
+    assert.equal(calls.length, 1)
+    assert.deepEqual(calls[0].source, { forge: "fake", instance: "fake.test" })
+    assert.equal(calls[0].events.length, 1)
+    assert.equal(calls[0].purgedBefore, 1)
+  })
+
+  it("answers 500 when it throws, after the purge", async () => {
+    fail = true
+    const body = JSON.stringify([event])
+    const response = await deliverTo(body, await signDelivery("fake", body, "whsec"))
+    assert.equal(response.status, 500)
+    assert.equal(recorded.purges.length, 1)
+    assert.equal(logged[0]?.message, "handleEvents failed")
+    assert.doesNotMatch(await response.text(), /queue down/)
+  })
+
+  it("isn't called for a delivery with a bad signature", async () => {
+    const body = JSON.stringify([event])
+    await deliverTo(body, await signDelivery("fake", body, "wrong"))
+    assert.equal(calls.length, 0)
   })
 })
 

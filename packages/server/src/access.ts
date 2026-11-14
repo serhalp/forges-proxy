@@ -1,5 +1,5 @@
 import { HTTPError } from "h3"
-import type { Env } from "#src/context.ts"
+import type { Env } from "./context.ts"
 
 /**
  * `private`: callers present `FORGES_PROXY_SECRET`. `public`: anyone may call, and only verbs that need neither

@@ -38,6 +38,12 @@ describe("GET /openapi.json", () => {
       assert.equal(doc.security, undefined)
     })
 
+    it("documents the event stream, which the manifest leaves out", async () => {
+      const { doc } = await document()
+      const stream = doc.paths["/{forge}/{instance}/sources.stream"]?.get
+      assert.ok(stream?.responses[200].content["text/event-stream"])
+    })
+
     it("takes reads' arguments as a JSON tuple in `args`", async () => {
       const { doc } = await document()
       const { parameters } = doc.paths["/{forge}/{instance}/repos.get"].get

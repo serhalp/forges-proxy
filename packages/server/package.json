@@ -37,9 +37,6 @@
   ],
   "type": "module",
   "sideEffects": false,
-  "imports": {
-    "#*": "./*"
-  },
   "exports": {
     ".": {
       "@forges-proxy/source": "./src/index.ts",
@@ -53,10 +50,10 @@
   "scripts": {
     "build": "tsdown",
     "dev": "srvx --watch --prod=false ./dev.ts",
-    "typecheck": "tsc --noEmit",
-    "test": "node --conditions=@forges-proxy/source --test \"test/**/*.test.ts\"",
-    "test:coverage": "node --conditions=@forges-proxy/source --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test \"test/**/*.test.ts\"",
-    "manifest": "node --conditions=@forges-proxy/source scripts/generate-manifest.ts"
+    "manifest": "node --conditions=@forges-proxy/source scripts/generate-manifest.ts",
+    "test": "node --conditions=@forges-proxy/source --test \"src/**/*.test.ts\" \"test/**/*.test.ts\"",
+    "test:coverage": "node --conditions=@forges-proxy/source --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test-coverage-exclude=\"src/**/*.test.ts\" --test \"src/**/*.test.ts\" \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@cfworker/json-schema": "^4.1.6",

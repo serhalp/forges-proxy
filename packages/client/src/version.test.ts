@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { describe, it } from "node:test"
-import { compatible, FORGES_VERSION } from "#src/version.ts"
+import { compatible, FORGES_VERSION } from "./version.ts"
 
 describe("FORGES_VERSION", () => {
   it("is the installed forges", () => {

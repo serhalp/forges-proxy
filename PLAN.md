@@ -17,9 +17,11 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 - [x] `GET /`: providers, capabilities, routed verbs
 - [x] Tests: `node:test` (Node 26) with `forges/fake` passed to `createServer`; unit and route tests
 - [x] `GET /status` with `rateLimits()` (per server instance)
+- [x] SSE for `sources.stream` (verified live against Tangled's Jetstream). `forges` main renames it `sources.subscribe`: follow on the next bump.
 - [x] Pass the request signal through to verbs, into the options parameter the manifest names
-- [ ] SSE for `sources.stream`
 - [x] Cache tags on public reads; `POST /webhooks/:forge/:instance` purges them through the `purge` option
+- [x] `handleEvents`: verified webhook events to the deployment's callback, awaited
+- [x] `logger` option: requests at `info`, the server's own failures at `error` (the default logs only errors, to `console.error`); the platform and Docker demos pass evlog
 - [x] Weak `ETag` on public JSON reads, with a 304 for a matching `If-None-Match` (verified live: Netlify's edge answers revalidations with it)
 - [x] CORS: any origin (the secret is a header, never a cookie), preflights cached for a day
 - [ ] Evaluate [`cdn-cache-control`](https://github.com/ascorbic/cdn-cache-control) for `cdnHeaders` (per-CDN header names). Gotchas: `.swr()` resets the TTL (call `.ttl()` after), and it sends only the CDN-specific header, not `CDN-Cache-Control` too.
@@ -32,7 +34,7 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 - [x] pnpm workspace: `@forges-proxy/server` (a Fetchable), `@forges-proxy/client`, `docs` placeholder, `demos/netlify-serverless` (verified live as a draft)
 - [x] Drop Nitro: `createServer(options)` on h3 returns a Fetchable; platform specifics (`cdnHeaders`, `purge`, `upstream`) are options, so purging is pluggable. Built with tsdown.
 - [x] Demos, smoke-tested with `pnpm smoke` through the client: node, hono, fastify, nitro, docker (local, public and private), cloudflare-workers (live, `workers.dev`), vercel (live), netlify-serverless (live draft)
-- [ ] netlify-edge: verify live. Edge Functions don't take a Fetchable yet, so the demo wraps it in a handler (TODO in the demo). The edge bundler resolves npm modules from the repository root, where pnpm doesn't link workspace packages, hence the root `package.json`'s dependency on `@forges-proxy/server`.
+- [ ] netlify-edge: verify live. Edge Functions don't take a Fetchable yet, so the demo wraps it in a handler (TODO in the demo). The edge bundler resolves npm modules from the repository root, where pnpm doesn't link workspace packages, hence the root `package.json`'s dependencies on `@forges-proxy/server` and `evlog`.
 - [x] netlify-server (Early Access): smoke-tested live (draft). Its site sets a package directory, not a base directory, because CLI builds skip Server bundling with a base directory (a `@netlify/build` bug).
 - [ ] Publish the packages: release tooling (npm scope `@forges-proxy` is registered)
 - [ ] Client: report `rateLimits()` and `refreshCapabilities()` through the proxy

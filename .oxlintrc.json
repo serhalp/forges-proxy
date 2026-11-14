@@ -17,7 +17,7 @@
   "overrides": [
     {
       // Test helpers sit next to the one test that uses them.
-      "files": ["**/test/**"],
+      "files": ["**/test/**", "**/*.test.ts"],
       "rules": { "unicorn/consistent-function-scoping": "off" }
     },
     {

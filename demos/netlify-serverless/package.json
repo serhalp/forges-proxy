@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "@forges-proxy/server": "^0.0.0",
-    "@netlify/functions": "6.1.1"
+    "@netlify/functions": "6.1.1",
+    "evlog": "2.35.1"
   }
 }

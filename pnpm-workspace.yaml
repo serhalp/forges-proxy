@@ -5,8 +5,5 @@ allowBuilds:
   esbuild: true
   workerd: true
 overrides:
-  # The manifest script hands it a TypeScript 6 program; one compiler, or SyntaxKinds disagree.
   ts-json-schema-generator>typescript: npm:typescript@6.0.3
-# Demos can then depend on a published range and still get the workspace package here, so a copy of a demo on its own
-# (a deploy button's) installs from npm.
 linkWorkspacePackages: true

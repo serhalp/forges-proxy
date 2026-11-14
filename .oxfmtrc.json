@@ -1,4 +1,5 @@
 {
   "semi": false,
+  "sortPackageJson": { "sortScripts": true },
   "ignorePatterns": [".claude", "packages/server/src/manifest.json"]
 }

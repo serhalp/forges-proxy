@@ -1,8 +1,8 @@
 import { sha256Hex } from "forges/kit"
-import type { AccessMode } from "#src/access.ts"
-import type { CdnHeaders } from "#src/context.ts"
-import type { ManifestVerb } from "#src/manifest.ts"
-import { serialise } from "#src/wire.ts"
+import type { AccessMode } from "./access.ts"
+import type { CdnHeaders } from "./context.ts"
+import type { ManifestVerb } from "./manifest.ts"
+import { serialise } from "./wire.ts"
 
 const CDN_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=600"
 

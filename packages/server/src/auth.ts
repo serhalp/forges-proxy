@@ -1,8 +1,8 @@
 import { timingSafeEqual } from "forges/kit"
 import type { Middleware } from "h3"
-import { accessMode } from "#src/access.ts"
-import type { Context } from "#src/context.ts"
-import { proxyError } from "#src/errors.ts"
+import { accessMode } from "./access.ts"
+import type { Context } from "./context.ts"
+import { proxyError } from "./errors.ts"
 
 const OPEN = /^\/(?:docs|openapi\.json)$/
 // Verified by their signatures instead.

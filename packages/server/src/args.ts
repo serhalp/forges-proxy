@@ -2,9 +2,9 @@ import { Validator } from "@cfworker/json-schema"
 import * as v from "valibot"
 import type { H3Event } from "h3"
 import { getQuery, readBody } from "h3"
-import type { ManifestVerb } from "#src/manifest.ts"
-import { argsSchema, manifest } from "#src/manifest.ts"
-import { reviveArgs } from "#src/wire.ts"
+import type { ManifestVerb } from "./manifest.ts"
+import { argsSchema, manifest } from "./manifest.ts"
+import { reviveArgs } from "./wire.ts"
 
 const validators = new Map<string, Validator>()
 

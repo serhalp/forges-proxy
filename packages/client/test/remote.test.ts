@@ -11,8 +11,11 @@ import {
   UnsupportedOperationError,
 } from "forges"
 import { fake as fakeForge } from "forges/fake"
-import { connect } from "#src/remote.ts"
-import { FORGES_VERSION } from "#src/version.ts"
+import { github as githubFactory } from "forges/github"
+import { gitlab as gitlabFactory } from "forges/gitlab"
+import { allFactories } from "../src/all.ts"
+import { connect } from "../src/remote.ts"
+import { FORGES_VERSION } from "../src/version.ts"
 import { serialise } from "../../server/src/wire.ts"
 import { createProxy, env } from "../../server/test/support/proxy.ts"
 import * as v from "valibot"
@@ -30,10 +33,15 @@ const direct = fakeForge({
   },
 })
 const app = createProxy(createForges([direct, githubForge()]))
-// In-process h3 ignores an aborted signal, where a real `fetch` rejects with it.
+// In-process h3 ignores an aborted signal, where a real `fetch` rejects with it and errors the body.
 const fetch = async (url: string, init?: RequestInit) => {
   init?.signal?.throwIfAborted()
-  return app.fetch(new Request(url, init))
+  const response = await app.fetch(new Request(url, init))
+  const { status, statusText, headers } = response
+  const body = response.body?.pipeThrough(new TransformStream(), {
+    signal: init?.signal ?? undefined,
+  })
+  return new Response(body, { status, statusText, headers })
 }
 
 const repo = { forge: "fake", instance: "fake.test", owner: "acme", name: "widgets" }
@@ -43,7 +51,12 @@ const issue = { forge: "fake", instance: "fake.test", repo, kind: "issue" as con
 const overTheWire = <T>(value: T): T => reviveDates(JSON.parse(serialise(value, { raw: false })))
 
 async function remote(secret?: string): Promise<{ fake: ForgeProvider; github: ForgeProvider }> {
-  const [fakeProvider, githubProvider] = await connect({ url: "http://proxy.test", secret, fetch })
+  const [fakeProvider, githubProvider] = await connect({
+    url: "http://proxy.test",
+    secret,
+    fetch,
+    factories: allFactories,
+  })
   return { fake: fakeProvider, github: githubProvider }
 }
 
@@ -213,6 +226,66 @@ describe("remote provider", () => {
     assert.equal(github.urlFor({ repo: ref }), "https://github.com/acme/widgets")
     assert.equal(github.parseUrl("https://github.com/acme/widgets")?.repo?.name, "widgets")
     assert.equal(github.webOrigin, "https://github.com")
+  })
+
+  it("answers them only for the forges it has factories for", async () => {
+    const only = async (factories: Parameters<typeof connect>[0]["factories"]) =>
+      (await connect({ url: "http://proxy.test", secret: "s3cret", fetch, factories }))[1]
+    assert.equal((await only([githubFactory])).webOrigin, "https://github.com")
+    assert.equal((await only(undefined)).webOrigin, undefined)
+    assert.equal(
+      (await only([gitlabFactory])).parseUrl("https://github.com/acme/widgets"),
+      undefined,
+    )
+  })
+})
+
+describe("remote event stream", () => {
+  env({ FORGES_PROXY_SECRET: "s3cret" })
+
+  it("follows events with their cursors, until aborted", async () => {
+    const { fake } = await remote("s3cret")
+    const controller = new AbortController()
+    const items = fake.sources.stream({ signal: controller.signal })[Symbol.asyncIterator]()
+    const next = items.next()
+    await direct.threads.create(repo, { kind: "issue", title: "Streamed" })
+    const { value } = await next
+    assert.ok(value!.event.occurredAt instanceof Date)
+    assert.equal(value!.cursor, direct.store.events.at(-1)!.id)
+    controller.abort()
+    assert.deepEqual(await items.next(), { done: true, value: undefined })
+  })
+
+  it("resumes from a cursor", async () => {
+    const { fake } = await remote("s3cret")
+    await direct.threads.create(repo, { kind: "issue", title: "Missed" })
+    const [seen, missed] = direct.store.events.slice(-2)
+    const controller = new AbortController()
+    for await (const item of fake.sources.stream({ cursor: seen.id, signal: controller.signal })) {
+      assert.equal(item.cursor, missed.id)
+      controller.abort()
+    }
+  })
+
+  it("throws StreamClosedError when the forge closes it", async () => {
+    const { fake } = await remote("s3cret")
+    const items = fake.sources.stream()[Symbol.asyncIterator]()
+    const next = items.next()
+    direct.offline()
+    try {
+      await assert.rejects(next, { name: "StreamClosedError" })
+    } finally {
+      direct.online()
+    }
+  })
+
+  it("rejects for a forge without a stream", async () => {
+    const { github } = await remote("s3cret")
+    assert.equal(github.can("sources.stream"), false)
+    await assert.rejects(
+      github.sources.stream()[Symbol.asyncIterator]().next(),
+      UnsupportedOperationError,
+    )
   })
 })
 

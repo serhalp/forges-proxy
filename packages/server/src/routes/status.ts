@@ -1,5 +1,5 @@
 import type { EventHandler } from "h3"
-import type { Context } from "#src/context.ts"
+import type { Context } from "../context.ts"
 
 /**
  * Each provider's request budgets, as the latest upstream responses reported them. They're per server instance, so on

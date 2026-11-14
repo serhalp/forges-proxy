@@ -1,19 +1,21 @@
 import type { FetchLike, Forges } from "forges"
+import type { H3Event } from "h3"
 import { H3, handleCors } from "h3"
-import { auth } from "#src/auth.ts"
-import { proxyError } from "#src/errors.ts"
-import type { CdnHeaders, Env, Purge } from "#src/context.ts"
-import { providers } from "#src/providers.ts"
-import { standardCdnHeaders } from "#src/response.ts"
-import { docsRoute } from "#src/routes/docs.ts"
-import { indexRoute } from "#src/routes/index.ts"
-import { openapiRoute } from "#src/routes/openapi.ts"
-import { statusRoute } from "#src/routes/status.ts"
-import { verbRoute } from "#src/routes/verb.ts"
-import { webhookRoute } from "#src/routes/webhook.ts"
+import { auth } from "./auth.ts"
+import { proxyError } from "./errors.ts"
+import type { CdnHeaders, Env, HandleEvents, Logger, Purge } from "./context.ts"
+import { providers } from "./providers.ts"
+import { standardCdnHeaders } from "./response.ts"
+import { docsRoute } from "./routes/docs.ts"
+import { indexRoute } from "./routes/index.ts"
+import { openapiRoute } from "./routes/openapi.ts"
+import { statusRoute } from "./routes/status.ts"
+import { streamRoute } from "./routes/stream.ts"
+import { verbRoute } from "./routes/verb.ts"
+import { webhookRoute } from "./routes/webhook.ts"
 
-export type { CdnHeaders, Env, Purge } from "#src/context.ts"
-export { standardCdnHeaders } from "#src/response.ts"
+export type { CdnHeaders, Env, HandleEvents, Logger, Purge } from "./context.ts"
+export { standardCdnHeaders } from "./response.ts"
 
 export interface ServerOptions {
   /**
@@ -32,8 +34,15 @@ export interface ServerOptions {
   upstream?: FetchLike
   /** Purges CDN entries by tag when a webhook says they changed. Without it they expire by age. */
   purge?: Purge
+  /** Called with each verified webhook delivery's events, after its purge. Awaited, so hand slow work to a queue. */
+  handleEvents?: HandleEvents
   /** The headers that hand a cacheable read to the CDN. @default standardCdnHeaders: `CDN-Cache-Control`, `Cache-Tag` */
   cdnHeaders?: CdnHeaders
+  /**
+   * Where the server logs requests (`info`) and its own failures (`error`). Pass the logger itself, not its methods.
+   * @default errors to `console.error`, no request logs
+   */
+  logger?: Logger
 }
 
 /** A [Fetchable](https://fetchable.org). */
@@ -43,6 +52,9 @@ export interface Server {
 
 // Any origin: the secret is a header, never a cookie, so no request carries credentials the page didn't add itself.
 const CORS = { origin: "*", methods: ["GET", "POST"], maxAge: "86400" } as const
+
+// A platform logs requests itself, so only a logger the deployment chose gets one line per request.
+const errorsOnly: Logger = { error: (event) => console.error(event) }
 
 /** The proxy, answering at its own root. */
 export function createServer(options: ServerOptions = {}): Server {
@@ -54,10 +66,32 @@ export function createServer(options: ServerOptions = {}): Server {
     forges: () =>
       (forges ??= providers(env, { fetch: upstream, anonymous: options.anonymousForges ?? false })),
     purge: options.purge,
+    handleEvents: options.handleEvents,
     cdnHeaders: options.cdnHeaders ?? standardCdnHeaders,
+    logger: options.logger ?? errorsOnly,
   }
-  // h3's own errors (a misconfigured mode, a body that isn't JSON) in the proxy's error shape, never cached.
-  const app = new H3({ onError: (error) => proxyError(error.status, error.message) })
+  const { logger } = context
+  const started = new WeakMap<H3Event, number>()
+  const app = new H3({
+    // Unhandled exceptions go to `logger` instead of h3's `console.error`.
+    silent: true,
+    onRequest: (event) => void started.set(event, performance.now()),
+    onResponse: (response, event) =>
+      logger.info?.({
+        message: "request",
+        method: event.req.method,
+        path: event.url.pathname,
+        status: response.status,
+        durationMs: Math.round(performance.now() - (started.get(event) ?? performance.now())),
+      }),
+    // h3's own errors (a misconfigured mode, a body that isn't JSON) in the proxy's error shape, never cached.
+    onError: (error) => {
+      if (!error.unhandled) return proxyError(error.status, error.message)
+      // The message could carry anything, so it stays in the logs.
+      logger.error({ message: "Unhandled error", error })
+      return proxyError(500, "Internal error")
+    },
+  })
     // Before auth, so preflights pass and errors stay readable.
     .use((event) => handleCors(event, { ...CORS, methods: [...CORS.methods] }) || undefined)
     .use(auth(context))
@@ -66,6 +100,7 @@ export function createServer(options: ServerOptions = {}): Server {
     .get("/docs", docsRoute)
     .get("/openapi.json", openapiRoute(context))
     .post("/webhooks/:forge/:instance", webhookRoute(context))
+    .get("/:forge/:instance/sources.stream", streamRoute(context))
     .all("/:forge/:instance/:verb", verbRoute(context))
   return { fetch: async (request) => app.fetch(request) }
 }

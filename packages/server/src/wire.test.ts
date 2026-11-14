@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
-import { reviveArgs, serialise } from "#src/wire.ts"
+import { reviveArgs, serialise } from "./wire.ts"
 import * as v from "valibot"
 
 describe("reviveArgs", () => {

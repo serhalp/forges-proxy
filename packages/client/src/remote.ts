@@ -2,18 +2,25 @@ import type {
   AuthKind,
   FetchLike,
   ForgeCapabilities,
-  ForgeOptionsBase,
   ForgeListing,
   ForgeProvider,
   ForgeVerb,
-  KnownForgeKind,
   Page,
 } from "forges"
-import * as forges from "forges"
+import {
+  can,
+  ForgeApiError,
+  reviveDates,
+  StreamClosedError,
+  support,
+  UnsupportedOperationError,
+} from "forges"
 import { CAPABILITY_TABLE, forgeIterable, iteratePages } from "forges/kit"
+import { EventSourceParserStream } from "eventsource-parser/stream"
 import * as v from "valibot"
-import { compatible, FORGES_VERSION } from "#src/version.ts"
-import { decodeBytes, encodeBytes } from "#src/wire.ts"
+import { compatible, FORGES_VERSION } from "./version.ts"
+import { ERRORS } from "./errors.ts"
+import { decodeBytes, encodeBytes } from "./wire.ts"
 
 export interface RemoteOptions {
   /** Where the proxy answers, such as `https://forges.example.com` or `https://example.com/forges/`. */
@@ -21,7 +28,16 @@ export interface RemoteOptions {
   /** `FORGES_PROXY_SECRET` of a private instance. */
   secret?: string
   fetch?: FetchLike
+  /**
+   * `forges` provider factories, such as `github` from `forges/github`, that answer the sync helpers (`urlFor`,
+   * `parseUrl`, ...) locally for their forges; the others go without. `allFactories` from
+   * `@forges-proxy/client/all` covers every forge, at the cost of bundling them all. @default []
+   */
+  factories?: readonly ProviderFactory[]
 }
+
+/** A `forges` provider factory, whatever its options. */
+export type ProviderFactory = (options: never) => ForgeProvider
 
 const isObject = (value: unknown): value is object => typeof value === "object" && value !== null
 
@@ -50,40 +66,6 @@ const ErrorBody = v.object({
 })
 
 type RemoteVerb = Omit<RemoteIndex["verbs"][number], "name">
-
-type Factory = (options: ForgeOptionsBase) => ForgeProvider
-// Credential-less providers answer the sync helpers (`urlFor`, `parseUrl`, ...) that need no request. Some factories'
-// types require `auth`, which those helpers never use.
-/* oxlint-disable typescript/no-unsafe-type-assertion */
-const LOCAL: Record<string, Factory> = {
-  "azure-devops": forges.azureDevOps as Factory,
-  bitbucket: forges.bitbucket as Factory,
-  "cloudflare-artifacts": forges.cloudflareArtifacts as Factory,
-  "cursor-origin": forges.cursorOrigin as Factory,
-  entire: forges.entire as Factory,
-  forgejo: forges.forgejo as Factory,
-  gitbucket: forges.gitbucket as Factory,
-  gitea: forges.gitea as Factory,
-  gitee: forges.gitee as Factory,
-  github: forges.github as Factory,
-  gitlab: forges.gitlab as Factory,
-  pushin: forges.pushin as Factory,
-  sourcehut: forges.sourcehut as Factory,
-  tangled: forges.tangled as Factory,
-} satisfies Record<KnownForgeKind, Factory>
-/* oxlint-enable typescript/no-unsafe-type-assertion */
-
-type ErrorClass = new (...args: never[]) => Error
-
-const isErrorClass = (value: unknown): value is ErrorClass =>
-  typeof value === "function" && value.prototype instanceof Error
-
-const ERRORS = new Map<string, ErrorClass>()
-for (const value of Object.values(forges)) {
-  if (isErrorClass(value)) {
-    ERRORS.set(value.name, value)
-  }
-}
 
 /**
  * One `ForgeProvider` per forge the proxy at `url` serves, to pass to `createForges()`. Every verb is present: those
@@ -124,11 +106,11 @@ function remoteProvider(
   options: RemoteOptions & { fetch: FetchLike; headers: Record<string, string> },
 ): ForgeProvider {
   const { forge, instance } = info
-  const local = localProvider(info)
+  const local = localProvider(info, options.factories ?? [])
   const origin = { forge, instance }
   const routed = (verb: string) => verbs.has(verb)
   const unsupported = (verb: string) =>
-    new forges.UnsupportedOperationError(`The proxy does not route ${verb}`, origin)
+    new UnsupportedOperationError(`The proxy does not route ${verb}`, origin)
 
   async function call(verb: string, args: unknown[]): Promise<unknown> {
     const { write, options: at } = verbs.get(verb)!
@@ -164,7 +146,7 @@ function remoteProvider(
       return response.body
     }
     // Bytes after dates, since `reviveDates` would take a `Uint8Array` apart.
-    return decodeBytes(forges.reviveDates(await response.json()))
+    return decodeBytes(reviveDates(await response.json()))
   }
 
   /** A listing: each page is a request, with the cursor in the options. */
@@ -178,6 +160,42 @@ function remoteProvider(
       ]) as Promise<Page<unknown>>
     const first = args[at] ?? {}
     return Object.assign(iteratePages(page, first), { page: () => page(first) })
+  }
+
+  /** `sources.stream`: one request read as server-sent events, which ends with `StreamClosedError` unless aborted. */
+  async function* stream(streamOptions: { cursor?: string; signal?: AbortSignal } = {}) {
+    const { signal } = streamOptions
+    let cursor = streamOptions.cursor
+    const url = new URL(
+      `${encodeURIComponent(forge)}/${encodeURIComponent(instance)}/sources.stream`,
+      options.url,
+    )
+    const response = await options.fetch(url.href, {
+      headers: { ...options.headers, ...(cursor ? { "last-event-id": cursor } : {}) },
+      signal,
+    })
+    if (!response.ok) {
+      throw await toError(response, origin)
+    }
+    const messages = response
+      .body!.pipeThrough(new TextDecoderStream())
+      .pipeThrough(new EventSourceParserStream())
+    try {
+      for await (const message of messages) {
+        if (message.event === "error") {
+          throw errorFrom(JSON.parse(message.data), 502, origin)
+        }
+        cursor = message.id ?? cursor
+        yield { event: reviveDates(JSON.parse(message.data)), cursor }
+      }
+    } catch (error) {
+      // Aborting ends iteration without an error, as `sources.stream()` does.
+      if (signal?.aborted) return
+      throw error
+    }
+    if (signal?.aborted) return
+    // The proxy or its platform ended the response, e.g. at a serverless time limit.
+    throw new StreamClosedError(`The stream from ${instance} closed`, cursor, origin)
   }
 
   const namespaces: Record<string, Record<string, unknown>> = {}
@@ -195,6 +213,14 @@ function remoteProvider(
 
   function method(verb: string, isListing: boolean): (...args: unknown[]) => unknown {
     const remote = verbs.get(verb)
+    if (verb === "sources.stream") {
+      return remote
+        ? (streamOptions) => stream(isObject(streamOptions) ? streamOptions : {})
+        : async function* () {
+            yield* []
+            throw unsupported(verb)
+          }
+    }
     if (remote?.listing) {
       return (...args) => listing(verb, remote.options, args)
     }
@@ -225,9 +251,9 @@ function remoteProvider(
     rateLimits: () => [],
     request: () => Promise.reject(unsupported("request")),
     can: (verb: ForgeVerb, kind?: Parameters<ForgeProvider["can"]>[1]) =>
-      routed(verb) && forges.can(info.capabilities, verb, kind),
+      routed(verb) && can(info.capabilities, verb, kind),
     support: (verb: ForgeVerb, kind?: Parameters<ForgeProvider["support"]>[1]) =>
-      routed(verb) ? forges.support(info.capabilities, verb, kind) : false,
+      routed(verb) ? support(info.capabilities, verb, kind) : false,
     normaliseMarkdown: (body: string) => local?.normaliseMarkdown(body) ?? body,
     urlFor: (target: Parameters<ForgeProvider["urlFor"]>[0]) => local?.urlFor(target),
     webOrigin: local?.webOrigin,
@@ -243,27 +269,44 @@ function remoteProvider(
   return provider as unknown as ForgeProvider
 }
 
-function localProvider(info: RemoteIndex["providers"][number]): ForgeProvider | undefined {
-  try {
-    return LOCAL[info.forge]?.({ baseUrl: info.baseUrl, instance: info.instance })
-  } catch {
-    // Some forges need options the proxy doesn't share, such as an organisation; their helpers go without.
-    return undefined
+/** A credential-less provider for the sync helpers, from the caller's factory for this forge. */
+function localProvider(
+  info: RemoteIndex["providers"][number],
+  factories: readonly ProviderFactory[],
+): ForgeProvider | undefined {
+  for (const factory of factories) {
+    try {
+      // Some factories' types require `auth` or other options, which the helpers never use.
+      const provider: unknown = Reflect.apply(factory, undefined, [
+        { baseUrl: info.baseUrl, instance: info.instance },
+      ])
+      if (isObject(provider) && "forge" in provider && provider.forge === info.forge) {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        return provider as ForgeProvider
+      }
+    } catch {
+      // Some forges need options the proxy doesn't share, such as an organisation; their helpers go without.
+    }
   }
+  return undefined
 }
 
 /** Rebuilds the error class the proxy reports, with its fields, without running its constructor. */
 async function toError(response: Response, origin: object): Promise<Error> {
-  const body = v.safeParse(ErrorBody, await response.json().catch(() => undefined))
+  return errorFrom(await response.json().catch(() => undefined), response.status, origin)
+}
+
+function errorFrom(json: unknown, status: number, origin: object): Error {
+  const body = v.safeParse(ErrorBody, json)
   const {
     name = "ForgeApiError",
-    message = response.statusText,
+    message = `The proxy answered ${status}`,
     ...fields
   } = body.success ? body.output.error : {}
   const Class = ERRORS.get(name)
   if (!Class) {
-    return new forges.ForgeApiError(message, response.status, "", origin)
+    return new ForgeApiError(message, status, "", origin)
   }
   const error = Reflect.construct(Error, [message], Class)
-  return Object.assign(error, forges.reviveDates(fields), { name })
+  return Object.assign(error, reviveDates(fields), { name })
 }

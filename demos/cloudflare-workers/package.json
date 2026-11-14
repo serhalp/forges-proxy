@@ -3,13 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "cf dev",
     "build": "cf build",
     "deploy": "cf deploy",
+    "dev": "cf dev",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@forges-proxy/server": "^0.0.0"
+    "@forges-proxy/server": "^0.0.0",
+    "evlog": "2.35.1"
   },
   "devDependencies": {
     "cf": "1.0.0-beta.28",

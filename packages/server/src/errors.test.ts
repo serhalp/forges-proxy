@@ -7,14 +7,19 @@ import {
   UnknownForgeError,
   UnsupportedOperationError,
 } from "forges"
-import { errorResponse, proxyError } from "#src/errors.ts"
+import { errorResponse, proxyError } from "./errors.ts"
 import * as v from "valibot"
 
 const context = { forge: "github", instance: "github.com", url: "https://api.github.com/repos/a/b" }
 
+const silent = { error: () => {} }
+
 describe("errorResponse", () => {
   it("passes upstream 4xx through without the url or upstream body", async () => {
-    const response = errorResponse(new NotFoundError("Not found", 404, "secret body", context))
+    const response = errorResponse(
+      new NotFoundError("Not found", 404, "secret body", context),
+      silent,
+    )
     assert.equal(response.status, 404)
     assert.equal(response.headers.get("cache-control"), "no-store")
     assert.deepEqual(await response.json(), {
@@ -36,6 +41,7 @@ describe("errorResponse", () => {
         resetAt: new Date(30_500),
         secondary: true,
       }),
+      silent,
     )
     assert.equal(response.status, 429)
     assert.equal(response.headers.get("retry-after"), "31")
@@ -47,21 +53,24 @@ describe("errorResponse", () => {
   })
 
   it("maps unsupported operations to 501 and unknown forges to 404", () => {
-    assert.equal(errorResponse(new UnsupportedOperationError("No", context)).status, 501)
-    assert.equal(errorResponse(new UnknownForgeError("No", context)).status, 404)
+    assert.equal(errorResponse(new UnsupportedOperationError("No", context), silent).status, 501)
+    assert.equal(errorResponse(new UnknownForgeError("No", context), silent).status, 404)
   })
 
   it("maps upstream 5xx to 502", () => {
-    assert.equal(errorResponse(new ForgeApiError("Down", 503, "", context)).status, 502)
+    assert.equal(errorResponse(new ForgeApiError("Down", 503, "", context), silent).status, 502)
   })
 
   it("maps an upstream 401 to 502, so it doesn't read as a wrong proxy secret", () => {
-    assert.equal(errorResponse(new ForgeApiError("Bad credentials", 401, "", context)).status, 502)
+    assert.equal(
+      errorResponse(new ForgeApiError("Bad credentials", 401, "", context), silent).status,
+      502,
+    )
   })
 
   it("hides anything that is not a forge error", async () => {
     const consoleError = mock.method(console, "error", () => {})
-    const response = errorResponse(new Error("database password is hunter2"))
+    const response = errorResponse(new Error("database password is hunter2"), silent)
     consoleError.mock.restore()
     assert.equal(response.status, 500)
     assert.deepEqual(await response.json(), {

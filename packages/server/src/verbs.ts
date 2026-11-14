@@ -1,7 +1,7 @@
 import type { ForgeListing, ForgeProvider } from "forges"
-import type { AccessMode } from "#src/access.ts"
-import type { ManifestVerb } from "#src/manifest.ts"
-import { manifest } from "#src/manifest.ts"
+import type { AccessMode } from "./access.ts"
+import type { ManifestVerb } from "./manifest.ts"
+import { manifest } from "./manifest.ts"
 
 // Reads that need more than public access (security alerts, who can push, admin settings), so a token with too much
 // scope can't expose them to anyone.

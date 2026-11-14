@@ -1,7 +1,7 @@
 import { afterEach, beforeEach } from "node:test"
 import type { Forges } from "forges"
-import type { Server, ServerOptions } from "#src/index.ts"
-import { createServer } from "#src/index.ts"
+import type { Server, ServerOptions } from "../../src/index.ts"
+import { createServer } from "../../src/index.ts"
 
 /** What the proxy under test purged, since the last reset. */
 export const recorded = { purges: [] as string[][] }

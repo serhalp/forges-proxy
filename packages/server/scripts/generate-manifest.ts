@@ -28,7 +28,7 @@ import {
   SchemaGenerator,
 } from "ts-json-schema-generator"
 import { CAPABILITY_TABLE } from "forges/kit"
-import type { Manifest, ManifestParam, Schema } from "#src/manifest.ts"
+import type { Manifest, ManifestParam, Schema } from "../src/manifest.ts"
 
 const root = new URL("..", import.meta.url).pathname
 const cache = `${root}node_modules/.cache/forges-proxy/`
@@ -318,16 +318,16 @@ class WireTypes implements SubNodeParser, SubTypeFormatter {
   }
 }
 
-/**
- * Schemas for type nodes in `program`, collecting the named types they reference into `definitions`. Parses with the
- * chain itself: the parser `createParser()` returns would inline a root reference such as `RepoRef`.
- */
 /** The `forges` types the wire maps: a listing is answered with its page. */
 interface ForgesTypes {
   listing: TS.Symbol
   page: TS.Declaration
 }
 
+/**
+ * Schemas for type nodes in `program`, collecting the named types they reference into `definitions`. Parses with the
+ * chain itself: the parser `createParser()` returns would inline a root reference such as `RepoRef`.
+ */
 function schemaGenerator(program: TS.Program, forges: ForgesTypes) {
   const config = {
     ...DEFAULT_CONFIG,

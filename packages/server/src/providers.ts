@@ -1,7 +1,7 @@
 import type { FetchLike, Forges, KnownForgeKind } from "forges"
 import { createForges } from "forges"
 import { providersFromEnv } from "forges/env"
-import type { Env } from "#src/context.ts"
+import type { Env } from "./context.ts"
 
 // Every kind `forges` knows; the `satisfies` breaks the build when it gains one. `false` keeps a kind out of the
 // anonymous defaults: Tangled reads hosts that callers name (`did:web:`), so it'd let anyone aim the proxy anywhere.

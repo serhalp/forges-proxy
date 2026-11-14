@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import type { ForgeEvent } from "forges"
-import { purgeTags, responseTags } from "#src/tags.ts"
+import { purgeTags, responseTags } from "./tags.ts"
 
 const repo = { forge: "github", instance: "github.com", owner: "acme", name: "widgets" }
 

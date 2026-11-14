@@ -3,8 +3,8 @@ import type { KnipConfig } from "knip"
 export default {
   workspaces: {
     ".": {
-      // The Netlify Edge bundler resolves the demo's import from the root.
-      ignoreDependencies: ["@forges-proxy/server"],
+      // The Netlify Edge bundler resolves the demo's imports from the root.
+      ignoreDependencies: ["@forges-proxy/server", "evlog"],
       ignoreBinaries: ["zizmor"],
     },
     // Entries the platforms find by convention, which knip has no plugin for.

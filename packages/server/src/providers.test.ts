@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
-import { providers } from "#src/providers.ts"
+import { providers } from "./providers.ts"
 
 const names = (env: Record<string, string>, anonymous: boolean) =>
   providers(env, { fetch, anonymous }).providers.map(

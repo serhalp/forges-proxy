@@ -2,9 +2,9 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { createForges } from "forges"
 import { fake } from "forges/fake"
-import { manifest } from "#src/manifest.ts"
-import { callVerb, routedVerb, withSignal } from "#src/verbs.ts"
-import { routableVerbs } from "#scripts/generate-manifest.ts"
+import { manifest } from "./manifest.ts"
+import { callVerb, routedVerb, withSignal } from "./verbs.ts"
+import { routableVerbs } from "../scripts/generate-manifest.ts"
 import * as v from "valibot"
 
 const VERBS = routableVerbs()

@@ -6,11 +6,12 @@ import {
   UnsupportedOperationError,
   WebhookVerificationError,
 } from "forges"
+import type { Logger } from "./context.ts"
 
 /** The response for an error thrown by a verb, without leaking anything that is not a forge error. */
-export function errorResponse(error: unknown): Response {
+export function errorResponse(error: unknown, logger: Logger): Response {
   if (!(error instanceof ForgeError)) {
-    console.error(error)
+    logger.error({ message: "Unexpected error", error })
     return json(500, { name: "InternalError", message: "Internal error" })
   }
   // Every field the error class sets, so clients can rebuild it, except `url` and the upstream `body`: either can

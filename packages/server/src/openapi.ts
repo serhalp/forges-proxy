@@ -1,7 +1,7 @@
-import type { AccessMode } from "#src/access.ts"
-import type { ManifestVerb, Schema } from "#src/manifest.ts"
-import { argsSchema, manifest } from "#src/manifest.ts"
-import { isRouted } from "#src/verbs.ts"
+import type { AccessMode } from "./access.ts"
+import type { ManifestVerb, Schema } from "./manifest.ts"
+import { argsSchema, manifest } from "./manifest.ts"
+import { isRouted } from "./verbs.ts"
 
 const ERROR: Schema = {
   type: "object",
@@ -16,6 +16,40 @@ const ERROR: Schema = {
     },
   },
   required: ["error"],
+}
+
+// Outside the manifest, since it answers with server-sent events rather than JSON.
+const STREAM = {
+  operationId: "sources_stream",
+  tags: ["sources"],
+  summary: "sources.stream",
+  description:
+    "The forge's events as they happen, as server-sent events: each event's `id` is its cursor and its `data` a `ForgeEvent` as JSON. A failure ends the stream with an `error` event whose `data` is an `Error`. Serverless platforms end long responses, so reconnect with the last cursor.",
+  parameters: [
+    {
+      name: "Last-Event-ID",
+      in: "header",
+      description: "Resume after this cursor. `EventSource` sends it when it reconnects.",
+      schema: { type: "string" },
+    },
+    {
+      name: "cursor",
+      in: "query",
+      description: "Resume after this cursor, where the header can't be set.",
+      schema: { type: "string" },
+    },
+  ],
+  responses: {
+    200: {
+      description: "The event stream.",
+      content: { "text/event-stream": { schema: { type: "string" } } },
+    },
+    default: {
+      description:
+        "A `ForgeError`, such as `UnsupportedOperationError` for a forge without a stream.",
+      content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+    },
+  },
 }
 
 /**
@@ -64,13 +98,18 @@ export function openApi(
           security: [{ secret: [] }],
         }
       : { components: { schemas: { ...manifest.schemas, Error: ERROR } } }),
-    tags: [...new Set(verbs.map(([name]) => name.split(".")[0]))].map((name) => ({ name })),
-    paths: Object.fromEntries(
-      verbs.map(([name, verb]) => [
-        `/{forge}/{instance}/${name}`,
-        { parameters: pathParams, [verb.write ? "post" : "get"]: operation(name, verb) },
-      ]),
-    ),
+    tags: [...new Set([...verbs.map(([name]) => name.split(".")[0]), "sources"])].map((name) => ({
+      name,
+    })),
+    paths: {
+      ...Object.fromEntries(
+        verbs.map(([name, verb]) => [
+          `/{forge}/{instance}/${name}`,
+          { parameters: pathParams, [verb.write ? "post" : "get"]: operation(name, verb) },
+        ]),
+      ),
+      "/{forge}/{instance}/sources.stream": { parameters: pathParams, get: STREAM },
+    },
   }
 }
 

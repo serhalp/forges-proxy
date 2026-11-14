@@ -1,7 +1,7 @@
 import { defineConfig } from "tsdown"
 
 export default defineConfig({
-  entry: ["src/remote.ts"],
+  entry: ["src/remote.ts", "src/all.ts"],
   platform: "neutral",
   // `engines.node`, as `forges` requires.
   target: "node22.18",
