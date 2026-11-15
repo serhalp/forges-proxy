@@ -62,20 +62,21 @@ export function createServer(options: ServerOptions = {}): Server {
   const env = options.env ?? globalThis.process?.env ?? {}
   let forges = options.forges
   let cursorKey: Promise<CryptoKey> | undefined
+  const logger = options.logger ?? errorsOnly
   const context = {
     env,
     forges: () =>
       (forges ??= providers(env, {
         fetch: options.fetch ?? withUserAgent,
         anonymous: options.anonymousForges ?? false,
+        logger,
       })),
     cursorKey: () => (cursorKey ??= signingKey(env)),
     purge: options.purge,
     handleEvents: options.handleEvents,
     cdnHeaders: options.cdnHeaders ?? standardCdnHeaders,
-    logger: options.logger ?? errorsOnly,
+    logger,
   }
-  const { logger } = context
   const started = new WeakMap<H3Event, number>()
   const app = new H3({
     // Unhandled exceptions go to `logger` instead of h3's `console.error`.
@@ -89,15 +90,17 @@ export function createServer(options: ServerOptions = {}): Server {
         status: response.status,
         durationMs: Math.round(performance.now() - (started.get(event) ?? performance.now())),
       }),
-    // h3's own errors (a misconfigured mode, a body that isn't JSON) in the proxy's error shape, never cached.
+    // h3's own errors (a misconfigured mode, an unknown route) in the proxy's error shape, never cached. They skip the
+    // CORS middleware, so they set its header themselves, or browsers can't read them.
     onError: (error) => {
-      if (!error.unhandled) return proxyError(error.status, error.message)
+      const cors = { "access-control-allow-origin": CORS.origin }
+      if (!error.unhandled) return proxyError(error.status, error.message, cors)
       // The message could carry anything, so it stays in the logs.
       logger.error({ message: "Unhandled error", error })
-      return proxyError(500, "Internal error")
+      return proxyError(500, "Internal error", cors)
     },
   })
-    // Before auth, so preflights pass and errors stay readable.
+    // Before auth, so preflights pass and auth errors stay readable.
     .use((event) => handleCors(event, { ...CORS, methods: [...CORS.methods] }) || undefined)
     .use(auth(context))
     .get("/", indexRoute(context))

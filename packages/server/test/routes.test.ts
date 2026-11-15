@@ -124,6 +124,12 @@ describe("private mode", () => {
     const denied = await call("/", { headers: { origin: "https://app.test" } })
     assert.equal(denied.status, 401)
     assert.equal(denied.headers.get("access-control-allow-origin"), "*")
+    // h3's own errors skip the CORS middleware.
+    const unknown = await call("/fake/fake.test/repos.get/extra", {
+      headers: { origin: "https://app.test", ...authorization },
+    })
+    assert.equal(unknown.status, 404)
+    assert.equal(unknown.headers.get("access-control-allow-origin"), "*")
   })
 
   it("guards everything but the docs and webhooks", async () => {

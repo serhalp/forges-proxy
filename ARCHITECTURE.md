@@ -15,7 +15,7 @@ client ──▶ CDN ──▶ auth middleware ──▶ verb route ──▶ fo
 - **Event stream** (`GET /:forge/:instance/sources.stream`). The provider's `sources.stream()` as server-sent events, outside the manifest since it answers with a stream rather than JSON. Cursors are the event ids, so `EventSource` resumes on its own. Never cached.
 - **Webhooks** (`POST /webhooks/:forge/:instance`). Verified by the provider and turned into repository tags with `affectedKeys()`. Purges the tags through the deployment's `purge` option, then awaits its `handleEvents` with the events. A failure answers 500, so the forge's delivery log shows it.
 - **Operations manifest** (`packages/server/src/manifest.ts`). Re-exports the routed verbs and model schemas from `forges/schema`. The server's only list of verbs: it drives routing, validation, the signal passthrough, `/`, `/openapi.json`, and `/docs`.
-- **Client** (`@forges-proxy/client`). `connect()` turns a proxy back into `ForgeProvider`s, finding each verb's options where `/` says they are. It warns when `/` reports an incompatible `forges` version.
+- **Client** (`@forges-proxy/client`). `connect()` turns a proxy back into `ForgeProvider`s, finding each verb's options where `/` says they are. It throws when `/` reports an incompatible `forges` version.
 
 ## Decisions
 
@@ -29,7 +29,7 @@ It's plain [h3](https://h3.dev), built with tsdown, with `forges` as a regular d
 
 ### Single tenant, credentials only in the environment
 
-Forge credentials come from `FORGES_*` variables via `providersFromEnv()`; callers never send forge tokens. `anonymousForges` adds every forge the env doesn't mention that `forges` can read without credentials, by trying `ENABLED` for each and keeping what builds. Tangled is excluded: its reads fetch hosts named by caller data (`did:web:`), which is SSRF without an egress allowlist. Access is either a bearer secret (`FORGES_PROXY_SECRET`, private, with `FORGES_PROXY_PREVIOUS_SECRET` also accepted during a rotation) or public mode (`FORGES_PROXY_PUBLIC=1`), which routes no write or account verbs, nor reads that need elevated access (`PRIVILEGED` in `verbs.ts`). Its authenticated providers also sign the `nextUrl` of the cursors they hand out and refuse unsigned ones, since a `nextUrl` can name any path of the forge's API (`cursors.ts`; the key is derived from the env's forge credentials, so every server instance agrees on it). Both or neither is a 503, so a misconfigured instance fails closed.
+Forge credentials come from `FORGES_*` variables via `providersFromEnv()`; callers never send forge tokens. `anonymousForges` adds every forge the env doesn't mention that `forges` can read without credentials, by trying `ENABLED` for each and keeping what builds. Tangled is excluded: its reads fetch hosts named by caller data (`did:web:`), which is SSRF without an egress allowlist. Access is either a bearer secret (`FORGES_PROXY_SECRET`, private, with `FORGES_PROXY_PREVIOUS_SECRET` also accepted during a rotation) or public mode (`FORGES_PROXY_PUBLIC=1`), which routes no write or account verbs, nor reads that need elevated access (`PRIVILEGED` in `verbs.ts`). A public instance's tokens must only read public data. Its authenticated providers also sign the `nextUrl` of the cursors they hand out and refuse unsigned ones, since a `nextUrl` can name any path of the forge's API (`cursors.ts`; the key is derived from the env's forge credentials, so every server instance agrees on it). Both or neither is a 503, so a misconfigured instance fails closed.
 
 ### RPC over the provider surface, not REST
 
@@ -39,7 +39,7 @@ On the wire: `null` for a skipped optional argument, bytes as `{ "$bytes": "<bas
 
 ### RPC, not a transparent forge-API proxy
 
-**Context.** The RPC design runs `forges` twice, in the proxy and in the client (`connect()`), and the two must agree on its version: the proxy reports it in `GET /` and `connect()` warns on a mismatch. The alternative runs `forges` only in the client and makes the proxy a caching, credential-adding pass-through for each forge's own API.
+**Context.** The RPC design runs `forges` twice, in the proxy and in the client (`connect()`), and the two must agree on its version: the proxy reports it in `GET /` and `connect()` throws on a mismatch. The alternative runs `forges` only in the client and makes the proxy a caching, credential-adding pass-through for each forge's own API.
 
 **Shape.** The client passes a `fetch` that rewrites forge URLs onto the proxy, e.g. `github({ fetch: via("https://proxy.example") })` sending `https://api.github.com/repos/a/b` as `/api.github.com/repos/a/b`. Not `baseUrl`: `forges` derives the instance from it, so refs, keys, and web links would name the proxy's host. The proxy forwards to an allowlist of configured hosts (otherwise it's an open proxy), adds the token, and keeps the CDN and webhook purging.
 

@@ -4,7 +4,7 @@
 
 ```sh
 pnpm install                              # also fetches the Node.js and pnpm in `devEngines`
-pnpm --filter @forges-proxy/server dev    # the proxy from `process.env`, on http://localhost:3000
+FORGES_PROXY_PUBLIC=1 FORGES_GITHUB_ENABLED=1 pnpm --filter @forges-proxy/server dev   # http://localhost:3000
 ```
 
 ## Layout

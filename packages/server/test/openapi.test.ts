@@ -26,6 +26,12 @@ describe("GET /openapi.json", () => {
   describe("on a public instance", () => {
     env({ FORGES_PROXY_PUBLIC: "1" })
 
+    it("marks `raw` optional, since responses leave it out by default", async () => {
+      const { doc } = await document()
+      assert.ok(JSON.stringify(doc.components.schemas.Repo).includes('"raw"'))
+      assert.doesNotMatch(JSON.stringify(doc.components.schemas), /"required":\[[^\]]*"raw"/)
+    })
+
     it("documents only the reads it routes, for the forges it serves", async () => {
       const { response, doc } = await document()
       assert.equal(response.headers.get("cache-control"), "public, max-age=300")

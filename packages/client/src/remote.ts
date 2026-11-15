@@ -86,7 +86,7 @@ export async function connect(options: RemoteOptions): Promise<ForgeProvider[]> 
     throw await toError(response, {})
   }
   const index = v.parse(RemoteIndex, await response.json())
-  // A warning, not a rejection: most verbs survive a mismatch, and unrouted ones already reject.
+  // Rejected outright: a mismatched wire format fails in ways that are hard to trace back to the version.
   if (index.forges && !compatible(index.forges, FORGES_VERSION)) {
     throw new Error(
       `forges-proxy: ${options.url} runs forges ${index.forges}, but this client was built against ${FORGES_VERSION}. Update both to the same wire format.`,

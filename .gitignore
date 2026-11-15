@@ -1,8 +1,5 @@
 node_modules
-.env
-.env.local
 
-# Netlify CLI state: the site link here, and builds in each Netlify demo
 .netlify
 .vercel
 .env*

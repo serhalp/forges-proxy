@@ -1,15 +1,11 @@
 import { Validator } from "@cfworker/json-schema"
-import * as v from "valibot"
 import type { H3Event } from "h3"
 import { getQuery, readBody } from "h3"
 import { decode } from "forges/wire"
-import type { ManifestVerb } from "./manifest.ts"
+import type { VerbSignature } from "./manifest.ts"
 import { argsSchema, manifest } from "./manifest.ts"
 
 const validators = new Map<string, Validator>()
-
-// Anything else in the body, or a missing body, is left for the `args` check to name.
-const Body = v.fallback(v.object({ args: v.optional(v.unknown()) }), {})
 
 /**
  * The call's arguments, revived, from `?args=` on reads and `{ args }` on writes; or why they can't be passed to the
@@ -18,12 +14,10 @@ const Body = v.fallback(v.object({ args: v.optional(v.unknown()) }), {})
 export async function readArgs(
   event: H3Event,
   name: string,
-  verb: ManifestVerb,
+  verb: VerbSignature,
   origin: { forge: string; instance: string },
 ): Promise<{ args: unknown[] } | { problem: string }> {
-  const wire = verb.write
-    ? (v.parse(Body, await readBody(event)).args ?? [])
-    : parseArgs(getQuery(event).args)
+  const wire = verb.write ? bodyArgs(await readBody(event)) : parseArgs(getQuery(event).args)
   if (!Array.isArray(wire)) {
     return { problem: "`args` must be a JSON array" }
   }
@@ -59,7 +53,7 @@ function parseArgs(value: unknown): unknown {
 }
 
 /** Why `args` don't fit the verb's signature, or `undefined` when they do. */
-function argsProblem(name: string, verb: ManifestVerb, args: unknown[]): string | undefined {
+function argsProblem(name: string, verb: VerbSignature, args: unknown[]): string | undefined {
   let validator = validators.get(name)
   if (!validator) {
     validator = new Validator(
@@ -111,4 +105,9 @@ function foreignRef(
     }
   }
   return undefined
+}
+
+// Anything else in the body, or a missing body, is left for the `args` check to name.
+function bodyArgs(body: unknown): unknown {
+  return (typeof body === "object" && body !== null && "args" in body ? body.args : undefined) ?? []
 }

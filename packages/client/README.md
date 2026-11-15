@@ -34,4 +34,4 @@ import { allFactories } from "@forges-proxy/client/all"
 const providers = await connect({ url, secret, factories: allFactories })
 ```
 
-Listings read one page per request, errors come back as the same classes, and verbs the proxy doesn't route reject with `UnsupportedOperationError`. `connect()` warns when the proxy runs an incompatible `forges`.
+Listings read one page per request, errors come back as the same classes, and verbs the proxy doesn't route reject with `UnsupportedOperationError`. `connect()` throws when the proxy runs an incompatible `forges`.

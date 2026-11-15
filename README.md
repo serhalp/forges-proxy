@@ -58,15 +58,16 @@ Providers come from `FORGES_<KIND>_<FIELD>[_<SUFFIX>]` variables, as `forgesFrom
 Set exactly one of:
 
 - `FORGES_PROXY_SECRET`: private instance. Callers send `Authorization: Bearer <secret>` to everything but `/docs`, `/openapi.json`, and webhooks. Every verb is routed. To rotate it without downtime, move the old one to `FORGES_PROXY_PREVIOUS_SECRET`, set the new one, and unset the old one once every caller has moved over; both are accepted meanwhile.
-- `FORGES_PROXY_PUBLIC=1`: public instance. No auth, and only reads that need neither an account nor elevated access are routed (no writes, no security alerts, collaborators, or admin settings). Still, give it tokens that can only read public data, e.g. a GitHub fine-grained token limited to public repositories.
+- `FORGES_PROXY_PUBLIC=1`: public instance. No auth, and only reads that need neither an account nor elevated access are routed (no writes, no security alerts, collaborators, or admin settings). Its forge tokens must only be able to read public data, e.g. a GitHub fine-grained token limited to public repositories.
 
 ## Use
 
 ```sh
 pnpm install
-pnpm build
-pnpm --filter @forges-proxy/server dev
+FORGES_PROXY_PUBLIC=1 FORGES_GITHUB_ENABLED=1 pnpm --filter @forges-proxy/server dev
 ```
+
+This serves GitHub anonymously, on a public instance. Add `FORGES_GITHUB_TOKEN` for a higher rate limit, or see [Configure](#configure).
 
 - `GET /`: configured providers, their capabilities (refined by each instance's version, once per server instance), and the routed verbs with the position of their options.
 - `GET /docs`: API reference (Scalar), from `GET /openapi.json` (OpenAPI 3.1).

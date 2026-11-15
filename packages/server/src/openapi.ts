@@ -1,5 +1,5 @@
 import type { AccessMode } from "./access.ts"
-import type { ManifestVerb, Schema } from "./manifest.ts"
+import type { VerbSignature, Schema } from "./manifest.ts"
 import { argsSchema, manifest } from "./manifest.ts"
 import { isRouted } from "./verbs.ts"
 
@@ -92,12 +92,12 @@ export function openApi(
     ...(mode === "private"
       ? {
           components: {
-            schemas: { ...manifest.schemas, Error: ERROR },
+            schemas: { ...SCHEMAS, Error: ERROR },
             securitySchemes: { secret: { type: "http", scheme: "bearer" } },
           },
           security: [{ secret: [] }],
         }
-      : { components: { schemas: { ...manifest.schemas, Error: ERROR } } }),
+      : { components: { schemas: { ...SCHEMAS, Error: ERROR } } }),
     tags: [...new Set([...verbs.map(([name]) => name.split(".")[0]), "sources"])].map((name) => ({
       name,
     })),
@@ -113,7 +113,27 @@ export function openApi(
   }
 }
 
-function operation(name: string, verb: ManifestVerb): Record<string, unknown> {
+// Models with `raw` optional: responses leave it out unless asked for with `?raw=1`.
+const SCHEMAS: Record<string, Schema> = Object.fromEntries(
+  Object.entries(manifest.schemas).map(([name, schema]) => [name, withoutRequiredRaw(schema)]),
+)
+
+function withoutRequiredRaw(schema: Schema): Schema {
+  const copy = Object.fromEntries(
+    Object.entries(schema).map(([key, child]) => [key, withoutRequiredRawIn(child)]),
+  )
+  if (Array.isArray(copy.required) && isSchema(copy.properties) && "raw" in copy.properties) {
+    copy.required = copy.required.filter((name) => name !== "raw")
+  }
+  return copy
+}
+
+function withoutRequiredRawIn(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutRequiredRawIn)
+  return isSchema(value) ? withoutRequiredRaw(value) : value
+}
+
+function operation(name: string, verb: VerbSignature): Record<string, unknown> {
   const args = argsSchema(verb)
   const required = verb.params.some((param) => !param.optional)
   return {
@@ -149,7 +169,7 @@ function operation(name: string, verb: ManifestVerb): Record<string, unknown> {
               name: "raw",
               in: "query",
               description:
-                "`1` keeps each model's `raw` forge payload, which is left out by default.",
+                "`1` adds each model's `raw` forge payload, which responses leave out by default.",
               schema: { type: "string", enum: ["1"] },
             },
           ],
@@ -159,7 +179,7 @@ function operation(name: string, verb: ManifestVerb): Record<string, unknown> {
 }
 
 /** The positional arguments, by name, for viewers that don't render `prefixItems`. */
-function signature(verb: ManifestVerb): string {
+function signature(verb: VerbSignature): string {
   return `\`[${verb.params.map((param) => `${param.name}${param.optional ? "?" : ""}`).join(", ")}]\``
 }
 
@@ -172,7 +192,7 @@ function isEmpty(schema: Schema): boolean {
   return schema.type === "null" || JSON.stringify(schema) === '{"not":{}}'
 }
 
-function responses(verb: ManifestVerb): Record<string, unknown> {
+function responses(verb: VerbSignature): Record<string, unknown> {
   const { anyOf } = verb.result
   const branches = Array.isArray(anyOf) ? anyOf.filter(isSchema) : [verb.result]
   const json = branches.filter((schema) => !isEmpty(schema) && schema.format !== "binary")

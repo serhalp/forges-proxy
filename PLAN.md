@@ -40,12 +40,16 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 - [x] netlify-server (Early Access): smoke-tested live (draft). Its site sets a package directory, not a base directory, because CLI builds skip Server bundling with a base directory (a `@netlify/build` bug).
 - [x] Signed cursors on public instances with authenticated providers, so a caller-supplied `nextUrl` can't reach other API paths with the instance's token
 - [ ] Publish the packages: release tooling (npm scope `@forges-proxy` is registered)
+- [ ] Rate limits, configurable per caller and per route. The server diagram already advertises them. Reopens [Rate limiting is the platform's job](ARCHITECTURE.md#rate-limiting-is-the-platforms-job): per-caller counts need state the proxy doesn't keep, so likely a `rateLimit` option the deployment backs with its platform's limiter or a store.
 - [x] Client: `rateLimits()` from a `forges-rate-limits` header on verb responses (caveats in the README), `refreshCapabilities()` from `/`, which now refines capabilities by the instance's version
 
 ## Parked
 
+- Purge and `handleEvents` for forges that stream events instead of sending webhooks (Tangled). `sources.stream` today only relays a caller's stream, so Tangled entries expire by age. A long-running deployment (Docker, Node, Netlify Server) could hold its own subscription and feed events through the webhook path, resuming from a stored cursor. Serverless can't hold one open. Once built, the server diagram's stream path can merge into the webhook arrow.
 - A very short CDN TTL (e.g. 5s) on public 404s, so floods of missing repos don't all reach the forge.
 - An MCP server (read verbs as tools), as a workspace package.
+- The cache tag cap (`MAX_REPO_TAGS` in `tags.ts`) counts keys, not repos, and a repo with an `externalId` has two, so a page of 26+ repos keeps only the instance tag, which nothing purges, and expires by age. Count repos, size the cap to the CDNs' tag header limits, and drop or use the instance tag.
+- A timeout on each provider's `refreshCapabilities()` in `GET /`, falling back to its static capabilities. Today one unreachable self-hosted forge holds `/`, and so every `connect()`, for up to `forges`' 30 s request timeout on each cold instance.
 - CDN caching for private instances, which send `no-store` because the CDN answers before auth runs. Likely fix: vary on `authorization` (`Netlify-Vary: header=authorization` or the platform's equivalent).
 - Multiple callers with different identities, beyond one all-access secret or anonymous public mode. Two separate questions: who is calling, and whose forge credential is used.
   - Per use case: non-JS clients can hold secrets (pass their forge token through, or per-caller proxy keys). Internal tools, bots, and CI want proxy-held credentials with scoped keys per caller, or CI's OIDC token mapped to a policy. Sandboxes want a short-lived scoped proxy token, never a forge token. npmx-style services and agents need to act as the end user (OAuth, run by the proxy or the caller; MCP's auth spec uses OAuth).

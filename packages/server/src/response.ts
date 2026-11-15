@@ -1,7 +1,7 @@
 import { sha256Hex } from "forges/kit"
 import type { AccessMode } from "./access.ts"
 import type { CdnHeaders } from "./context.ts"
-import type { ManifestVerb } from "./manifest.ts"
+import type { VerbSignature } from "./manifest.ts"
 import { serialize } from "./wire.ts"
 
 const CDN_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=600"
@@ -10,7 +10,7 @@ const CDN_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=600"
  * Only public reads go to shared caches. Private instances send `no-store` until CDN caching can vary on the proxy
  * secret.
  */
-function isCacheable(verb: ManifestVerb, mode: AccessMode): boolean {
+function isCacheable(verb: VerbSignature, mode: AccessMode): boolean {
   return mode === "public" && !verb.write
 }
 
@@ -22,7 +22,7 @@ export async function resultResponse(
   request: Request,
   result: unknown,
   context: {
-    verb: ManifestVerb
+    verb: VerbSignature
     mode: AccessMode
     tags: string[]
     cdnHeaders: CdnHeaders

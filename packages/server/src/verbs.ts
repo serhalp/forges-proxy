@@ -1,10 +1,10 @@
 import type { ForgeListing, ForgeProvider } from "forges"
 import type { AccessMode } from "./access.ts"
-import type { ManifestVerb } from "./manifest.ts"
+import type { VerbSignature } from "./manifest.ts"
 import { manifest } from "./manifest.ts"
 
-// Reads that need more than public access (security alerts, who can push, admin settings), so a token with too much
-// scope can't expose them to anyone.
+// Reads that need more than public access (security alerts, who can push, admin settings), which a public instance's
+// tokens can't answer.
 const PRIVILEGED = new Set([
   "securityAlerts.list",
   "repos.collaborators",
@@ -18,14 +18,14 @@ const PRIVILEGED = new Set([
 /** Public instances route no writes, account verbs, or privileged reads. */
 export function isRouted(
   name: string,
-  verb: Pick<ManifestVerb, "write" | "account">,
+  verb: Pick<VerbSignature, "write" | "account">,
   mode: AccessMode,
 ): boolean {
   return mode === "private" || !(verb.write || verb.account || PRIVILEGED.has(name))
 }
 
 /** The verb, when this instance routes it. */
-export function routedVerb(name: string, mode: AccessMode): ManifestVerb | undefined {
+export function routedVerb(name: string, mode: AccessMode): VerbSignature | undefined {
   const verb = Object.hasOwn(manifest.verbs, name) ? manifest.verbs[name] : undefined
   return verb && isRouted(name, verb, mode) ? verb : undefined
 }
@@ -34,7 +34,7 @@ export function routedVerb(name: string, mode: AccessMode): ManifestVerb | undef
 export function callVerb(
   provider: ForgeProvider,
   name: string,
-  verb: Pick<ManifestVerb, "listing">,
+  verb: Pick<VerbSignature, "listing">,
   args: unknown[],
 ): unknown {
   const [namespace, method] = name.split(".")
@@ -54,7 +54,7 @@ export function callVerb(
 }
 
 /** `args` with `signal` in the verb's options, so that a dropped request stops its upstream requests. */
-export function withSignal(verb: ManifestVerb, args: unknown[], signal: AbortSignal): unknown[] {
+export function withSignal(verb: VerbSignature, args: unknown[], signal: AbortSignal): unknown[] {
   const index = verb.params.findIndex((param) => param.options)
   const options = args[index]
   if (index < 0 || (options !== undefined && (typeof options !== "object" || options === null))) {
