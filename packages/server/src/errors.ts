@@ -15,9 +15,14 @@ export function errorResponse(error: unknown, logger: Logger): Response {
     logger.error({ message: "Unexpected error", error })
     return json(500, { name: "InternalError", message: "Internal error" })
   }
-  // Every field the error class sets, so clients can rebuild it, except `url` and the upstream `body`: either can
-  // carry details of private data.
-  const { url: _url, body: _body, ...fields } = error as ForgeError & { body?: string }
+  // Every field the error class sets, so clients can rebuild it, except `url` and the upstream `body`, which can carry
+  // details of private data, and the operator token's `grantedScopes`.
+  const {
+    url: _url,
+    body: _body,
+    grantedScopes: _grantedScopes,
+    ...fields
+  } = error as ForgeError & { body?: string; grantedScopes?: string[] }
   const body = { ...fields, name: error.name, message: error.message }
   if (error instanceof RateLimitedError) {
     const retryAfter = error.resetAt

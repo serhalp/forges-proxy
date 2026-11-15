@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { describe, it, mock } from "node:test"
 import {
   ForgeApiError,
+  InsufficientScopeError,
   NotFoundError,
   RateLimitedError,
   UnknownForgeError,
@@ -31,6 +32,23 @@ describe("errorResponse", () => {
         status: 404,
       },
     })
+  })
+
+  it("keeps the scopes the operator's token has to itself", async () => {
+    const response = errorResponse(
+      new InsufficientScopeError("Forbidden", 403, "", {
+        ...context,
+        acceptedScopes: ["repo"],
+        grantedScopes: ["read:org", "admin:repo_hook"],
+      }),
+      silent,
+    )
+    const { error } = v.parse(
+      v.object({ error: v.record(v.string(), v.unknown()) }),
+      await response.json(),
+    )
+    assert.deepEqual(error.acceptedScopes, ["repo"])
+    assert.equal(error.grantedScopes, undefined)
   })
 
   it("maps rate limits to 429 with retry-after", async (t) => {
