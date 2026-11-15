@@ -23,7 +23,7 @@ client ──▶ CDN ──▶ auth middleware ──▶ verb route ──▶ fo
 
 The server is the `@forges-proxy/server` package: `createServer(options)` returns a [Fetchable](https://fetchable.org) (`{ fetch }`), and the default export is one configured from `process.env`. Deployments depend on it and hand it to their platform, so updates are a version bump rather than merging upstream into a fork.
 
-Nothing in the package names a platform. Anything platform-specific is an option the deployment passes: CDN header names (`cdnHeaders`), purging (`purge`) and the `fetch` behind the providers (`upstream`). Each demo in `demos/` is a deployment, smoke-tested through the client with `pnpm smoke <url>`.
+Nothing in the package names a platform. Anything platform-specific is an option the deployment passes: CDN header names (`cdnHeaders`), purging (`purge`) and the providers' HTTP requests (`fetch`). Each demo in `demos/` is a deployment, smoke-tested through the client with `pnpm smoke <url>`.
 
 It's plain [h3](https://h3.dev), built with tsdown, with `forges` as a regular dependency. We dropped Nitro: its file routing was ten lines of `app.get()`, its presets only wrote platform entries a Fetchable doesn't need, and bundling a library would have pinned `forges`. Both packages use `forges/wire` for dates and bytes, and the server reports the `forges` version it runs against.
 

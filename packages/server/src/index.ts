@@ -31,7 +31,7 @@ export interface ServerOptions {
   /** Providers to serve instead of those `env` configures. */
   forges?: Forges
   /** The `fetch` behind the providers, e.g. one that caches upstream responses. @default fetch */
-  upstream?: FetchLike
+  fetch?: FetchLike
   /** Purges CDN entries by tag when a webhook says they changed. Without it they expire by age. */
   purge?: Purge
   /** Called with each verified webhook delivery's events, after its purge. Awaited, so hand slow work to a queue. */
@@ -59,12 +59,14 @@ const errorsOnly: Logger = { error: (event) => console.error(event) }
 /** The proxy, answering at its own root. */
 export function createServer(options: ServerOptions = {}): Server {
   const env = options.env ?? globalThis.process?.env ?? {}
-  const upstream = options.upstream ?? withUserAgent
   let forges = options.forges
   const context = {
     env,
     forges: () =>
-      (forges ??= providers(env, { fetch: upstream, anonymous: options.anonymousForges ?? false })),
+      (forges ??= providers(env, {
+        fetch: options.fetch ?? withUserAgent,
+        anonymous: options.anonymousForges ?? false,
+      })),
     purge: options.purge,
     handleEvents: options.handleEvents,
     cdnHeaders: options.cdnHeaders ?? standardCdnHeaders,

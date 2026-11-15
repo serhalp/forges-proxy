@@ -133,7 +133,7 @@ Webhook URLs need no proxy secret; the forge's signature is what authenticates t
 
 ## Upstream requests
 
-The CDN absorbs repeated public reads; each miss is a request upstream. To cache upstream responses as well, pass your own `fetch` as `upstream`.
+The CDN absorbs repeated public reads; each miss is a request upstream. To cache upstream responses as well, pass your own `fetch`.
 
 ## Logging
 

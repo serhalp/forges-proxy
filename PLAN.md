@@ -34,7 +34,7 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 - [x] Client: find options where the manifest puts them (via `/`), not by a heuristic
 - [x] `connect()` client (`@forges-proxy/client`): one `ForgeProvider` per proxied forge
 - [x] pnpm workspace: `@forges-proxy/server` (a Fetchable), `@forges-proxy/client`, `docs` placeholder, `demos/netlify-serverless` (verified live as a draft)
-- [x] Drop Nitro: `createServer(options)` on h3 returns a Fetchable; platform specifics (`cdnHeaders`, `purge`, `upstream`) are options, so purging is pluggable. Built with tsdown.
+- [x] Drop Nitro: `createServer(options)` on h3 returns a Fetchable; platform specifics (`cdnHeaders`, `purge`, `fetch`) are options, so purging is pluggable. Built with tsdown.
 - [x] Demos, smoke-tested with `pnpm smoke` through the client: node, hono, fastify, nitro, docker (local, public and private), cloudflare-workers (live, `workers.dev`), vercel (live), netlify-serverless (live draft)
 - [ ] netlify-edge: verify live. Edge Functions don't take a Fetchable yet, so the demo wraps it in a handler (TODO in the demo). The edge bundler resolves npm modules from the repository root, where pnpm doesn't link workspace packages, hence the root `package.json`'s dependencies on `@forges-proxy/server` and `evlog`.
 - [x] netlify-server (Early Access): smoke-tested live (draft). Its site sets a package directory, not a base directory, because CLI builds skip Server bundling with a base directory (a `@netlify/build` bug).
