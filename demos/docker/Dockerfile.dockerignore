@@ -6,3 +6,6 @@
 **/.vercel
 .git
 .claude
+# Local secrets
+**/.env*
+**/.dev.vars
