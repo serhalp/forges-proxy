@@ -2,6 +2,11 @@
 
 A self-hostable, public or single-tenant caching proxy and credential broker for [`forges`](https://forges.link): one API, one cache, and one set of credentials in front of every forge you configure. Callers authenticate to the proxy; it holds the forge tokens. Design in [ARCHITECTURE.md](./ARCHITECTURE.md), next steps in [PLAN.md](./PLAN.md).
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/server-dark.png">
+  <img alt="@forges-proxy/server: self-hosted API gateway for code forges. Web apps (even under a strict CSP or for forge APIs without CORS), CI and bots, AI agents and any language call your deployment. Behind a cache, it holds the forge tokens, caches responses, rate-limits per caller and per route, and serves one typed API for 14 forges, whose webhooks purge affected cache entries and run your own handler." src="assets/server-light.png">
+</picture>
+
 ## Use cases
 
 - Non-JS clients, using `forges` over HTTP, as a sidecar or a separate gateway service.
@@ -78,6 +83,11 @@ curl -G localhost:3000/github/github.com/repos.get \
 ```
 
 ## Client
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/client-dark.png">
+  <img alt="@forges-proxy/client: drop-in forges providers for your proxy. Without a proxy, createForges() holds a GitHub, GitLab and Gitea token and calls each forge directly. With the proxy, createForges(await connect({ url, secret })) sends each call with the proxy secret to @forges-proxy/server, which calls the same forges with their tokens." src="assets/client-light.png">
+</picture>
 
 `@forges-proxy/client` turns the proxy back into `forges` providers, so code written against `forges` works unchanged:
 
