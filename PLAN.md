@@ -6,7 +6,7 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 
 - Forges whose hosts aren't known in advance (Tangled authors' servers and knots, self-hosted instances, Radicle nodes). The proxy only serves instances configured in the env. How should it serve the rest, and what stops hosts named by user data from reaching the proxy's own network?
 - What else to build on the manifest? Hey API client generation, an MCP server.
-- Should the manifest and `connect()` move into `forges` (e.g. `forges/remote`), where the types live? `forges/schema` already ships model schemas from the same generator; verb signatures (params, result, class, options position) would retire `generate-manifest.ts`, its TS 6 dependency and name-based date revival. Or the whole project, as `@forges/server` and `@forges/client`? Ask the `forges` team.
+- Should the manifest and `connect()` move into `forges` (e.g. `forges/remote`), where the types live? `forges/schema` already ships model schemas from the same generator; verb signatures (params, result, class, options position) would retire `generate-manifest.ts`, its TS 6 dependency, and name-based date revival. Or the whole project, as `@forges/server` and `@forges/client`? Ask the `forges` team.
 
 ## TODO
 
@@ -35,7 +35,7 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 - [x] `connect()` client (`@forges-proxy/client`): one `ForgeProvider` per proxied forge
 - [x] pnpm workspace: `@forges-proxy/server` (a Fetchable), `@forges-proxy/client`, `docs` placeholder, `demos/netlify-serverless` (verified live as a draft)
 - [x] Drop Nitro: `createServer(options)` on h3 returns a Fetchable; platform specifics (`cdnHeaders`, `purge`, `fetch`) are options, so purging is pluggable. Built with tsdown.
-- [x] Demos, smoke-tested with `pnpm smoke` through the client: node, hono, fastify, nitro, docker (local, public and private), cloudflare-workers (live, `workers.dev`), vercel (live), netlify-serverless (live draft)
+- [x] Demos, smoke-tested with `pnpm smoke` through the client: node, hono, fastify, nitro, docker (local, public, and private), cloudflare-workers (live, `workers.dev`), vercel (live), netlify-serverless (live draft)
 - [ ] netlify-edge: verify live. Edge Functions don't take a Fetchable yet, so the demo wraps it in a handler (TODO in the demo). The edge bundler resolves npm modules from the repository root, where pnpm doesn't link workspace packages, hence the root `package.json`'s dependencies on `@forges-proxy/server` and `evlog`.
 - [x] netlify-server (Early Access): smoke-tested live (draft). Its site sets a package directory, not a base directory, because CLI builds skip Server bundling with a base directory (a `@netlify/build` bug).
 - [ ] Publish the packages: release tooling (npm scope `@forges-proxy` is registered)
@@ -47,13 +47,13 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 - An MCP server (read verbs as tools), as a workspace package.
 - CDN caching for private instances, which send `no-store` because the CDN answers before auth runs. Likely fix: vary on `authorization` (`Netlify-Vary: header=authorization` or the platform's equivalent).
 - Multiple callers with different identities, beyond one all-access secret or anonymous public mode. Two separate questions: who is calling, and whose forge credential is used.
-  - Per use case: non-JS clients can hold secrets (pass their forge token through, or per-caller proxy keys). Internal tools, bots and CI want proxy-held credentials with scoped keys per caller, or CI's OIDC token mapped to a policy. Sandboxes want a short-lived scoped proxy token, never a forge token. npmx-style services and agents need to act as the end user (OAuth, run by the proxy or the caller; MCP's auth spec uses OAuth).
-  - Most cases generalise private mode from one secret to many scoped identities; acting as the end user is the harder, stateful part (token storage, refresh, sessions).
+  - Per use case: non-JS clients can hold secrets (pass their forge token through, or per-caller proxy keys). Internal tools, bots, and CI want proxy-held credentials with scoped keys per caller, or CI's OIDC token mapped to a policy. Sandboxes want a short-lived scoped proxy token, never a forge token. npmx-style services and agents need to act as the end user (OAuth, run by the proxy or the caller; MCP's auth spec uses OAuth).
+  - Most cases generalize private mode from one secret to many scoped identities; acting as the end user is the harder, stateful part (token storage, refresh, sessions).
   - Whatever the shape: no shared cache across identities, never fall back to the operator's credential, no tokens in logs.
 
 ## Notes
 
-- Cloudflare Workers define `WorkerGlobalScope`, so `forges` 0.3.2 takes them for a browser and sends no `user-agent`; GitHub answers 403, which surfaces as `InsufficientScopeError`. Fixed on `forges` main; until it's released, the server's default upstream `fetch` adds one (`withUserAgent` in `packages/server/src/index.ts`). Drop that after the next `forges` release.
+- Cloudflare Workers define `WorkerGlobalScope`, so `forges` 0.3.2 takes them for a browser and sends no `user-agent`; GitHub answers 403, which surfaces as `InsufficientScopeError`. Fixed on `forges` main; until it's released, the server's default `fetch` adds one (`withUserAgent` in `packages/server/src/index.ts`). Drop that after the next `forges` release.
 - `DATE_FIELDS` / `reviveDates` cover output models only. Input options have `since`, `until`, `createdAfter`, `before`; the proxy revives those itself (`packages/server/src/wire.ts`).
 - Error messages embed the upstream URL (e.g. `NotFoundError`), so leaving out `error.url` doesn't keep it private.
 - Errors cross the wire with every field their class sets except `url` and `body`; the client rebuilds the class with `Reflect.construct`.

@@ -28,7 +28,7 @@ export interface ManifestVerb {
 
 /** Each routed verb's signature and schemas, from `forges/schema`. */
 export interface Manifest {
-  /** The `forges` version the manifest was generated from, which the proxy reports to clients. */
+  /** The `forges` version the manifest comes from, which the proxy reports to clients. */
   forges: string
   verbs: Record<string, ManifestVerb>
   /** Referenced as `#/components/schemas/<Type>`. */

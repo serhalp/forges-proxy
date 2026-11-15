@@ -16,7 +16,7 @@ import { gitlab as gitlabFactory } from "forges/gitlab"
 import { allFactories } from "../src/all.ts"
 import { connect } from "../src/remote.ts"
 import { FORGES_VERSION } from "../src/version.ts"
-import { serialise } from "../../server/src/wire.ts"
+import { serialize } from "../../server/src/wire.ts"
 import { createProxy, env } from "../../server/test/support/proxy.ts"
 import * as v from "valibot"
 
@@ -50,7 +50,7 @@ const issue = { forge: "fake", instance: "fake.test", repo, kind: "issue" as con
 /** What a direct call's result looks like once it has crossed the wire. */
 const overTheWire = <T>(value: T): T =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-  decode(JSON.parse(serialise(value, { raw: false }))) as T
+  decode(JSON.parse(serialize(value, { raw: false }))) as T
 
 async function remote(secret?: string): Promise<{ fake: ForgeProvider; github: ForgeProvider }> {
   const [fakeProvider, githubProvider] = await connect({

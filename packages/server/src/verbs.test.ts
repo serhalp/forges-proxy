@@ -20,7 +20,7 @@ describe("manifest", () => {
     }
   })
 
-  it("classifies listings, writes and account verbs", () => {
+  it("classifies listings, writes, and account verbs", () => {
     const kind = (name: string) => {
       const { write, account, listing = false } = manifest.verbs[name]
       return { write, account, listing }

@@ -10,12 +10,12 @@ client ──▶ CDN ──▶ auth middleware ──▶ verb route ──▶ fo
             ETag)     public mode)      call, tag)                        memory)
 ```
 
-- **CDN.** Public reads carry `CDN-Cache-Control` (60 s fresh, 10 min stale-while-revalidate), a weak `ETag` and `Cache-Tag`, or whatever the deployment's `cdnHeaders` returns instead (the Netlify demos add `durable`). Private instances and writes are `private, no-store`.
-- **Verb route** (`packages/server/src/routes/verb.ts`). Checks the arguments against the operations manifest, decodes dates and bytes, passes the request's signal into the verb's options, calls the provider and tags the response with every repository in its arguments and result.
+- **CDN.** Public reads carry `CDN-Cache-Control` (60 s fresh, 10 min stale-while-revalidate), a weak `ETag`, and `Cache-Tag`, or whatever the deployment's `cdnHeaders` returns instead (the Netlify demos add `durable`). Private instances and writes are `private, no-store`.
+- **Verb route** (`packages/server/src/routes/verb.ts`). Checks the arguments against the operations manifest, decodes dates and bytes, passes the request's signal into the verb's options, calls the provider, and tags the response with every repository in its arguments and result.
 - **Event stream** (`GET /:forge/:instance/sources.stream`). The provider's `sources.stream()` as server-sent events, outside the manifest since it answers with a stream rather than JSON. Cursors are the event ids, so `EventSource` resumes on its own. Never cached.
 - **Webhooks** (`POST /webhooks/:forge/:instance`). Verified by the provider and turned into repository tags with `affectedKeys()`. Purges the tags through the deployment's `purge` option, then awaits its `handleEvents` with the events. A failure answers 500, so the forge's delivery log shows it.
-- **Operations manifest** (`packages/server/src/manifest.ts`). Re-exports the routed verbs and model schemas from `forges/schema`. The server's only list of verbs: it drives routing, validation, the signal passthrough, `/`, `/openapi.json` and `/docs`.
-- **Client** (`@forges-proxy/client`). `connect()` turns a proxy back into `ForgeProvider`s, finding each verb's options where `/` says they are. It throws when `/` reports an incompatible `forges` version.
+- **Operations manifest** (`packages/server/src/manifest.ts`). Re-exports the routed verbs and model schemas from `forges/schema`. The server's only list of verbs: it drives routing, validation, the signal passthrough, `/`, `/openapi.json`, and `/docs`.
+- **Client** (`@forges-proxy/client`). `connect()` turns a proxy back into `ForgeProvider`s, finding each verb's options where `/` says they are. It warns when `/` reports an incompatible `forges` version.
 
 ## Decisions
 
@@ -33,7 +33,7 @@ Forge credentials come from `FORGES_*` variables via `providersFromEnv()`; calle
 
 ### RPC over the provider surface, not REST
 
-`GET /:forge/:instance/:verb?args=<json array>` for reads, `POST` with `{ "args": [...] }` for writes. Arguments are positional, as the method takes them. Verb classes (write, account, listing) come from `forges/schema`, so new verbs need no proxy change. A listing answers with the page its options' `cursor` names (`listing.page()`); clients rebuild the iterable with `iteratePages`. `provider.request` (takes absolute URLs, so SSRF), `installations.token` and `installations.provider(s)` are never routed.
+`GET /:forge/:instance/:verb?args=<json array>` for reads, `POST` with `{ "args": [...] }` for writes. Arguments are positional, as the method takes them. Verb classes (write, account, listing) come from `forges/schema`, so new verbs need no proxy change. A listing answers with the page its options' `cursor` names (`listing.page()`); clients rebuild the iterable with `iteratePages`. `provider.request` (takes absolute URLs, so SSRF), `installations.token`, and `installations.provider(s)` are never routed.
 
 On the wire: `null` for a skipped optional argument, bytes as `{ "$bytes": "<base64>" }`, dates as `{ "$date": "<ISO 8601>" }`, `raw` dropped unless `?raw=1`, `undefined` as 204, streams as `application/octet-stream`. Errors are `{ "error": { name, message, ...fields } }`, which the client rebuilds into the `ForgeError` class.
 
@@ -41,7 +41,7 @@ On the wire: `null` for a skipped optional argument, bytes as `{ "$bytes": "<bas
 
 **Context.** The RPC design runs `forges` twice, in the proxy and in the client (`connect()`), and the two must agree on its version: the proxy reports it in `GET /` and `connect()` warns on a mismatch. The alternative runs `forges` only in the client and makes the proxy a caching, credential-adding pass-through for each forge's own API.
 
-**Shape.** The client passes a `fetch` that rewrites forge URLs onto the proxy, e.g. `github({ fetch: via("https://proxy.example") })` sending `https://api.github.com/repos/a/b` as `/api.github.com/repos/a/b`. Not `baseUrl`: `forges` derives the instance from it, so refs, keys and web links would name the proxy's host. The proxy forwards to an allowlist of configured hosts (otherwise it's an open proxy), adds the token, and keeps the CDN and webhook purging.
+**Shape.** The client passes a `fetch` that rewrites forge URLs onto the proxy, e.g. `github({ fetch: via("https://proxy.example") })` sending `https://api.github.com/repos/a/b` as `/api.github.com/repos/a/b`. Not `baseUrl`: `forges` derives the instance from it, so refs, keys, and web links would name the proxy's host. The proxy forwards to an allowlist of configured hosts (otherwise it's an open proxy), adds the token, and keeps the CDN and webhook purging.
 
 **Gains.**
 
@@ -55,8 +55,8 @@ On the wire: `null` for a skipped optional argument, bytes as `{ "$bytes": "<bas
 - GraphQL reads are `POST`s, which CDNs don't cache.
 - Cache tags come from URL paths per forge (`/repos/:owner/:name/...` on GitHub) rather than refs in arguments and results.
 - A verb that makes several upstream requests is several browser round trips instead of one call, each through the CDN.
-- Argument validation, the OpenAPI document and `/docs` go away.
-- Responses are each forge's raw payloads, so the CDN stores more and browsers download more than the normalised models.
+- Argument validation, the OpenAPI document, and `/docs` go away.
+- Responses are each forge's raw payloads, so the CDN stores more and browsers download more than the normalized models.
 
 **Decision.** RPC. Public read-only instances and non-JS callers need the proxy to know verbs, and a verb's upstream fan-out should stay one call from the app.
 
@@ -74,7 +74,7 @@ Public instances need protecting from callers who burn the forge budget. Per-cli
 
 ### No registry-level fan-out route (`/_all/...`)
 
-**Context.** The `Forges` registry has methods that span providers: `search.threads`, `search.repos` and `notifications.list` merge every provider's results by date, and `threads.getMany` splits refs by provider. The rest of the registry routes by ref, which the per-provider routes already cover.
+**Context.** The `Forges` registry has methods that span providers: `search.threads`, `search.repos`, and `notifications.list` merge every provider's results by date, and `threads.getMany` splits refs by provider. The rest of the registry routes by ref, which the per-provider routes already cover.
 
 **Decision.** No server-side route for them. Clients get fan-out by registering the remote providers: `createForges(await connect(...))`.
 

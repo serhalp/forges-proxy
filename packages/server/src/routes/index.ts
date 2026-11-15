@@ -13,8 +13,8 @@ const RETRY_MS = 5 * 60_000
  * with the position of its options, where clients put `signal` and a listing's cursor.
  */
 export function indexRoute(context: Context): EventHandler {
-  // Refined by the instance's version, which `refreshCapabilities()` requests on every call: once per provider and
-  // server instance, then. A forge that doesn't answer keeps its static capabilities, and is asked again later.
+  // `refreshCapabilities()` asks the instance for its version on every call, so it runs once per provider and server
+  // instance. A forge that doesn't answer keeps its static capabilities and is asked again later.
   const refreshed = new WeakMap<
     ForgeProvider,
     { at: number; capabilities: Promise<ForgeCapabilities> }

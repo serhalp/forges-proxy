@@ -4,7 +4,7 @@
 
 A public, read-only instance: <https://forges-proxy-server-demo.netlify.app/>. [`/docs`](https://forges-proxy-server-demo.netlify.app/docs) lists what it routes.
 
-The same proxy as the [Functions demo](../netlify-serverless), as a long-lived Node.js server: CDN caching, webhooks, logging and anonymous forges all work the same.
+The same proxy as the [Functions demo](../netlify-serverless), as a long-lived Node.js server: CDN caching, webhooks, logging, and anonymous forges all work the same.
 
 [Netlify Server](https://docs.netlify.com/build/server/) is in Early Access. It needs a credit-based plan, and Node.js 24+ to build, which `.node-version` sets.
 

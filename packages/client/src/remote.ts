@@ -112,7 +112,7 @@ function remoteProvider(
   let capabilities = info.capabilities
   let budgets: RateLimit[] = []
 
-  /** Keeps the budgets a verb response reports, the latest the server instance that answered had seen. */
+  /** Keeps the budgets a verb response reports: the latest the answering server instance had seen. */
   function remember(response: Response): void {
     const header = response.headers.get(RATE_LIMITS_HEADER)
     if (!header) return
@@ -315,7 +315,7 @@ function localProvider(
         return provider as ForgeProvider
       }
     } catch {
-      // Some forges need options the proxy doesn't share, such as an organisation; their helpers go without.
+      // Some forges need options the proxy doesn't share, such as an organization; their helpers go without.
     }
   }
   return undefined

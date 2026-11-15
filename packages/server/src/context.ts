@@ -13,7 +13,7 @@ export type HandleEvents = (
 
 /**
  * A logger that takes structured events: the server logs one `info` per request and its own failures as `error`.
- * `console`, pino and evlog's `log` all fit, and their levels decide what's kept.
+ * `console`, pino, and evlog's `log` all fit, and their levels decide what's kept.
  */
 export interface Logger {
   info?(event: Record<string, unknown>): void

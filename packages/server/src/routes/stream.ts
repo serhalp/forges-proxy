@@ -3,7 +3,7 @@ import type { EventHandler } from "h3"
 import { EventStream, getRouterParams } from "h3"
 import type { Context } from "../context.ts"
 import { errorResponse, proxyError } from "../errors.ts"
-import { serialise } from "../wire.ts"
+import { serialize } from "../wire.ts"
 
 // Proxies and CDNs drop connections that go quiet for long.
 const HEARTBEAT_MS = 15_000
@@ -36,7 +36,7 @@ export function streamRoute(context: Context): EventHandler {
     void (async () => {
       try {
         for await (const item of provider.sources.stream({ cursor, signal: closed.signal })) {
-          await stream.push({ id: item.cursor, data: serialise(item.event, { raw: false }) })
+          await stream.push({ id: item.cursor, data: serialize(item.event, { raw: false }) })
         }
       } catch (error) {
         await stream.push({

@@ -2,7 +2,7 @@ import { sha256Hex } from "forges/kit"
 import type { AccessMode } from "./access.ts"
 import type { CdnHeaders } from "./context.ts"
 import type { ManifestVerb } from "./manifest.ts"
-import { serialise } from "./wire.ts"
+import { serialize } from "./wire.ts"
 
 const CDN_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=600"
 
@@ -44,7 +44,7 @@ export async function resultResponse(
   if (result === undefined) {
     return new Response(null, { status: 204, headers })
   }
-  const body = serialise(result, { raw: new URL(request.url).searchParams.get("raw") === "1" })
+  const body = serialize(result, { raw: new URL(request.url).searchParams.get("raw") === "1" })
   if (!cacheable) {
     return new Response(body, { headers: { "content-type": "application/json", ...headers } })
   }

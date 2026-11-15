@@ -58,7 +58,7 @@ describe("GET /openapi.json", () => {
       assert.deepEqual([schema.minItems, schema.maxItems], [1, 2])
     })
 
-    it("documents streams, empty results and errors", async () => {
+    it("documents streams, empty results, and errors", async () => {
       const { doc } = await document()
       const path = (verb: string) => doc.paths[`/{forge}/{instance}/${verb}`].get.responses
       assert.ok(path("ci.log")[200].content["application/octet-stream"])

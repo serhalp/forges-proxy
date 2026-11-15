@@ -12,7 +12,7 @@ const ERROR: Schema = {
       required: ["name", "message"],
       additionalProperties: true,
       description:
-        "The `ForgeError`'s class name, message and fields, which `connect()` rebuilds it from.",
+        "The `ForgeError`'s class name, message, and fields, which `connect()` rebuilds it from.",
     },
   },
   required: ["error"],

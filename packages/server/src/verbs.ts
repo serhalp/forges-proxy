@@ -15,7 +15,7 @@ const PRIVILEGED = new Set([
   "orgs.teams",
 ])
 
-/** Public instances route no writes, account verbs or privileged reads. */
+/** Public instances route no writes, account verbs, or privileged reads. */
 export function isRouted(
   name: string,
   verb: Pick<ManifestVerb, "write" | "account">,
