@@ -2,6 +2,7 @@ import type { FetchLike, Forges } from "forges"
 import type { H3Event } from "h3"
 import { H3, handleCors } from "h3"
 import { auth } from "./auth.ts"
+import { cursorKey as signingKey } from "./cursors.ts"
 import { proxyError } from "./errors.ts"
 import type { CdnHeaders, Env, HandleEvents, Logger, Purge } from "./context.ts"
 import { providers } from "./providers.ts"
@@ -60,6 +61,7 @@ const errorsOnly: Logger = { error: (event) => console.error(event) }
 export function createServer(options: ServerOptions = {}): Server {
   const env = options.env ?? globalThis.process?.env ?? {}
   let forges = options.forges
+  let cursorKey: Promise<CryptoKey> | undefined
   const context = {
     env,
     forges: () =>
@@ -67,6 +69,7 @@ export function createServer(options: ServerOptions = {}): Server {
         fetch: options.fetch ?? withUserAgent,
         anonymous: options.anonymousForges ?? false,
       })),
+    cursorKey: () => (cursorKey ??= signingKey(env)),
     purge: options.purge,
     handleEvents: options.handleEvents,
     cdnHeaders: options.cdnHeaders ?? standardCdnHeaders,

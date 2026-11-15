@@ -38,6 +38,7 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 - [x] Demos, smoke-tested with `pnpm smoke` through the client: node, hono, fastify, nitro, docker (local, public, and private), cloudflare-workers (live, `workers.dev`), vercel (live), netlify-serverless (live draft)
 - [ ] netlify-edge: verify live. Edge Functions don't take a Fetchable yet, so the demo wraps it in a handler (TODO in the demo). The edge bundler resolves npm modules from the repository root, where pnpm doesn't link workspace packages, hence the root `package.json`'s dependencies on `@forges-proxy/server` and `evlog`.
 - [x] netlify-server (Early Access): smoke-tested live (draft). Its site sets a package directory, not a base directory, because CLI builds skip Server bundling with a base directory (a `@netlify/build` bug).
+- [x] Signed cursors on public instances with authenticated providers, so a caller-supplied `nextUrl` can't reach other API paths with the instance's token
 - [ ] Publish the packages: release tooling (npm scope `@forges-proxy` is registered)
 - [x] Client: `rateLimits()` from a `forges-rate-limits` header on verb responses (caveats in the README), `refreshCapabilities()` from `/`, which now refines capabilities by the instance's version
 

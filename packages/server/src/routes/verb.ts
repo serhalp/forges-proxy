@@ -5,6 +5,7 @@ import { getRouterParams } from "h3"
 import { accessMode } from "../access.ts"
 import { readArgs } from "../args.ts"
 import type { Context } from "../context.ts"
+import { signPage, signsCursors, unsignedCursor } from "../cursors.ts"
 import { errorResponse, proxyError } from "../errors.ts"
 import { resultResponse } from "../response.ts"
 import { responseTags } from "../tags.ts"
@@ -36,10 +37,19 @@ export function verbRoute(context: Context): EventHandler {
     if ("problem" in read) {
       return proxyError(400, read.problem)
     }
+    const scope = `${forge}:${instance}`
+    const key = signsCursors(mode, provider) ? await context.cursorKey() : undefined
+    const unsigned = key && (await unsignedCursor(verb, read.args, key, scope))
+    if (unsigned) {
+      return proxyError(400, unsigned)
+    }
 
     let result: unknown
     try {
       result = await callVerb(provider, name, verb, withSignal(verb, read.args, event.req.signal))
+      if (key && verb.listing) {
+        result = await signPage(result, key, scope)
+      }
     } catch (error) {
       return withRateLimits(errorResponse(error, context.logger), provider)
     }

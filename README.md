@@ -75,7 +75,7 @@ pnpm --filter @forges-proxy/server dev
 - `POST /:forge/:instance/:verb` with `{ "args": [...] }`: a write.
 - `GET /:forge/:instance/sources.stream`: the forge's live events (`sources.stream()`, Tangled only today) as [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events). Each event's `id` is its cursor; resume with `Last-Event-ID`, as `EventSource` does on reconnect, or `?cursor=`. A failure ends the stream with an `error` event. Serverless platforms end long responses at their time limit, so expect to reconnect. Browsers' `EventSource` can't send the proxy secret, so on a private instance use the client or `fetch`.
 
-Arguments are positional, as the `ForgeProvider` method takes them, and are validated against the verb's signature (see `/docs`). Pass `null` for a skipped optional argument. Bytes travel as `{ "$bytes": "<base64>" }` in both directions. A listing answers with one page; pass its `cursor` back in the options to read the next.
+Arguments are positional, as the `ForgeProvider` method takes them, and are validated against the verb's signature (see `/docs`). Pass `null` for a skipped optional argument. Bytes travel as `{ "$bytes": "<base64>" }` in both directions. A listing answers with one page; pass its `cursor` back, unchanged, in the options to read the next. Public instances sign a cursor's `nextUrl` and refuse one they didn't sign.
 
 ```sh
 curl -G localhost:3000/github/github.com/repos.get \

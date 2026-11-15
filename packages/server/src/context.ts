@@ -28,6 +28,8 @@ export interface Context {
   /** `FORGES_PROXY_*` are read on every request; providers are built from the rest once. */
   env: Env
   forges: () => Forges
+  /** Signs public instances' cursors; see `cursors.ts`. */
+  cursorKey: () => Promise<CryptoKey>
   purge?: Purge
   handleEvents?: HandleEvents
   cdnHeaders: CdnHeaders
