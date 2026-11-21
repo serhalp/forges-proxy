@@ -114,8 +114,8 @@ export function createServer(options: ServerOptions = {}): Server {
 }
 
 /**
- * `forges` 0.3.2 takes Workers for a browser and sends no `user-agent`, which GitHub refuses; drop this once the fix is
- * released. Calls `fetch` through a closure, since some runtimes reject one detached from `globalThis`.
+ * `forges` (as of 0.4.0) takes Workers for a browser and sends no `user-agent`, which GitHub refuses; drop this once it
+ * sends one there. Calls `fetch` through a closure, since some runtimes reject one detached from `globalThis`.
  */
 const withUserAgent: typeof fetch = (input, init) => {
   const headers = new Headers(init?.headers)

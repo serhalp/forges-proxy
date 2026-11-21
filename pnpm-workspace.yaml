@@ -5,5 +5,5 @@ allowBuilds:
   esbuild: true
   workerd: true
 linkWorkspacePackages: true
-overrides:
-  forges: https://pkg.pr.new/danielroe/forges@287
+minimumReleaseAgeExclude:
+  - forges@0.4.0

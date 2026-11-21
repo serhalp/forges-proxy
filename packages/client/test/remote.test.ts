@@ -93,12 +93,14 @@ describe("connect", () => {
         ? Response.json({ ...v.parse(v.looseObject({}), await response.json()), forges: version })
         : response
     }
-    for (const version of [FORGES_VERSION, "0.3.9"]) {
+    const [major, minor] = FORGES_VERSION.split(".")
+    for (const version of [FORGES_VERSION, `${major}.${minor}.99`]) {
       await connect({ url: "http://proxy.test", secret: "s3cret", fetch: runs(version) })
     }
+    const next = `${major}.${Number(minor) + 1}.0`
     await assert.rejects(
-      connect({ url: "http://proxy.test", secret: "s3cret", fetch: runs("0.4.0") }),
-      /runs forges 0\.4\.0, but this client was built against/,
+      connect({ url: "http://proxy.test", secret: "s3cret", fetch: runs(next) }),
+      new RegExp(`runs forges ${next.replaceAll(".", "\\.")}, but this client was built against`),
     )
   })
 

@@ -162,9 +162,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  forges: https://pkg.pr.new/danielroe/forges@287
-
 importers:
 
   .:
@@ -182,8 +179,8 @@ importers:
         specifier: 2.35.1
         version: 2.35.1(fastify@5.12.8)(hono@4.13.17)
       forges:
-        specifier: https://pkg.pr.new/danielroe/forges@287
-        version: https://pkg.pr.new/danielroe/forges@287
+        specifier: 0.4.0
+        version: 0.4.0
       knip:
         specifier: 6.45.1
         version: 6.45.1
@@ -326,13 +323,13 @@ importers:
       eventsource-parser:
         specifier: ^4.1.3
         version: 4.1.3
-      forges:
-        specifier: https://pkg.pr.new/danielroe/forges@287
-        version: https://pkg.pr.new/danielroe/forges@287
       valibot:
         specifier: ^1.5.0
         version: 1.5.0(typescript@7.0.2)
     devDependencies:
+      forges:
+        specifier: 0.4.0
+        version: 0.4.0
       tsdown:
         specifier: 0.23.7
         version: 0.23.7(oxc-resolver@11.24.2)(typescript@7.0.2)
@@ -345,8 +342,8 @@ importers:
         specifier: ^4.1.6
         version: 4.1.6
       forges:
-        specifier: https://pkg.pr.new/danielroe/forges@287
-        version: https://pkg.pr.new/danielroe/forges@287
+        specifier: ^0.4.0
+        version: 0.4.0
       h3:
         specifier: ^2.0.8
         version: 2.0.8(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)
@@ -1807,9 +1804,8 @@ packages:
     resolution: {integrity: sha512-eru+uCPQ2g+nLBkf84MHP/KyNNMar0BDy0j+i8Fb72GF9/YHBZ58q7FODUtfVV7XU9nfRUHXSmaM8NmZcIbZ4Q==}
     engines: {node: '>=20'}
 
-  forges@https://pkg.pr.new/danielroe/forges@287:
-    resolution: {integrity: sha512-k9EgUgCDKaN9XO0bQaRqaid92scCofUSKv9Wrhwk+WMowig73DE7gtgkNWUTlXY0nhDUwoXcsyZ9nlrbGLK2/A==, tarball: https://pkg.pr.new/danielroe/forges@287}
-    version: 0.3.2
+  forges@0.4.0:
+    resolution: {integrity: sha512-2b42PA65SUQZHH4CNCSV33711a2tQPd5x4XjoZaaFmsQ9Rm51BjN5EdUnZ4lujl817pl8uq4VROi5RdKq7c9Ng==}
     engines: {node: '>=22.18'}
 
   formatly@0.11.4:
@@ -3282,7 +3278,7 @@ snapshots:
       fast-querystring: 1.1.2
       safe-regex2: 5.1.2
 
-  forges@https://pkg.pr.new/danielroe/forges@287: {}
+  forges@0.4.0: {}
 
   formatly@0.11.4:
     dependencies:

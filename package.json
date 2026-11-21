@@ -23,7 +23,7 @@
     "@forges-proxy/server": "workspace:*",
     "@types/node": "26.6.6",
     "evlog": "2.35.1",
-    "forges": "0.3.2",
+    "forges": "0.4.0",
     "knip": "6.45.1",
     "oxfmt": "0.78.0",
     "oxlint": "1.93.0",
