@@ -7,6 +7,7 @@ import {
   entire,
   forgejo,
   gitbucket,
+  gitcafe,
   gitea,
   gitee,
   github,
@@ -14,6 +15,7 @@ import {
   pushin,
   sourcehut,
   tangled,
+  upstream,
 } from "forges"
 import type { ProviderFactory } from "./remote.ts"
 
@@ -26,6 +28,7 @@ const BY_KIND = {
   entire,
   forgejo,
   gitbucket,
+  gitcafe,
   gitea,
   gitee,
   github,
@@ -33,6 +36,7 @@ const BY_KIND = {
   pushin,
   sourcehut,
   tangled,
+  upstream,
 } satisfies Record<KnownForgeKind, ProviderFactory>
 
 /** Every `forges` provider factory, for `connect({ factories: allFactories })`. Bundles every forge. */

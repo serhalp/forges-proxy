@@ -14,6 +14,7 @@
     "forges",
     "git",
     "gitbucket",
+    "gitcafe",
     "gitea",
     "gitee",
     "github",
@@ -21,7 +22,8 @@
     "proxy",
     "pushin",
     "sourcehut",
-    "tangled"
+    "tangled",
+    "upstream"
   ],
   "homepage": "https://github.com/serhalp/forges-proxy/tree/main/packages/server#readme",
   "bugs": "https://github.com/serhalp/forges-proxy/issues",
@@ -56,7 +58,7 @@
   },
   "dependencies": {
     "@cfworker/json-schema": "^4.1.6",
-    "forges": "^0.4.0",
+    "forges": "^0.4.1",
     "h3": "^2.0.8"
   },
   "devDependencies": {

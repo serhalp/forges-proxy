@@ -14,6 +14,7 @@
     "forges",
     "git",
     "gitbucket",
+    "gitcafe",
     "gitea",
     "gitee",
     "github",
@@ -21,7 +22,8 @@
     "proxy",
     "pushin",
     "sourcehut",
-    "tangled"
+    "tangled",
+    "upstream"
   ],
   "homepage": "https://github.com/serhalp/forges-proxy/tree/main/packages/client#readme",
   "bugs": "https://github.com/serhalp/forges-proxy/issues",
@@ -62,11 +64,11 @@
     "valibot": "^1.5.0"
   },
   "devDependencies": {
-    "forges": "0.4.0",
+    "forges": "0.4.1",
     "tsdown": "0.23.7"
   },
   "peerDependencies": {
-    "forges": "~0.4.0"
+    "forges": "~0.4.1"
   },
   "engines": {
     "node": ">=22.18"

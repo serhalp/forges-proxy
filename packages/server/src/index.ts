@@ -114,7 +114,7 @@ export function createServer(options: ServerOptions = {}): Server {
 }
 
 /**
- * `forges` (as of 0.4.0) takes Workers for a browser and sends no `user-agent`, which GitHub refuses; drop this once it
+ * `forges` (as of 0.4.1) takes Workers for a browser and sends no `user-agent`, which GitHub refuses; drop this once it
  * sends one there. Calls `fetch` through a closure, since some runtimes reject one detached from `globalThis`.
  */
 const withUserAgent: typeof fetch = (input, init) => {

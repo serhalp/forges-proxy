@@ -58,7 +58,7 @@ What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.
 
 ## Notes
 
-- Cloudflare Workers define `WorkerGlobalScope`, so `forges` (as of 0.4.0) takes them for a browser and sends no `user-agent`; GitHub answers 403, which surfaces as `InsufficientScopeError`. Until `forges` sends one on Workers, the server's default `fetch` adds it (`withUserAgent` in `packages/server/src/index.ts`).
+- Cloudflare Workers define `WorkerGlobalScope`, so `forges` (as of 0.4.1) takes them for a browser and sends no `user-agent`; GitHub answers 403, which surfaces as `InsufficientScopeError`. Until `forges` sends one on Workers, the server's default `fetch` adds it (`withUserAgent` in `packages/server/src/index.ts`).
 - `DATE_FIELDS` / `reviveDates` cover output models only. Input options have `since`, `until`, `createdAfter`, `before`; the proxy revives those itself (`packages/server/src/wire.ts`).
 - Error messages embed the upstream URL (e.g. `NotFoundError`), so leaving out `error.url` doesn't keep it private.
 - Errors cross the wire with every field their class sets except `url` and `body`; the client rebuilds the class with `Reflect.construct`.

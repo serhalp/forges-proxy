@@ -53,7 +53,7 @@ Check a deployment end to end with `pnpm smoke <url> [secret]`.
 
 ## Configure
 
-Providers come from `FORGES_<KIND>_<FIELD>[_<SUFFIX>]` variables, as `forgesFromEnv()` reads them (e.g. `FORGES_GITHUB_TOKEN`, `FORGES_GITLAB_ENABLED=1`). With `createServer({ anonymousForges: true })`, every forge the env doesn't mention that can be read without credentials is served too, anonymously: GitHub, GitLab, Codeberg, gitea.com, Bitbucket, Gitee, Cursor Origin, and Pushin today. Tangled is left out: its reads go to hosts callers name, so it would let anyone aim the proxy at any host. The demos turn it on.
+Providers come from `FORGES_<KIND>_<FIELD>[_<SUFFIX>]` variables, as `forgesFromEnv()` reads them (e.g. `FORGES_GITHUB_TOKEN`, `FORGES_GITLAB_ENABLED=1`). With `createServer({ anonymousForges: true })`, every forge the env doesn't mention that can be read without credentials is served too, anonymously: GitHub, GitLab, Codeberg, gitea.com, Bitbucket, Gitee, Cursor Origin, Pushin, GitCafe, and Upstream today. Tangled is left out: its reads go to hosts callers name, so it would let anyone aim the proxy at any host. The demos turn it on.
 
 Set exactly one of:
 

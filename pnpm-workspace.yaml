@@ -6,4 +6,4 @@ allowBuilds:
   workerd: true
 linkWorkspacePackages: true
 minimumReleaseAgeExclude:
-  - forges@0.4.0
+  - forges@0.4.1

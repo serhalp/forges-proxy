@@ -13,6 +13,7 @@ const KINDS = Object.entries({
   entire: true,
   forgejo: true,
   gitbucket: true,
+  gitcafe: true,
   gitea: true,
   gitee: true,
   github: true,
@@ -20,6 +21,7 @@ const KINDS = Object.entries({
   pushin: true,
   sourcehut: true,
   tangled: false,
+  upstream: true,
 } satisfies Record<KnownForgeKind, boolean>).flatMap(([kind, include]) => (include ? [kind] : []))
 
 /**
