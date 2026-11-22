@@ -5,7 +5,6 @@ import { initLogger, log } from "evlog"
 initLogger({ env: { service: "forges-proxy" } })
 
 // No `purge`: CDN entries expire by age.
-// TODO: export the server itself once Edge Functions take a Fetchable.
 export default createServer({
   env: Netlify.env.toObject(),
   anonymousForges: true,
@@ -19,7 +18,7 @@ export default createServer({
     for (const { kind, action, summary } of events)
       log.info({ forge, instance, kind, action, summary })
   },
-}).fetch
+})
 
 // Edge function responses are only cached when they opt in.
 export const config: Config = { path: "/*", cache: "manual" }
