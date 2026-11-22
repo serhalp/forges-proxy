@@ -1,5 +1,6 @@
 {
   "semi": false,
+  "proseWrap": "always",
   "sortPackageJson": { "sortScripts": true },
   "ignorePatterns": [".claude"]
 }
