@@ -128,6 +128,7 @@ const withUserAgent: typeof fetch = (input, init) => {
 let server: Server | undefined
 
 /** The proxy configured from `process.env`, created on its first request. */
-export default {
-  fetch: (request: Request) => (server ??= createServer()).fetch(request),
-} satisfies Server
+const fromEnv: Server = {
+  fetch: (request) => (server ??= createServer()).fetch(request),
+}
+export default fromEnv

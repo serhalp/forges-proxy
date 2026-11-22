@@ -7,6 +7,7 @@ export default defineConfig({
   target: "node22.18",
   // Workers and Deno provide these through their Node compatibility.
   deps: { neverBundle: [/^node:/] },
-  dts: true,
+  // Oxc needs every export annotated, and spares us TypeScript's API.
+  dts: { generator: "oxc" },
   tsconfig: "tsconfig.build.json",
 })

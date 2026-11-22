@@ -5,5 +5,6 @@ export default defineConfig({
   platform: "neutral",
   // `engines.node`, as `forges` requires.
   target: "node22.18",
-  dts: true,
+  // Oxc needs every export annotated, and spares us TypeScript's API.
+  dts: { generator: "oxc" },
 })

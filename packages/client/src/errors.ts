@@ -23,7 +23,7 @@ import {
 } from "forges"
 
 /** The error classes the proxy can report, by name. A test checks it against everything `forges` exports. */
-export const ERRORS = new Map<string, new (...args: never[]) => Error>(
+export const ERRORS: Map<string, new (...args: never[]) => Error> = new Map(
   [
     AuthenticationRequiredError,
     BranchMovedError,
