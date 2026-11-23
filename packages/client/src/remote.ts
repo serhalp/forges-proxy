@@ -39,10 +39,10 @@ export interface ProxyOptions {
 
 export interface DiscoverOptions extends ProxyOptions {
   /**
-   * Pre-fetched proxy index from {@link fetchProxyIndex}, allowing providers to be constructed
+   * The proxy's description from {@link describeProxy}, allowing providers to be constructed
    * without fetching `GET /` again (e.g. cached per process or passed from SSR to the browser).
    */
-  index?: ProxyIndex
+  description?: ProxyDescription
   /**
    * `forges` provider factories (e.g. `github` from `forges/github`) used to run synchronous
    * helpers (`normaliseMarkdown`, `scopesFor`, `webhooks.events`, etc.) locally. Pass `allFactories`
@@ -56,7 +56,7 @@ export type ProviderFactory = (options: never) => ForgeProvider
 
 const isObject = (value: unknown): value is object => typeof value === "object" && value !== null
 
-const RemoteIndex: v.GenericSchema<unknown, ProxyIndex> = v.object({
+const Description: v.GenericSchema<unknown, ProxyDescription> = v.object({
   forges: v.optional(v.string()),
   providers: v.array(
     v.object({
@@ -71,10 +71,11 @@ const RemoteIndex: v.GenericSchema<unknown, ProxyIndex> = v.object({
     v.object({ name: v.string(), write: v.boolean(), listing: v.boolean(), options: v.number() }),
   ),
 })
-type RemoteIndex = ProxyIndex
-
-/** Serializable index payload returned by `GET /` on the proxy. */
-export interface ProxyIndex {
+/**
+ * What a proxy serves: its `forges` version, providers and their capabilities, and routed verbs.
+ * Serializable.
+ */
+export interface ProxyDescription {
   forges?: string
   providers: Array<{
     forge: string
@@ -94,16 +95,16 @@ const ErrorBody = v.object({
   error: v.looseObject({ name: v.optional(v.string()), message: v.optional(v.string()) }),
 })
 
-type RemoteVerb = Omit<RemoteIndex["verbs"][number], "name">
+type RemoteVerb = Omit<ProxyDescription["verbs"][number], "name">
 
-/** Fetches the proxy's `GET /` index payload for reuse with {@link discoverProviders}. */
-export async function fetchProxyIndex(options: ProxyOptions): Promise<ProxyIndex> {
+/** Fetches the proxy's description (`GET /`), for reuse with {@link discoverProviders}. */
+export async function describeProxy(options: ProxyOptions): Promise<ProxyDescription> {
   const transport = transportFor(options)
   const response = await transport.fetch(transport.url, { headers: transport.headers })
   if (!response.ok) {
     throw await toError(response, {})
   }
-  return v.parse(RemoteIndex, await response.json())
+  return v.parse(Description, await response.json())
 }
 
 /**
@@ -116,11 +117,11 @@ export async function fetchProxyIndex(options: ProxyOptions): Promise<ProxyIndex
  * ```
  */
 export async function discoverProviders(options: DiscoverOptions): Promise<ForgeProvider[]> {
-  const index = options.index ?? (await fetchProxyIndex(options))
-  assertCompatible(index, options.url)
-  const verbs = new Map(index.verbs.map(({ name, ...verb }) => [name, verb]))
+  const description = options.description ?? (await describeProxy(options))
+  assertCompatible(description, options.url)
+  const verbs = new Map(description.verbs.map(({ name, ...verb }) => [name, verb]))
   const transport = transportFor(options)
-  return index.providers.map((info) =>
+  return description.providers.map((info) =>
     remoteProvider(info, verbs, transport, options.factories ?? []),
   )
 }
@@ -214,10 +215,10 @@ function webFor(info: {
   }
 }
 
-function assertCompatible(index: ProxyIndex, url: string): void {
-  if (index.forges && !compatible(index.forges, FORGES_VERSION)) {
+function assertCompatible(description: ProxyDescription, url: string): void {
+  if (description.forges && !compatible(description.forges, FORGES_VERSION)) {
     throw new Error(
-      `forges-proxy: ${url} runs forges ${index.forges}, but this client was built against ${FORGES_VERSION}. Update both to the same wire format.`,
+      `forges-proxy: ${url} runs forges ${description.forges}, but this client was built against ${FORGES_VERSION}. Update both to the same wire format.`,
     )
   }
 }
@@ -250,7 +251,7 @@ function transportFor(options: ProxyOptions): Transport {
 }
 
 function remoteProvider(
-  info: RemoteIndex["providers"][number],
+  info: ProxyDescription["providers"][number],
   verbs: Map<string, RemoteVerb>,
   options: Transport,
   factories: readonly ProviderFactory[],
@@ -285,11 +286,11 @@ function remoteProvider(
     if (!response.ok) {
       throw await toError(response, origin)
     }
-    const index = v.parse(RemoteIndex, await response.json())
+    const description = v.parse(Description, await response.json())
     if (checkVersion) {
-      assertCompatible(index, options.url)
+      assertCompatible(description, options.url)
     }
-    const own = index.providers.find(
+    const own = description.providers.find(
       (entry) => entry.forge === forge && entry.instance === instance,
     )
     if (!own) {
@@ -299,7 +300,7 @@ function remoteProvider(
       )
     }
     ;({ capabilities, baseUrl, authKind } = own)
-    routedVerbs = new Set(index.verbs.map((verb) => verb.name))
+    routedVerbs = new Set(description.verbs.map((verb) => verb.name))
     return capabilities
   }
 
@@ -465,7 +466,7 @@ function remoteProvider(
 
 /** Instantiates a local, unauthenticated provider from `factories` to run synchronous helper methods. */
 function localProvider(
-  info: RemoteIndex["providers"][number],
+  info: ProxyDescription["providers"][number],
   factories: readonly ProviderFactory[],
 ): ForgeProvider | undefined {
   for (const factory of factories) {

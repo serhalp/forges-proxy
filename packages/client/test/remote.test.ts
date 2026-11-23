@@ -14,7 +14,7 @@ import { fake as fakeForge } from "forges/fake"
 import { github as githubFactory } from "forges/github"
 import { gitlab as gitlabFactory } from "forges/gitlab"
 import { allFactories } from "../src/all.ts"
-import { discoverProviders, fetchProxyIndex, proxyProvider } from "../src/remote.ts"
+import { discoverProviders, describeProxy, proxyProvider } from "../src/remote.ts"
 import { FORGES_VERSION } from "../src/version.ts"
 import { serialize } from "../../server/src/wire.ts"
 import { createProxy, env } from "../../server/test/support/proxy.ts"
@@ -108,8 +108,8 @@ describe("discoverProviders", () => {
     await assert.rejects(remote("nope"), { status: 401 })
   })
 
-  it("uses a pre-fetched index without requesting GET /", async () => {
-    const index = await fetchProxyIndex({ url: "http://proxy.test", secret: "s3cret", fetch })
+  it("uses a description it was given without requesting GET /", async () => {
+    const description = await describeProxy({ url: "http://proxy.test", secret: "s3cret", fetch })
     const requested: string[] = []
     const counting = (url: string, init?: RequestInit) => {
       requested.push(new URL(url).pathname)
@@ -118,7 +118,7 @@ describe("discoverProviders", () => {
     const options = { url: "http://proxy.test", secret: "s3cret", fetch: counting }
     const [provider] = await discoverProviders({
       ...options,
-      index: structuredClone(index),
+      description: structuredClone(description),
     })
     assert.equal((await provider.repos.get(repo)).description, "Widgets")
     assert.deepEqual(requested, ["/fake/fake.test/repos.get"])

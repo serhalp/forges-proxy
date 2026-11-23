@@ -21,15 +21,15 @@ const forges = createForges(await discoverProviders({ url: "https://forges.examp
 
 `discoverProviders()` returns a provider for every forge configured on the proxy (needed for
 cross-forge calls like `forges.search.threads()`). By default it fetches `GET /` on startup. To
-avoid fetching `GET /` on every server request or in the browser after SSR, fetch the index once
-with `fetchProxyIndex()` and pass it via `index`:
+avoid fetching `GET /` on every server request or in the browser after SSR, describe the proxy once
+with `describeProxy()` and pass the description:
 
 ```ts
-import { discoverProviders, fetchProxyIndex } from "@forges-proxy/client"
+import { discoverProviders, describeProxy } from "@forges-proxy/client"
 
-const index = await fetchProxyIndex({ url, secret })
-// Reuse `index` across requests with each caller's `fetch`:
-const providers = await discoverProviders({ url, secret, index, fetch })
+const description = await describeProxy({ url, secret })
+// Reuse `description` across requests with each caller's `fetch`:
+const providers = await discoverProviders({ url, secret, description, fetch })
 ```
 
 If you already know which forge you want to call, `proxyProvider()` constructs its provider
