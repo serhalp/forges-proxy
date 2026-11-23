@@ -125,9 +125,14 @@ describe("discoverProviders", () => {
   })
 
   it("aborts requests that exceed the configured timeout", async () => {
+    // Holds the event loop open as a real request's socket would; Node 22 doesn't for the timeout's timer.
     const stalls = (_url: string, init?: RequestInit) =>
       new Promise<Response>((_resolve, reject) => {
-        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason))
+        const socket = setTimeout(() => {}, 1000)
+        init?.signal?.addEventListener("abort", () => {
+          clearTimeout(socket)
+          reject(init.signal?.reason)
+        })
       })
     await assert.rejects(
       discoverProviders({ url: "http://proxy.test", fetch: stalls, timeout: 10 }),
