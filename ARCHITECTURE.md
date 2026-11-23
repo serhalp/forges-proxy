@@ -66,7 +66,8 @@ Access is controlled by setting either `FORGES_PROXY_SECRET` (private mode, with
 mode). Setting both or neither returns `503` so misconfigured deployments fail closed.
 
 In public mode, write verbs, account verbs, and privileged read verbs (`PRIVILEGED` in `verbs.ts`)
-are not routed. Any tokens configured on a public instance must be restricted to public data.
+are not routed; calling one returns `501` with `UnsupportedOperationError`, matching direct provider
+behavior. Any tokens configured on a public instance must be restricted to public data.
 Additionally, when a public instance uses an authenticated provider, it HMAC-signs `cursor.nextUrl`
 on outgoing listing pages and rejects unsigned `nextUrl` values on incoming requests (`cursors.ts`,
 keyed via HKDF from the configured `FORGES_*` credentials so all serverless instances derive the

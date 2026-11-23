@@ -218,19 +218,21 @@ describe("public mode", () => {
     assert.equal(other.status, 200)
   })
 
-  it("blocks write and account verbs with 404", async () => {
+  it("blocks write and account verbs with 501 UnsupportedOperationError", async () => {
     const comments = () =>
       factory.store.repos.get("acme/widgets")!.threads.get("1")!.comments.length
     const before = comments()
-    assert.equal((await write("threads.createComment", [issue, "Thanks"])).status, 404)
-    assert.equal((await read("users.me", [])).status, 404)
-    assert.equal((await read("notifications.list", [])).status, 404)
+    const blocked = await write("threads.createComment", [issue, "Thanks"])
+    assert.equal(blocked.status, 501)
+    assert.equal((await errorOf(blocked)).name, "UnsupportedOperationError")
+    assert.equal((await read("users.me", [])).status, 501)
+    assert.equal((await read("notifications.list", [])).status, 501)
     assert.equal(comments(), before)
   })
 
-  it("blocks privileged read verbs with 404", async () => {
-    assert.equal((await read("securityAlerts.list", [repo])).status, 404)
-    assert.equal((await read("repos.collaborators", [repo])).status, 404)
+  it("blocks privileged read verbs with 501", async () => {
+    assert.equal((await read("securityAlerts.list", [repo])).status, 501)
+    assert.equal((await read("repos.collaborators", [repo])).status, 501)
   })
 
   it("lists only public read verbs and omits skipped provider diagnostics in GET /", async () => {
@@ -268,10 +270,12 @@ describe("dispatch", () => {
       assert.equal(response.status, 404, name)
       assert.equal((await errorOf(response)).name, "ProxyError")
     }
-    assert.equal(
-      (await call("/github/github.com/repos.get", { args: [repo], headers: authorization })).status,
-      404,
-    )
+    const unconfigured = await call("/github/github.com/repos.get", {
+      args: [repo],
+      headers: authorization,
+    })
+    assert.equal(unconfigured.status, 404)
+    assert.equal((await errorOf(unconfigured)).name, "UnknownForgeError")
   })
 
   it("returns 405 Method Not Allowed when called with the wrong HTTP method", async () => {

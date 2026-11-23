@@ -1,4 +1,5 @@
 import type { ForgeProvider } from "forges"
+import { UnknownForgeError, UnsupportedOperationError } from "forges"
 import { encode } from "forges/wire"
 import type { EventHandler } from "h3"
 import { getRouterParams } from "h3"
@@ -9,6 +10,7 @@ import { signPage, signsCursors, unsignedCursor } from "../cursors.ts"
 import { errorResponse, proxyError } from "../errors.ts"
 import { isCacheable, resultResponse } from "../response.ts"
 import { responseTags } from "../tags.ts"
+import { manifest } from "../manifest.ts"
 import { callVerb, routedVerb, withSignal } from "../verbs.ts"
 
 const RATE_LIMITS_HEADER = "forges-rate-limits"
@@ -23,7 +25,13 @@ export function verbRoute(context: Context): EventHandler {
     const mode = accessMode(context.env)
     const verb = routedVerb(name, mode)
     if (!verb) {
-      return proxyError(404, `Unknown verb ${name}`)
+      // Known `forges` verbs that are disabled in the current access mode return 501 `UnsupportedOperationError`.
+      return Object.hasOwn(manifest.verbs, name)
+        ? errorResponse(
+            new UnsupportedOperationError(`This proxy does not route ${name}`, { forge, instance }),
+            context.logger,
+          )
+        : proxyError(404, `Unknown verb ${name}`)
     }
     const allowed = verb.write ? "POST" : "GET"
     if (event.req.method !== allowed) {
@@ -31,7 +39,13 @@ export function verbRoute(context: Context): EventHandler {
     }
     const provider = context.forges().for({ forge, instance })
     if (!provider) {
-      return proxyError(404, `No provider is configured for ${forge} on ${instance}`)
+      return errorResponse(
+        new UnknownForgeError(`No provider is configured for ${forge} on ${instance}`, {
+          forge,
+          instance,
+        }),
+        context.logger,
+      )
     }
     const read = await readArgs(event, name, verb, { forge, instance })
     if ("problem" in read) {
