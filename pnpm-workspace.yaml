@@ -7,3 +7,6 @@ allowBuilds:
 linkWorkspacePackages: true
 minimumReleaseAgeExclude:
   - forges@0.4.1
+permissions:
+  tsdown:
+    skills: false
