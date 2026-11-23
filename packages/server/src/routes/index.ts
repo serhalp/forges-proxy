@@ -4,6 +4,7 @@ import type { EventHandler } from "h3"
 import { accessMode } from "../access.ts"
 import type { Context } from "../context.ts"
 import { manifest } from "../manifest.ts"
+import { cachedJsonResponse } from "../response.ts"
 import { isRouted } from "../verbs.ts"
 
 const RETRY_MS = 5 * 60_000
@@ -32,11 +33,11 @@ export function indexRoute(context: Context): EventHandler {
     refreshed.set(provider, entry)
     return entry.capabilities
   }
-  return async () => {
+  return async (event) => {
     const mode = accessMode(context.env)
     const { providers } = context.forges()
     const capabilities = await Promise.all(providers.map(capabilitiesOf))
-    return {
+    const body = {
       mode,
       forges: manifest.forges,
       providers: providers.map((provider, index) => ({
@@ -66,6 +67,12 @@ export function indexRoute(context: Context): EventHandler {
       // Only expose skipped provider diagnostics on authenticated private instances.
       ...(mode === "private" ? { skipped: skippedProviders(context) } : {}),
     }
+    // Cache `GET /` on public instances since `connect()` fetches it on startup.
+    return cachedJsonResponse(event.req, JSON.stringify(body), {
+      mode,
+      tags: providers.map((provider) => `${provider.forge}:${provider.instance}`),
+      cdnHeaders: context.cdnHeaders,
+    })
   }
 }
 

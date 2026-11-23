@@ -30,13 +30,7 @@ export async function resultResponse(
   },
 ): Promise<Response> {
   const cacheable = isCacheable(context.verb, context.mode)
-  const headers = cacheable
-    ? {
-        // Force browsers to revalidate while allowing the CDN to cache and purge by tag.
-        "cache-control": "public, max-age=0, must-revalidate",
-        ...context.cdnHeaders({ cacheControl: CDN_CACHE_CONTROL, tags: context.tags }),
-      }
-    : { "cache-control": "private, no-store" }
+  const headers = cacheHeaders(cacheable, context)
   if (result instanceof ReadableStream) {
     return new Response(result, {
       headers: { "content-type": "application/octet-stream", ...headers },
@@ -46,6 +40,45 @@ export async function resultResponse(
     return new Response(null, { status: 204, headers })
   }
   const body = serialize(result, { raw: new URL(request.url).searchParams.get("raw") === "1" })
+  return jsonResponse(request, body, headers, cacheable)
+}
+
+/**
+ * Builds a JSON `Response` that is cached by both browsers (`max-age=60`) and the CDN on public
+ * instances, with weak `ETag` revalidation.
+ */
+export async function cachedJsonResponse(
+  request: Request,
+  body: string,
+  context: { mode: AccessMode; tags: string[]; cdnHeaders: CdnHeaders },
+): Promise<Response> {
+  const cacheable = context.mode === "public"
+  const headers = cacheHeaders(cacheable, context)
+  if (cacheable) {
+    headers["cache-control"] = "public, max-age=60"
+  }
+  return jsonResponse(request, body, headers, cacheable)
+}
+
+function cacheHeaders(
+  cacheable: boolean,
+  context: { tags: string[]; cdnHeaders: CdnHeaders },
+): Record<string, string> {
+  return cacheable
+    ? {
+        // Force browsers to revalidate while allowing the CDN to cache and purge by tag.
+        "cache-control": "public, max-age=0, must-revalidate",
+        ...context.cdnHeaders({ cacheControl: CDN_CACHE_CONTROL, tags: context.tags }),
+      }
+    : { "cache-control": "private, no-store" }
+}
+
+async function jsonResponse(
+  request: Request,
+  body: string,
+  headers: Record<string, string>,
+  cacheable: boolean,
+): Promise<Response> {
   if (!cacheable) {
     return new Response(body, { headers: { "content-type": "application/json", ...headers } })
   }

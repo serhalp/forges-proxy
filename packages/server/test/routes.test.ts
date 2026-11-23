@@ -174,6 +174,9 @@ describe("private mode", () => {
     )
     assert.equal(body.mode, "private")
     assert.ok(body.verbs.some((verb) => verb.name === "threads.createComment"))
+    const response = await call("/", { headers: authorization })
+    assert.equal(response.headers.get("cache-control"), "private, no-store")
+    assert.equal(response.headers.get("etag"), null)
     assert.deepEqual(body.skipped, [
       { forge: "gitlab", suffix: "", reason: "needs TOKEN, or ENABLED for anonymous reads" },
     ])
@@ -238,6 +241,20 @@ describe("public mode", () => {
     assert.ok(body.verbs.length > 0)
     assert.ok(body.verbs.every((verb) => !verb.write && !verb.account))
     assert.equal("skipped" in body, false)
+  })
+
+  it("sets browser and CDN cache headers with ETag revalidation on GET /", async () => {
+    const response = await call("/")
+    assert.equal(response.headers.get("cache-control"), "public, max-age=60")
+    assert.equal(
+      response.headers.get("cdn-cache-control"),
+      "public, max-age=60, stale-while-revalidate=600",
+    )
+    assert.equal(response.headers.get("cache-tag"), "fake:fake.test")
+    const etag = response.headers.get("etag")!
+    assert.match(etag, /^W\/"[0-9a-f]{32}"$/)
+    const revalidated = await call("/", { headers: { "if-none-match": etag } })
+    assert.equal(revalidated.status, 304)
   })
 })
 
