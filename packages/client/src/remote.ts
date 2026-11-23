@@ -20,7 +20,6 @@ import { CAPABILITY_TABLE, forgeIterable, iteratePages } from "forges/kit"
 import * as web from "forges/web"
 import type { ForgeWeb } from "forges/web"
 import { decode, encode } from "forges/wire"
-import { EventSourceParserStream } from "eventsource-parser/stream"
 import * as v from "valibot"
 import { compatible, FORGES_VERSION } from "./version.ts"
 import { ERRORS } from "./errors.ts"
@@ -388,6 +387,8 @@ function remoteProvider(
     if (!response.ok) {
       throw await toError(response, origin)
     }
+    // Loaded here so bundles that never stream leave the parser out.
+    const { EventSourceParserStream } = await import("eventsource-parser/stream")
     const messages = response
       .body!.pipeThrough(new TextDecoderStream())
       .pipeThrough(new EventSourceParserStream())
