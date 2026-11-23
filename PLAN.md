@@ -74,6 +74,11 @@ This project is experimental and may eventually move into the `forges` monorepo.
 
 ## Parked
 
+- **A testing helper for proxy consumers**: npmx had to hand-write the proxy's description and verb
+  responses in three places to mock it. A `@forges-proxy/client/testing` entry could export
+  `mockProxy(forges)`, a `fetch` that runs the real server in-process over the given providers (e.g.
+  `forges/fake`), as the client's own tests do. That makes the server an optional peer of that
+  entry.
 - **Cache purging and `handleEvents` for stream-based forges (Tangled)**: `sources.stream` currently
   only proxies a stream to a connected client, so cached Tangled reads only expire by TTL. A
   long-running server (Docker, Node, Netlify Server) could maintain a background subscription from a
