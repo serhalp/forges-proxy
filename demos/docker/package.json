@@ -7,7 +7,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@forges-proxy/server": "^0.0.0",
+    "@forges-proxy/server": "^0.1.0-alpha.0",
     "evlog": "2.35.1",
     "srvx": "1.0.8"
   }

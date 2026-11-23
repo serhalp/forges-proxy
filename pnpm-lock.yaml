@@ -206,7 +206,7 @@ importers:
   demos/cloudflare-workers:
     dependencies:
       '@forges-proxy/server':
-        specifier: ^0.0.0
+        specifier: ^0.1.0-alpha.0
         version: link:../../packages/server
       evlog:
         specifier: 2.35.1
@@ -222,7 +222,7 @@ importers:
   demos/docker:
     dependencies:
       '@forges-proxy/server':
-        specifier: ^0.0.0
+        specifier: ^0.1.0-alpha.0
         version: link:../../packages/server
       evlog:
         specifier: 2.35.1
@@ -234,7 +234,7 @@ importers:
   demos/fastify:
     dependencies:
       '@forges-proxy/server':
-        specifier: ^0.0.0
+        specifier: ^0.1.0-alpha.0
         version: link:../../packages/server
       fastify:
         specifier: 5.12.8
@@ -246,7 +246,7 @@ importers:
   demos/hono:
     dependencies:
       '@forges-proxy/server':
-        specifier: ^0.0.0
+        specifier: ^0.1.0-alpha.0
         version: link:../../packages/server
       hono:
         specifier: 4.13.17
@@ -258,7 +258,7 @@ importers:
   demos/netlify-edge:
     dependencies:
       '@forges-proxy/server':
-        specifier: ^0.0.0
+        specifier: ^0.1.0-alpha.0
         version: link:../../packages/server
       '@netlify/edge-functions':
         specifier: 4.0.4
@@ -270,7 +270,7 @@ importers:
   demos/netlify-server:
     dependencies:
       '@forges-proxy/server':
-        specifier: ^0.0.0
+        specifier: ^0.1.0-alpha.0
         version: link:../../packages/server
       '@netlify/cache':
         specifier: 4.2.1
@@ -282,7 +282,7 @@ importers:
   demos/netlify-serverless:
     dependencies:
       '@forges-proxy/server':
-        specifier: ^0.0.0
+        specifier: ^0.1.0-alpha.0
         version: link:../../packages/server
       '@netlify/cache':
         specifier: 4.2.1
@@ -297,7 +297,7 @@ importers:
   demos/nitro:
     dependencies:
       '@forges-proxy/server':
-        specifier: ^0.0.0
+        specifier: ^0.1.0-alpha.0
         version: link:../../packages/server
       nitro:
         specifier: 3.0.260903-beta
@@ -306,7 +306,7 @@ importers:
   demos/node:
     dependencies:
       '@forges-proxy/server':
-        specifier: ^0.0.0
+        specifier: ^0.1.0-alpha.0
         version: link:../../packages/server
       srvx:
         specifier: 1.0.8
@@ -315,7 +315,7 @@ importers:
   demos/vercel:
     dependencies:
       '@forges-proxy/server':
-        specifier: ^0.0.0
+        specifier: ^0.1.0-alpha.0
         version: link:../../packages/server
       evlog:
         specifier: 2.35.1

@@ -6,7 +6,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@forges-proxy/server": "^0.0.0",
+    "@forges-proxy/server": "^0.1.0-alpha.0",
     "@netlify/edge-functions": "4.0.4",
     "evlog": "2.35.1"
   }
