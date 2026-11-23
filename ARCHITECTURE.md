@@ -29,9 +29,9 @@ client ──▶ CDN ──▶ auth middleware ──▶ verb route ──▶ fo
 - **Operations manifest** (`packages/server/src/manifest.ts`): Re-exports routable verbs and model
   schemas from `forges/schema`. Drives routing, argument validation, `AbortSignal` injection,
   `GET /`, `/openapi.json`, and `/docs`.
-- **Client** (`@forges-proxy/client`): `connect()` fetches `GET /`, verifies that the server's
-  `forges` version is wire-compatible, and constructs local `ForgeProvider` proxies using the verb
-  metadata returned by `/`.
+- **Client** (`@forges-proxy/client`): `discoverProviders()` fetches `GET /`, verifies that the
+  server's `forges` version is wire-compatible, and constructs local `ForgeProvider` proxies using
+  the verb metadata returned by `/`.
 
 ## Decisions
 
@@ -98,10 +98,10 @@ Wire encoding:
 
 ### Provider RPC vs. transparent forge HTTP pass-through
 
-**Context**: Running `forges` on both the server and client (`connect()`) requires both sides to use
-a compatible `forges` version (`GET /` advertises the version and `connect()` throws on mismatch).
-An alternative is running `forges` only in the client and making the proxy a transparent,
-authenticating HTTP forwarder for upstream forge APIs.
+**Context**: Running `forges` on both the server and client (`discoverProviders()`) requires both
+sides to use a compatible `forges` version (`GET /` advertises the version and `discoverProviders()`
+throws on mismatch). An alternative is running `forges` only in the client and making the proxy a
+transparent, authenticating HTTP forwarder for upstream forge APIs.
 
 **Pass-through shape**: The client configures `forges` providers with a custom `fetch` that rewrites
 upstream URLs onto the proxy (e.g. `https://api.github.com/repos/a/b` ->
@@ -111,8 +111,9 @@ injects the token, and sets CDN cache headers.
 
 **Tradeoffs of pass-through**:
 
-- _Pros_: `forges` runs only on the client (no version coupling, no manifest, no `connect()`),
-  `provider.request` works against allowlisted hosts, and non-JS callers use native forge APIs.
+- _Pros_: `forges` runs only on the client (no version coupling, no manifest, no
+  `discoverProviders()`), `provider.request` works against allowlisted hosts, and non-JS callers use
+  native forge APIs.
 - _Cons_:
   - Public read-only mode would need per-forge request inspection to block writes and private
     endpoints. HTTP method checks aren't enough because GitHub reads like discussion listings use
@@ -153,7 +154,7 @@ front of `@forges-proxy/server`.
 `threads.getMany` batches refs by provider.
 
 **Decision**: Do not expose server-side `/_all/*` routes. Clients perform fan-out locally by passing
-the remote providers to `createForges(await connect(...))`.
+the remote providers to `createForges(await discoverProviders(...))`.
 
 **Rationale**:
 

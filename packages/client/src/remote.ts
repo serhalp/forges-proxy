@@ -16,12 +16,23 @@ import * as v from "valibot"
 import { compatible, FORGES_VERSION } from "./version.ts"
 import { ERRORS } from "./errors.ts"
 
-export interface RemoteOptions {
+/** Connection options for a `forges-proxy` deployment. */
+export interface ProxyOptions {
   /** Base URL of the `forges-proxy` deployment (e.g. `https://forges.example.com` or `https://example.com/forges/`). */
   url: string
   /** Bearer token matching `FORGES_PROXY_SECRET` on a private instance. */
   secret?: string
   fetch?: FetchLike
+  /** Request timeout in milliseconds (SSE streams are exempt). @default 30000 */
+  timeout?: number
+}
+
+export interface DiscoverOptions extends ProxyOptions {
+  /**
+   * Pre-fetched proxy index from {@link fetchProxyIndex}, allowing providers to be constructed
+   * without fetching `GET /` again (e.g. cached per process or passed from SSR to the browser).
+   */
+  index?: ProxyIndex
   /**
    * `forges` provider factories (e.g. `github` from `forges/github`) used to run synchronous
    * helper methods (`urlFor`, `parseUrl`, etc.) locally. Pass `allFactories` from
@@ -35,7 +46,7 @@ export type ProviderFactory = (options: never) => ForgeProvider
 
 const isObject = (value: unknown): value is object => typeof value === "object" && value !== null
 
-const RemoteIndex = v.object({
+const RemoteIndex: v.GenericSchema<unknown, ProxyIndex> = v.object({
   forges: v.optional(v.string()),
   providers: v.array(
     v.object({
@@ -46,12 +57,25 @@ const RemoteIndex = v.object({
       capabilities: v.custom<ForgeCapabilities>(isObject),
     }),
   ),
-  /** `options` is the parameter index of the verb's options argument, or -1 if none. */
   verbs: v.array(
     v.object({ name: v.string(), write: v.boolean(), listing: v.boolean(), options: v.number() }),
   ),
 })
-type RemoteIndex = v.InferOutput<typeof RemoteIndex>
+type RemoteIndex = ProxyIndex
+
+/** Serializable index payload returned by `GET /` on the proxy. */
+export interface ProxyIndex {
+  forges?: string
+  providers: Array<{
+    forge: string
+    instance: string
+    baseUrl: string
+    authKind: AuthKind
+    capabilities: ForgeCapabilities
+  }>
+  /** `options` is the parameter index of the verb's options argument, or -1 if none. */
+  verbs: Array<{ name: string; write: boolean; listing: boolean; options: number }>
+}
 
 const RATE_LIMITS_HEADER = "forges-rate-limits"
 const RateLimits = v.array(v.custom<RateLimit>(isObject))
@@ -62,45 +86,74 @@ const ErrorBody = v.object({
 
 type RemoteVerb = Omit<RemoteIndex["verbs"][number], "name">
 
-/**
- * Connects to a `forges-proxy` instance at `options.url` and returns one `ForgeProvider` per
- * configured provider, ready to pass to `createForges()`. Routed verbs execute over HTTP, listings
- * fetch one page per request, and unrouted verbs reject with `UnsupportedOperationError`.
- * @example
- * ```ts
- * const forges = createForges(await connect({ url: 'https://forges.example.com', secret }))
- * ```
- */
-export async function connect(options: RemoteOptions): Promise<ForgeProvider[]> {
-  const fetch = options.fetch ?? globalThis.fetch
-  const headers: Record<string, string> = options.secret
-    ? { authorization: `Bearer ${options.secret}` }
-    : {}
-  // Ensure a trailing slash so relative URL resolution works when the proxy is mounted under a subpath.
-  const base = options.url.endsWith("/") ? options.url : `${options.url}/`
-  const response = await fetch(base, { headers })
+/** Fetches the proxy's `GET /` index payload for reuse with {@link discoverProviders}. */
+export async function fetchProxyIndex(options: ProxyOptions): Promise<ProxyIndex> {
+  const transport = transportFor(options)
+  const response = await transport.fetch(transport.url, { headers: transport.headers })
   if (!response.ok) {
     throw await toError(response, {})
   }
-  const index = v.parse(RemoteIndex, await response.json())
+  return v.parse(RemoteIndex, await response.json())
+}
+
+/**
+ * Returns one `ForgeProvider` per provider configured on the proxy at `options.url`, ready to pass
+ * to `createForges()`. Routed verbs execute over HTTP, listings fetch one page per request, and
+ * unrouted verbs reject with `UnsupportedOperationError`.
+ * @example
+ * ```ts
+ * const forges = createForges(await discoverProviders({ url: 'https://forges.example.com', secret }))
+ * ```
+ */
+export async function discoverProviders(options: DiscoverOptions): Promise<ForgeProvider[]> {
+  const index = options.index ?? (await fetchProxyIndex(options))
   if (index.forges && !compatible(index.forges, FORGES_VERSION)) {
     throw new Error(
       `forges-proxy: ${options.url} runs forges ${index.forges}, but this client was built against ${FORGES_VERSION}. Update both to the same wire format.`,
     )
   }
   const verbs = new Map(index.verbs.map(({ name, ...verb }) => [name, verb]))
+  const transport = transportFor(options)
   return index.providers.map((info) =>
-    remoteProvider(info, verbs, { ...options, url: base, fetch, headers }),
+    remoteProvider(info, verbs, transport, options.factories ?? []),
   )
+}
+
+interface Transport {
+  url: string
+  headers: Record<string, string>
+  /** `fetch` wrapper that applies the request timeout. */
+  fetch: FetchLike
+  /** Unwrapped `fetch` without a timeout, used for long-lived SSE streams. */
+  stream: FetchLike
+}
+
+function transportFor(options: ProxyOptions): Transport {
+  const stream = options.fetch ?? ((input, init) => globalThis.fetch(input, init))
+  const timeout = options.timeout ?? 30_000
+  return {
+    // Ensure a trailing slash so relative URL resolution works when the proxy is mounted under a subpath.
+    url: options.url.endsWith("/") ? options.url : `${options.url}/`,
+    headers: options.secret ? { authorization: `Bearer ${options.secret}` } : {},
+    fetch: (input, init = {}) =>
+      stream(input, {
+        ...init,
+        signal: init.signal
+          ? AbortSignal.any([init.signal, AbortSignal.timeout(timeout)])
+          : AbortSignal.timeout(timeout),
+      }),
+    stream,
+  }
 }
 
 function remoteProvider(
   info: RemoteIndex["providers"][number],
   verbs: Map<string, RemoteVerb>,
-  options: RemoteOptions & { fetch: FetchLike; headers: Record<string, string> },
+  options: Transport,
+  factories: readonly ProviderFactory[],
 ): ForgeProvider {
   const { forge, instance } = info
-  const local = localProvider(info, options.factories ?? [])
+  const local = localProvider(info, factories)
   const origin = { forge, instance }
   const routed = (verb: string) => verbs.has(verb)
   const unsupported = (verb: string) =>
@@ -189,7 +242,7 @@ function remoteProvider(
       `${encodeURIComponent(forge)}/${encodeURIComponent(instance)}/sources.stream`,
       options.url,
     )
-    const response = await options.fetch(url.href, {
+    const response = await options.stream(url.href, {
       headers: { ...options.headers, ...(cursor ? { "last-event-id": cursor } : {}) },
       signal,
     })

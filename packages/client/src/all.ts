@@ -39,5 +39,5 @@ const BY_KIND = {
   upstream,
 } satisfies Record<KnownForgeKind, ProviderFactory>
 
-/** All built-in `forges` provider factories for `connect({ factories: allFactories })`. Bundles every forge provider. */
+/** All built-in `forges` provider factories for `discoverProviders({ factories: allFactories })`. Bundles every forge provider. */
 export const allFactories: readonly ProviderFactory[] = Object.values(BY_KIND)

@@ -12,7 +12,7 @@ const ERROR: Schema = {
       required: ["name", "message"],
       additionalProperties: true,
       description:
-        "Serialized `ForgeError` class name, message, and metadata used by `connect()` to reconstruct the error.",
+        "Serialized `ForgeError` class name, message, and metadata used by `discoverProviders()` to reconstruct the error.",
     },
   },
   required: ["error"],

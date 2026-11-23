@@ -14,7 +14,7 @@ import { fake as fakeForge } from "forges/fake"
 import { github as githubFactory } from "forges/github"
 import { gitlab as gitlabFactory } from "forges/gitlab"
 import { allFactories } from "../src/all.ts"
-import { connect } from "../src/remote.ts"
+import { discoverProviders, fetchProxyIndex } from "../src/remote.ts"
 import { FORGES_VERSION } from "../src/version.ts"
 import { serialize } from "../../server/src/wire.ts"
 import { createProxy, env } from "../../server/test/support/proxy.ts"
@@ -53,7 +53,7 @@ const overTheWire = <T>(value: T): T =>
   decode(JSON.parse(serialize(value, { raw: false }))) as T
 
 async function remote(secret?: string): Promise<{ fake: ForgeProvider; github: ForgeProvider }> {
-  const [fakeProvider, githubProvider] = await connect({
+  const [fakeProvider, githubProvider] = await discoverProviders({
     url: "http://proxy.test",
     secret,
     fetch,
@@ -62,7 +62,7 @@ async function remote(secret?: string): Promise<{ fake: ForgeProvider; github: F
   return { fake: fakeProvider, github: githubProvider }
 }
 
-describe("connect", () => {
+describe("discoverProviders", () => {
   env({ FORGES_PROXY_SECRET: "s3cret" })
 
   it("returns one ForgeProvider per provider configured on the proxy", async () => {
@@ -78,7 +78,7 @@ describe("connect", () => {
       assert.match(pathname, /^\/forges\//)
       return fetch(`http://proxy.test${pathname.slice("/forges".length)}${search}`, init)
     }
-    const [provider] = await connect({
+    const [provider] = await discoverProviders({
       url: "http://app.test/forges",
       secret: "s3cret",
       fetch: mounted,
@@ -95,17 +95,44 @@ describe("connect", () => {
     }
     const [major, minor] = FORGES_VERSION.split(".")
     for (const version of [FORGES_VERSION, `${major}.${minor}.99`]) {
-      await connect({ url: "http://proxy.test", secret: "s3cret", fetch: runs(version) })
+      await discoverProviders({ url: "http://proxy.test", secret: "s3cret", fetch: runs(version) })
     }
     const next = `${major}.${Number(minor) + 1}.0`
     await assert.rejects(
-      connect({ url: "http://proxy.test", secret: "s3cret", fetch: runs(next) }),
+      discoverProviders({ url: "http://proxy.test", secret: "s3cret", fetch: runs(next) }),
       new RegExp(`runs forges ${next.replaceAll(".", "\\.")}, but this client was built against`),
     )
   })
 
   it("rejects with 401 when given an invalid proxy secret", async () => {
     await assert.rejects(remote("nope"), { status: 401 })
+  })
+
+  it("uses a pre-fetched index without requesting GET /", async () => {
+    const index = await fetchProxyIndex({ url: "http://proxy.test", secret: "s3cret", fetch })
+    const requested: string[] = []
+    const counting = (url: string, init?: RequestInit) => {
+      requested.push(new URL(url).pathname)
+      return fetch(url, init)
+    }
+    const options = { url: "http://proxy.test", secret: "s3cret", fetch: counting }
+    const [provider] = await discoverProviders({
+      ...options,
+      index: structuredClone(index),
+    })
+    assert.equal((await provider.repos.get(repo)).description, "Widgets")
+    assert.deepEqual(requested, ["/fake/fake.test/repos.get"])
+  })
+
+  it("aborts requests that exceed the configured timeout", async () => {
+    const stalls = (_url: string, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason))
+      })
+    await assert.rejects(
+      discoverProviders({ url: "http://proxy.test", fetch: stalls, timeout: 10 }),
+      { name: "TimeoutError" },
+    )
   })
 
   it("integrates with createForges()", async () => {
@@ -230,8 +257,8 @@ describe("remote provider", () => {
   })
 
   it("returns undefined from synchronous helpers for forges without a provided factory", async () => {
-    const only = async (factories: Parameters<typeof connect>[0]["factories"]) =>
-      (await connect({ url: "http://proxy.test", secret: "s3cret", fetch, factories }))[1]
+    const only = async (factories: Parameters<typeof discoverProviders>[0]["factories"]) =>
+      (await discoverProviders({ url: "http://proxy.test", secret: "s3cret", fetch, factories }))[1]
     assert.equal((await only([githubFactory])).webOrigin, "https://github.com")
     assert.equal((await only(undefined)).webOrigin, undefined)
     assert.equal(
@@ -273,7 +300,11 @@ describe("remote provider state", () => {
         })),
       })
     }
-    const [fake] = await connect({ url: "http://proxy.test", secret: "s3cret", fetch: refining })
+    const [fake] = await discoverProviders({
+      url: "http://proxy.test",
+      secret: "s3cret",
+      fetch: refining,
+    })
     assert.equal(fake.can("sources.stream"), true)
     const refreshed = await fake.refreshCapabilities()
     assert.equal(refreshed.sources.stream, false)

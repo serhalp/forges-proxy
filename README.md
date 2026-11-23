@@ -25,8 +25,8 @@ forges.
 - [`packages/server`](packages/server) (`@forges-proxy/server`): the proxy server, exported as a
   [Fetchable](https://fetchable.org) (`{ fetch(request) }`). Use `createServer(options)` for custom
   configuration, or the default export to configure from `process.env`.
-- [`packages/client`](packages/client) (`@forges-proxy/client`): `connect()`, which wraps a remote
-  proxy in standard `forges` provider objects.
+- [`packages/client`](packages/client) (`@forges-proxy/client`): `discoverProviders()`, which wraps
+  a remote proxy in standard `forges` provider objects.
 - [`packages/docs`](packages/docs): placeholder for the documentation site.
 - [`demos/`](demos): example deployments for supported platforms and frameworks.
 
@@ -150,7 +150,7 @@ curl -G localhost:3000/github/github.com/repos.get \
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/client-dark.png">
-  <img alt="@forges-proxy/client: drop-in forges providers for your proxy. Without a proxy, createForges() holds a GitHub, GitLab, and Gitea token and calls each forge directly. With the proxy, createForges(await connect({ url, secret })) sends each call with the proxy secret to @forges-proxy/server, which calls the same forges with their tokens." src="assets/client-light.png">
+  <img alt="@forges-proxy/client: drop-in forges providers for your proxy. Without a proxy, createForges() holds a GitHub, GitLab, and Gitea token and calls each forge directly. With the proxy, createForges(await discoverProviders({ url, secret })) sends each call with the proxy secret to @forges-proxy/server, which calls the same forges with their tokens." src="assets/client-light.png">
 </picture>
 
 `@forges-proxy/client` connects to a proxy and returns `ForgeProvider` instances that plug directly
@@ -158,9 +158,9 @@ into `createForges()`:
 
 ```ts
 import { createForges } from "forges"
-import { connect } from "@forges-proxy/client"
+import { discoverProviders } from "@forges-proxy/client"
 
-const forges = createForges(await connect({ url: "https://forges.example.com", secret }))
+const forges = createForges(await discoverProviders({ url: "https://forges.example.com", secret }))
 const repo = await forges.repos.get({
   forge: "github",
   instance: "github.com",
@@ -168,6 +168,20 @@ const repo = await forges.repos.get({
   name: "forges",
 })
 ```
+
+`discoverProviders()` fetches `GET /` on startup. To avoid fetching `GET /` on every server request
+or in the browser after SSR, fetch the index once with `fetchProxyIndex()` and pass it via `index`:
+
+```ts
+import { discoverProviders, fetchProxyIndex } from "@forges-proxy/client"
+
+const index = await fetchProxyIndex({ url, secret })
+// Reuse `index` across requests with each caller's `fetch`:
+const providers = await discoverProviders({ url, secret, index, fetch })
+```
+
+Requests to the proxy time out after `timeout` milliseconds (default `30000`); `sources.stream()`
+connections do not time out.
 
 Synchronous helper methods (`urlFor()`, `parseUrl()`, `referenceFor()`, etc.) run locally and
 require the underlying provider factory. Pass the factories you need via `factories` to avoid
@@ -177,7 +191,7 @@ them:
 ```ts
 import { github } from "forges/github"
 
-const providers = await connect({ url, secret, factories: [github] })
+const providers = await discoverProviders({ url, secret, factories: [github] })
 ```
 
 If no factory is provided for a forge, its synchronous helpers return `undefined` (or `[]` / the

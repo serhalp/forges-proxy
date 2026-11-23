@@ -10,9 +10,9 @@ This project is experimental and may eventually move into the `forges` monorepo.
   support dynamic hosts while preventing SSRF against internal networks from user-supplied hosts?
 - **Manifest consumers**: What else should build on the operations manifest (e.g. Hey API client
   generation, an MCP server)?
-- **Upstreaming into `forges`**: Should `connect()` move into `forges` (e.g. `forges/remote`), or
-  should the whole project become `@forges/server` and `@forges/client`? Check with the `forges`
-  maintainers.
+- **Upstreaming into `forges`**: Should `discoverProviders()` move into `forges` (e.g.
+  `forges/remote`), or should the whole project become `@forges/server` and `@forges/client`? Check
+  with the `forges` maintainers.
 
 ## TODO
 
@@ -48,7 +48,8 @@ This project is experimental and may eventually move into the `forges` monorepo.
       for edge runtimes) and return 400 with the failing field path
 - [x] Test that every `date-time` input field in the manifest is decoded by `forges/wire`
 - [x] Client: use the options parameter index reported by `GET /` instead of a heuristic
-- [x] `connect()` client (`@forges-proxy/client`): returns one `ForgeProvider` per proxied forge
+- [x] `discoverProviders()` client (`@forges-proxy/client`): returns one `ForgeProvider` per proxied
+      forge
 - [x] pnpm workspace: `@forges-proxy/server`, `@forges-proxy/client`, `docs` placeholder, and
       `demos/netlify-serverless`
 - [x] Replace Nitro with plain h3 + tsdown: `createServer(options)` returns a Fetchable and takes
@@ -86,8 +87,8 @@ This project is experimental and may eventually move into the `forges` monorepo.
   Count repos instead, align the limit with CDN header limits, and either drop or support purging
   the instance tag.
 - **Timeout on `provider.refreshCapabilities()` in `GET /`**: An unreachable self-hosted forge
-  currently blocks `GET /` (and therefore `connect()`) for up to `forges`'s 30s request timeout on
-  each cold server instance. Add a short timeout and fall back to static capabilities.
+  currently blocks `GET /` (and therefore `discoverProviders()`) for up to `forges`'s 30s request
+  timeout on each cold server instance. Add a short timeout and fall back to static capabilities.
 - **CDN caching on private instances**: Currently disabled (`private, no-store`) because the CDN
   serves cached responses before auth middleware runs. Could be enabled on CDNs that support varying
   on `Authorization` (e.g. `Netlify-Vary: header=authorization`).

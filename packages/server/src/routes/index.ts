@@ -67,7 +67,7 @@ export function indexRoute(context: Context): EventHandler {
       // Only expose skipped provider diagnostics on authenticated private instances.
       ...(mode === "private" ? { skipped: skippedProviders(context) } : {}),
     }
-    // Cache `GET /` on public instances since `connect()` fetches it on startup.
+    // Cache `GET /` on public instances since `discoverProviders()` fetches it on startup.
     return cachedJsonResponse(event.req, JSON.stringify(body), {
       mode,
       tags: providers.map((provider) => `${provider.forge}:${provider.instance}`),

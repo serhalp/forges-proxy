@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict"
 import process from "node:process"
-import { connect } from "@forges-proxy/client"
+import { discoverProviders } from "@forges-proxy/client"
 import { createForges } from "forges"
 import * as v from "valibot"
 
@@ -56,7 +56,7 @@ await check("CORS preflight", async () => {
   assert.equal(response.headers.get("access-control-allow-origin"), "*")
 })
 await check("client read", async () => {
-  const forges = createForges(await connect({ url: base, secret }))
+  const forges = createForges(await discoverProviders({ url: base, secret }))
   const ref = { forge: "github", instance: "github.com", owner: "danielroe", name: "forges" }
   const repo = await forges.for(ref)!.repos.get(ref)
   assert.equal(repo.ref.name, "forges")

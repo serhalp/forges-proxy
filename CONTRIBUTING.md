@@ -15,7 +15,7 @@ This repo is a pnpm workspace. The server uses [h3](https://h3.dev/) v2 and buil
 - `packages/server`: `@forges-proxy/server`. `src/index.ts` (`createServer()`) wires the middleware
   and routes (`src/routes/`). `src/manifest.ts` re-exports verb and model schemas from
   `forges/schema`.
-- `packages/client`: `@forges-proxy/client` (`connect()`).
+- `packages/client`: `@forges-proxy/client` (`discoverProviders()`).
 - `packages/docs`: placeholder for the documentation site.
 - `demos/*`: example deployments for each platform and framework. Keep platform-specific code in the
   demos and pass it to `createServer()` via options.
