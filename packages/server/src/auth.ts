@@ -5,7 +5,7 @@ import type { Context } from "./context.ts"
 import { proxyError } from "./errors.ts"
 
 const OPEN = /^\/(?:docs|openapi\.json)$/
-// Verified by their signatures instead.
+// Webhook deliveries authenticate using the forge's webhook signature instead of the proxy secret.
 const WEBHOOK = /^\/webhooks\/[^/]+\/[^/]+$/
 
 export function auth(context: Context): Middleware {
@@ -17,7 +17,7 @@ export function auth(context: Context): Middleware {
     }
     const header = event.req.headers.get("authorization") ?? ""
     const token = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : ""
-    // Both compared every time, so the timing doesn't say which one matched.
+    // Evaluate both active and previous secrets before branching to avoid timing leaks.
     const accepted = [context.env.FORGES_PROXY_SECRET, context.env.FORGES_PROXY_PREVIOUS_SECRET]
       .filter((secret) => !!secret)
       .map((secret) => timingSafeEqual(token, secret!))

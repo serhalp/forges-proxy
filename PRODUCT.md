@@ -6,38 +6,37 @@ brand
 
 ## Users
 
-Developers deciding whether to put forges-proxy in front of their forge access: people building web
-apps, CI bots, AI agents, or non-JS services that read from GitHub, GitLab, Tangled, and other
-forges. They meet it in the README on GitHub, skimming, in light or dark mode, and want to know in
-seconds what it does and whether it fits.
+Developers evaluating whether to put `forges-proxy` in front of their forge integrations: people
+building web apps, CI bots, AI agents, or non-JS services that talk to GitHub, GitLab, Tangled, and
+other code forges. They usually land on the GitHub README and need to understand what the proxy does
+and how to deploy it at a glance.
 
 ## Product Purpose
 
-A self-hosted API gateway for code forges: it holds the forge tokens, caches public reads at the
-CDN, rate-limits callers, and serves the `forges` API over HTTP with a typed client and an OpenAPI
-document. Success is a reader who understands the shape of it from the server diagram and the first
-screen of the README, and deploys their own.
+A self-hosted API gateway and credential broker for code forges. It holds forge tokens on the
+server, caches public reads at the CDN, and exposes the `forges` API over HTTP with a typed
+TypeScript client and an OpenAPI 3.1 spec. The README and diagrams should make the request flow and
+deployment model immediately clear.
 
-## Brand Personality
+## Tone and Style
 
-Plain, precise, technical. Reads like good API docs: factual, quiet, confident. Specific nouns and
-real numbers over adjectives.
+Direct, technical, and specific. Write like clear reference documentation: use concrete nouns, exact
+header and option names, and real numbers instead of marketing adjectives.
 
 ## Anti-references
 
-- SaaS landing pages: hero headlines, feature-card grids, marketing polish.
-- Enterprise architecture slides: boxes-and-arrows deck look, clip-art icons.
-- The generic AI look: purple or indigo accents, gradients, tracked uppercase eyebrows everywhere,
-  aphoristic copy.
+- SaaS landing pages: hero slogans, feature-card grids, sales copy.
+- Enterprise architecture slides: cluttered boxes-and-arrows or clip-art diagrams.
+- Generic AI aesthetics: purple/indigo gradients, all-caps tracked eyebrows, aphoristic one-liners.
 
 ## Design Principles
 
-- Show, don't tell: a diagram should carry the idea without its caption.
-- Precision over persuasion: state what it does, with real names and numbers.
-- One idea per surface: every element earns its place or goes.
-- Docs, not ads: it should sit naturally in a GitHub README.
+- Self-explanatory diagrams: diagrams should show the data flow clearly without relying on the
+  surrounding prose.
+- Concrete details: prefer exact API names, headers, and sizes over vague claims.
+- Visual fit: diagrams use GitHub's light and dark palettes so they blend directly into the README.
 
 ## Accessibility & Inclusion
 
-Images carry full alt text. Text meets WCAG AA contrast in both light and dark renders. Meaning
-never depends on colour alone.
+All images include complete alt text. Text meets WCAG AA contrast in both light and dark themes, and
+meaning never relies on color alone.

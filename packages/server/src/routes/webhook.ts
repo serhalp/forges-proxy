@@ -6,9 +6,9 @@ import { errorResponse, proxyError } from "../errors.ts"
 import { purgeTags } from "../tags.ts"
 
 /**
- * Receives a forge's webhook deliveries, verified with the provider's `WEBHOOK_SECRET`, purges the cached responses of
- * every repository they concern, and hands their events to `handleEvents`. Point the forge's webhook at
- * `/webhooks/:forge/:instance`.
+ * Handles `POST /webhooks/:forge/:instance`: verifies the delivery signature using the provider's
+ * configured webhook secret, purges CDN cache tags for all affected repositories, and invokes
+ * `handleEvents`.
  */
 export function webhookRoute(context: Context): EventHandler {
   return async (event) => {
@@ -34,7 +34,7 @@ export function webhookRoute(context: Context): EventHandler {
       try {
         await context.handleEvents(events, { forge, instance })
       } catch (error) {
-        // Always a 500, whatever it threw: the failure is the deployment's, not the delivery's. The message stays in the logs.
+        // Return 500 without leaking internal error details so the forge marks the delivery as failed.
         context.logger.error({ message: "handleEvents failed", error })
         return proxyError(500, "handleEvents failed")
       }

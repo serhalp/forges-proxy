@@ -10,28 +10,27 @@ const names = (env: Record<string, string>, anonymous: boolean) =>
   )
 
 describe("providers", () => {
-  it("serves only what the env configures by default", () => {
+  it("only configures providers present in env by default", () => {
     assert.deepEqual(names({}, false), [])
     assert.deepEqual(names({ FORGES_GITHUB_ENABLED: "1" }, false), ["github:github.com"])
   })
 
-  it("adds every forge readable without credentials, when asked", () => {
+  it("enables unconfigured forges that support anonymous reads when anonymous is true", () => {
     const all = names({}, true)
     for (const name of ["github:github.com", "gitlab:gitlab.com", "forgejo:codeberg.org"]) {
       assert.ok(all.includes(name), name)
     }
-    // Its reads go to hosts that callers name.
+    // Tangled is excluded because its reads fetch caller-specified hosts.
     assert.ok(!all.some((name) => name.startsWith("tangled:")))
   })
 
-  it("leaves a forge the env mentions as the env says", () => {
-    // Skipped for want of a token, and not replaced by the anonymous default.
+  it("does not fall back to an anonymous default when a forge has partial env configuration", () => {
     const all = names({ FORGES_GITLAB_BASE_URL: "https://git.example" }, true)
     assert.ok(!all.some((name) => name.startsWith("gitlab:")))
     assert.ok(all.includes("github:github.com"))
   })
 
-  it("logs each set the env configures that can't be built, but not anonymous defaults", () => {
+  it("logs skipped providers configured in env without logging skipped anonymous defaults", () => {
     const errors: unknown[] = []
     providers(
       { FORGES_GITLAB_BASE_URL: "https://git.example" },

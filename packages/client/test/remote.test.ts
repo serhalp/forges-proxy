@@ -33,7 +33,7 @@ const direct = fakeForge({
   },
 })
 const app = createProxy(createForges([direct, githubForge()]))
-// In-process h3 ignores an aborted signal, where a real `fetch` rejects with it and errors the body.
+// Propagate `init.signal` abort to in-process `app.fetch` calls and response streams to match real `fetch`.
 const fetch = async (url: string, init?: RequestInit) => {
   init?.signal?.throwIfAborted()
   const response = await app.fetch(new Request(url, init))
@@ -47,7 +47,7 @@ const fetch = async (url: string, init?: RequestInit) => {
 const repo = { forge: "fake", instance: "fake.test", owner: "acme", name: "widgets" }
 const issue = { forge: "fake", instance: "fake.test", repo, kind: "issue" as const, number: "1" }
 
-/** What a direct call's result looks like once it has crossed the wire. */
+/** Round-trips a direct provider result through the server's wire serializer for comparison. */
 const overTheWire = <T>(value: T): T =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   decode(JSON.parse(serialize(value, { raw: false }))) as T
@@ -65,14 +65,14 @@ async function remote(secret?: string): Promise<{ fake: ForgeProvider; github: F
 describe("connect", () => {
   env({ FORGES_PROXY_SECRET: "s3cret" })
 
-  it("builds a provider per forge the proxy serves", async () => {
+  it("returns one ForgeProvider per provider configured on the proxy", async () => {
     const { fake, github } = await remote("s3cret")
     assert.deepEqual([fake.forge, fake.instance], ["fake", "fake.test"])
     assert.deepEqual(fake.capabilities, overTheWire(direct.capabilities))
     assert.equal(github.forge, "github")
   })
 
-  it("reaches a proxy mounted under a path", async () => {
+  it("resolves requests against a proxy mounted under a path prefix", async () => {
     const mounted = async (url: string, init?: RequestInit) => {
       const { pathname, search } = new URL(url)
       assert.match(pathname, /^\/forges\//)
@@ -86,7 +86,7 @@ describe("connect", () => {
     assert.equal((await provider.repos.get(repo)).description, "Widgets")
   })
 
-  it("throws when the proxy runs an incompatible forges", async () => {
+  it("throws when the proxy reports an incompatible forges version", async () => {
     const runs = (version: string) => async (url: string, init?: RequestInit) => {
       const response = await fetch(url, init)
       return new URL(url).pathname === "/"
@@ -104,16 +104,16 @@ describe("connect", () => {
     )
   })
 
-  it("rejects a wrong secret", async () => {
+  it("rejects with 401 when given an invalid proxy secret", async () => {
     await assert.rejects(remote("nope"), { status: 401 })
   })
 
-  it("plugs into createForges", async () => {
+  it("integrates with createForges()", async () => {
     const forges = createForges(Object.values(await remote("s3cret")))
     assert.equal((await forges.for(repo)!.repos.get(repo)).description, "Widgets")
   })
 
-  it("fans out registry listings over the providers' pages", async () => {
+  it("supports cross-provider registry listings over remote providers", async () => {
     const forges = createForges([(await remote("s3cret")).fake])
     const threads = await Array.fromAsync(forges.search.threads({ repo }))
     const titles = threads.map((thread) => thread.title)
@@ -124,14 +124,14 @@ describe("connect", () => {
 describe("remote provider", () => {
   env({ FORGES_PROXY_SECRET: "s3cret" })
 
-  it("reads what the provider reads, dates included", async () => {
+  it("returns normalized models with decoded Date fields", async () => {
     const { fake } = await remote("s3cret")
     const repoRead = await fake.repos.get(repo)
     assert.deepEqual(repoRead, overTheWire(await direct.repos.get(repo)))
     assert.ok((await fake.threads.get(issue)).createdAt instanceof Date)
   })
 
-  it("pages through a listing", async () => {
+  it("paginates listings via async iteration and .page()", async () => {
     const { fake } = await remote("s3cret")
     const titles = async (provider: ForgeProvider) => {
       const seen = []
@@ -147,13 +147,13 @@ describe("remote provider", () => {
     assert.ok(page.cursor)
   })
 
-  it("returns file bytes as bytes", async () => {
+  it("decodes binary file responses into Uint8Array", async () => {
     const { fake } = await remote("s3cret")
     const file = await fake.contents.getFile(repo, "logo.png")
     assert.deepEqual(file.content, new Uint8Array([0, 255, 1]))
   })
 
-  it("writes file bytes as bytes", async () => {
+  it("encodes Uint8Array arguments when writing files", async () => {
     const { fake } = await remote("s3cret")
     const bytes = new Uint8Array([9, 0, 200])
     await fake.contents.commitFiles(repo, {
@@ -164,19 +164,19 @@ describe("remote provider", () => {
     assert.deepEqual((await direct.contents.getFile(repo, "data.bin")).content, bytes)
   })
 
-  it("streams job logs", async () => {
+  it("streams binary job logs", async () => {
     const { fake } = await remote("s3cret")
     const [run] = (await fake.ci.runs(repo).page()).items
     const [job] = (await fake.ci.jobs(run.ref).page()).items
     assert.equal(await new Response(await fake.ci.log(job.ref)).text(), "ok\n")
   })
 
-  it("resolves with nothing where the provider does", async () => {
+  it("resolves to undefined on 204 No Content responses", async () => {
     const { fake } = await remote("s3cret")
     assert.equal(await fake.releases.latest(repo), undefined)
   })
 
-  it("writes", async () => {
+  it("executes write verbs via POST", async () => {
     const { fake } = await remote("s3cret")
     const comment = await fake.threads.createComment(issue, "Over the wire")
     assert.equal(comment.body, "Over the wire")
@@ -187,7 +187,7 @@ describe("remote provider", () => {
     )
   })
 
-  it("rebuilds forge errors with their class and fields", async () => {
+  it("reconstructs ForgeError subclasses with their metadata fields", async () => {
     const { fake } = await remote("s3cret")
     direct.failNext(
       "repos.get",
@@ -214,14 +214,14 @@ describe("remote provider", () => {
     await assert.rejects(fake.repos.get(repo), { name: "ForbiddenError", reason: "sso_required" })
   })
 
-  it("aborts with the caller's signal", async () => {
+  it("propagates caller AbortSignal to fetch", async () => {
     const { fake } = await remote("s3cret")
     await assert.rejects(fake.repos.get(repo, { signal: AbortSignal.abort() }), {
       name: "AbortError",
     })
   })
 
-  it("answers the sync helpers locally", async () => {
+  it("runs synchronous helper methods locally when factories are provided", async () => {
     const { github } = await remote("s3cret")
     const ref = { forge: "github", instance: "github.com", owner: "acme", name: "widgets" }
     assert.equal(github.urlFor({ repo: ref }), "https://github.com/acme/widgets")
@@ -229,7 +229,7 @@ describe("remote provider", () => {
     assert.equal(github.webOrigin, "https://github.com")
   })
 
-  it("answers them only for the forges it has factories for", async () => {
+  it("returns undefined from synchronous helpers for forges without a provided factory", async () => {
     const only = async (factories: Parameters<typeof connect>[0]["factories"]) =>
       (await connect({ url: "http://proxy.test", secret: "s3cret", fetch, factories }))[1]
     assert.equal((await only([githubFactory])).webOrigin, "https://github.com")
@@ -244,7 +244,7 @@ describe("remote provider", () => {
 describe("remote provider state", () => {
   env({ FORGES_PROXY_SECRET: "s3cret" })
 
-  it("reports the budgets of its latest response", async () => {
+  it("updates rateLimits() from the latest verb response header", async () => {
     const { fake } = await remote("s3cret")
     assert.deepEqual(fake.rateLimits(), [])
     direct.setRateLimit({ limit: 10 })
@@ -256,9 +256,8 @@ describe("remote provider state", () => {
     }
   })
 
-  it("refreshes its capabilities from the proxy", async () => {
+  it("updates capabilities when refreshCapabilities() is called", async () => {
     let reads = 0
-    // The second read of `/` reports no stream, as a proxy that has since refined its capabilities would.
     const refining = async (url: string, init?: RequestInit) => {
       const response = await fetch(url, init)
       if (new URL(url).pathname !== "/" || ++reads === 1) return response
@@ -286,7 +285,7 @@ describe("remote provider state", () => {
 describe("remote event stream", () => {
   env({ FORGES_PROXY_SECRET: "s3cret" })
 
-  it("follows events with their cursors, until aborted", async () => {
+  it("yields streamed events and their cursors until aborted", async () => {
     const { fake } = await remote("s3cret")
     const controller = new AbortController()
     const items = fake.sources.stream({ signal: controller.signal })[Symbol.asyncIterator]()
@@ -299,7 +298,7 @@ describe("remote event stream", () => {
     assert.deepEqual(await items.next(), { done: true, value: undefined })
   })
 
-  it("resumes from a cursor", async () => {
+  it("resumes streaming from a provided cursor", async () => {
     const { fake } = await remote("s3cret")
     await direct.threads.create(repo, { kind: "issue", title: "Missed" })
     const [seen, missed] = direct.store.events.slice(-2)
@@ -310,7 +309,7 @@ describe("remote event stream", () => {
     }
   })
 
-  it("throws StreamClosedError when the forge closes it", async () => {
+  it("throws StreamClosedError when the upstream stream closes", async () => {
     const { fake } = await remote("s3cret")
     const items = fake.sources.stream()[Symbol.asyncIterator]()
     const next = items.next()
@@ -322,7 +321,7 @@ describe("remote event stream", () => {
     }
   })
 
-  it("rejects for a forge without a stream", async () => {
+  it("rejects with UnsupportedOperationError when the forge does not support streaming", async () => {
     const { github } = await remote("s3cret")
     assert.equal(github.can("sources.stream"), false)
     await assert.rejects(
@@ -332,10 +331,10 @@ describe("remote event stream", () => {
   })
 })
 
-describe("remote provider of a public instance", () => {
+describe("remote provider against a public instance", () => {
   env({ FORGES_PROXY_PUBLIC: "1" })
 
-  it("reports and rejects the verbs the proxy doesn't route", async () => {
+  it("reports false from can()/support() and rejects unrouted verbs with UnsupportedOperationError", async () => {
     const { fake } = await remote()
     assert.equal(fake.can("repos.get"), true)
     assert.equal(fake.can("threads.createComment", "issue"), false)

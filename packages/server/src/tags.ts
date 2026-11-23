@@ -1,20 +1,21 @@
 import type { ForgeEvent, RepoRef } from "forges"
 import { affectedKeys, repoKey } from "forges"
 
-// Past this, a response is tagged by its instance only; purges by repo miss it and `max-age` bounds its staleness.
+// Cap per-response repo tags to stay within CDN header size limits; responses exceeding this keep only the instance tag.
 const MAX_REPO_TAGS = 50
 
 /**
- * Cache tags for a response: the `repoKey` of every repository its arguments or result name, and its instance. A
- * repo is tagged by both its path and its `externalId` key, since requests usually name the path while webhook
- * payloads carry the id, and `repoKey` prefers the id.
+ * Computes cache tags for a response from every `RepoRef` in its arguments and result, plus the
+ * `<forge>:<instance>` tag. Emits both path (`owner/name`) and `@externalId` keys when available
+ * because read requests usually specify `owner/name` whereas webhook events include `externalId`
+ * (which `repoKey()` prefers).
  */
 export function responseTags(forge: string, instance: string, ...values: unknown[]): string[] {
   const repos = new Set(values.flatMap((value) => [...reposIn(value)].flatMap(keysOf)))
   return [`${forge}:${instance}`, ...(repos.size <= MAX_REPO_TAGS ? repos : [])]
 }
 
-/** The repo tags that `events` invalidate: everything `affectedKeys()` names, with both key forms. */
+/** Computes all repository cache tags (both path and `@externalId` forms) invalidated by `events`. */
 export function purgeTags(events: ForgeEvent[]): string[] {
   const tags = new Set<string>()
   for (const event of events) {
@@ -38,7 +39,6 @@ function keysOf(ref: RepoRef): string[] {
   return keys
 }
 
-/** Every `RepoRef` nested in `value`, skipping forge payloads. */
 function reposIn(value: unknown, found = new Set<RepoRef>()): Set<RepoRef> {
   if (Array.isArray(value)) {
     for (const item of value) {

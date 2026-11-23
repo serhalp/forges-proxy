@@ -9,7 +9,7 @@ primary_region = 'ewr'
 # Deploy from the repository root: flyctl deploy --config demos/docker/fly.toml .
 [build]
 dockerfile = 'Dockerfile'
-# Fly uploads the context itself and only reads a root `.dockerignore` otherwise.
+# Point Fly to the demo's ignore file when building from the repository root context.
 ignorefile = 'Dockerfile.dockerignore'
 
 [http_service]

@@ -19,11 +19,11 @@ describe("GET /status", () => {
   env({ FORGES_PROXY_SECRET: "s3cret" })
   const authorization = { authorization: "Bearer s3cret" }
 
-  it("needs the secret on a private instance", async () => {
+  it("requires authentication on a private instance", async () => {
     assert.equal((await get("/status")).status, 401)
   })
 
-  it("reports the budgets the latest upstream responses left", async () => {
+  it("returns the latest rate-limit budgets recorded by each provider", async () => {
     await get(
       `/fake/fake.test/repos.get?args=${encodeURIComponent(JSON.stringify([repo]))}`,
       authorization,
@@ -46,7 +46,7 @@ describe("GET /status", () => {
     assert.ok(providers[0].rateLimits[0].remaining < 10)
   })
 
-  it("are also reported on each verb response, for the client's rateLimits()", async () => {
+  it("includes the provider's rate-limit budgets in the forges-rate-limits header on verb responses", async () => {
     const response = await get(
       `/fake/fake.test/repos.get?args=${encodeURIComponent(JSON.stringify([repo]))}`,
       authorization,
@@ -66,7 +66,6 @@ describe("GET /", () => {
       v.object({ capabilities: v.object({ sources: v.object({ stream: v.unknown() }) }) }),
     ),
   })
-  // A server per test, since each caches its providers' refined capabilities.
   const readerOf = (provider: ReturnType<typeof fake>) => {
     const server = createServer({ forges: createForges([provider]) })
     return async () => {
@@ -77,7 +76,7 @@ describe("GET /", () => {
     }
   }
 
-  it("reports capabilities refined by refreshCapabilities(), refreshed once", async (t) => {
+  it("refreshes provider capabilities once via refreshCapabilities() and caches the result", async (t) => {
     const provider = fake()
     const refresh = t.mock.method(provider, "refreshCapabilities", async () => ({
       ...provider.capabilities,
@@ -89,7 +88,7 @@ describe("GET /", () => {
     assert.equal(refresh.mock.callCount(), 1)
   })
 
-  it("falls back to the static capabilities when the forge doesn't answer", async (t) => {
+  it("falls back to static capabilities when refreshCapabilities() rejects", async (t) => {
     const provider = fake()
     t.mock.method(provider, "refreshCapabilities", async () => {
       throw new Error("down")

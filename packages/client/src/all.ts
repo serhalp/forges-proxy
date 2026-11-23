@@ -19,7 +19,7 @@ import {
 } from "forges"
 import type { ProviderFactory } from "./remote.ts"
 
-// The `satisfies` breaks the build when `forges` gains a kind.
+// `satisfies` ensures a compile error when `forges` adds a new kind.
 const BY_KIND = {
   "azure-devops": azureDevOps,
   bitbucket,
@@ -39,5 +39,5 @@ const BY_KIND = {
   upstream,
 } satisfies Record<KnownForgeKind, ProviderFactory>
 
-/** Every `forges` provider factory, for `connect({ factories: allFactories })`. Bundles every forge. */
+/** All built-in `forges` provider factories for `connect({ factories: allFactories })`. Bundles every forge provider. */
 export const allFactories: readonly ProviderFactory[] = Object.values(BY_KIND)

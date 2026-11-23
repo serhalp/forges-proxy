@@ -1,135 +1,124 @@
 # forges-proxy plan
 
-What's next. Settled design and decisions are in [ARCHITECTURE.md](ARCHITECTURE.md). Experimental;
-may move into the `forges` monorepo.
+Open work and future ideas. Settled design decisions live in [ARCHITECTURE.md](ARCHITECTURE.md).
+This project is experimental and may eventually move into the `forges` monorepo.
 
 ## Open questions
 
-- Forges whose hosts aren't known in advance (Tangled authors' servers and knots, self-hosted
-  instances, Radicle nodes). The proxy only serves instances configured in the env. How should it
-  serve the rest, and what stops hosts named by user data from reaching the proxy's own network?
-- What else to build on the manifest? Hey API client generation, an MCP server.
-- Should the manifest and `connect()` move into `forges` (e.g. `forges/remote`), where the types
-  live? `forges/schema` already ships model schemas from the same generator; verb signatures
-  (params, result, class, options position) would retire `generate-manifest.ts`, its TS 6
-  dependency, and name-based date revival. Or the whole project, as `@forges/server` and
-  `@forges/client`? Ask the `forges` team.
+- **Dynamic forge hosts** (Tangled user servers and knots, self-hosted instances, Radicle nodes):
+  Today the proxy only serves instances explicitly configured in the environment. How should it
+  support dynamic hosts while preventing SSRF against internal networks from user-supplied hosts?
+- **Manifest consumers**: What else should build on the operations manifest (e.g. Hey API client
+  generation, an MCP server)?
+- **Upstreaming into `forges`**: Should `connect()` move into `forges` (e.g. `forges/remote`), or
+  should the whole project become `@forges/server` and `@forges/client`? Check with the `forges`
+  maintainers.
 
 ## TODO
 
-- [x] Pin deps
+- [x] Pin dependencies
 - [x] Generic dispatcher: providers from env, GET reads / POST writes, error mapping
-- [x] Cache headers per verb class (public reads only; private is `no-store` until the parked issue
-      is solved)
-- [x] Proxy access secret (`FORGES_PROXY_SECRET`) or public mode (`FORGES_PROXY_PUBLIC=1`); both or
-      neither is a 503
-- [x] Secret rotation: `FORGES_PROXY_PREVIOUS_SECRET` is accepted alongside the new secret while
-      callers move over
-- [x] `sources.stream` in `/openapi.json`
-- [x] `GET /`: providers, capabilities, routed verbs
-- [x] Tests: `node:test` (Node 26) with `forges/fake` passed to `createServer`; unit and route tests
-- [x] `GET /status` with `rateLimits()` (per server instance)
-- [x] SSE for `sources.stream` (verified live against Tangled's Jetstream). `forges` main renames it
-      `sources.subscribe`: follow on the next bump.
-- [x] Pass the request signal through to verbs, into the options parameter the manifest names
-- [x] Cache tags on public reads; `POST /webhooks/:forge/:instance` purges them through the `purge`
-      option
-- [x] `handleEvents`: verified webhook events to the deployment's callback, awaited
-- [x] `logger` option: requests at `info`, the server's own failures at `error` (the default logs
-      only errors, to `console.error`); the platform and Docker demos pass evlog
-- [x] Weak `ETag` on public JSON reads, with a 304 for a matching `If-None-Match` (verified live:
-      Netlify's edge answers revalidations with it)
-- [x] CORS: any origin (the secret is a header, never a cookie), preflights cached for a day
-- [ ] Evaluate [`cdn-cache-control`](https://github.com/ascorbic/cdn-cache-control) for `cdnHeaders`
-      (per-CDN header names). Gotchas: `.swr()` resets the TTL (call `.ttl()` after), and it sends
-      only the CDN-specific header, not `CDN-Cache-Control` too.
-- [ ] Finer tags (per thread, per release) so an active repo doesn't purge all of its entries on
-      every event
-- [x] Operations manifest (`packages/server/scripts/generate-manifest.ts` →
-      `packages/server/src/manifest.json`) → OpenAPI 3.1 (`/openapi.json`) → Scalar (`/docs`)
-- [x] Validate `args` against the manifest's schemas (`@cfworker/json-schema`: no codegen, so fine
-      at the edge), with a 400 naming the failing path
-- [x] A test checks every `date-time` input field in the manifest is one `wire.ts` revives, so a new
-      one in `forges` can't arrive as a string
-- [x] Client: find options where the manifest puts them (via `/`), not by a heuristic
-- [x] `connect()` client (`@forges-proxy/client`): one `ForgeProvider` per proxied forge
-- [x] pnpm workspace: `@forges-proxy/server` (a Fetchable), `@forges-proxy/client`, `docs`
-      placeholder, `demos/netlify-serverless` (verified live as a draft)
-- [x] Drop Nitro: `createServer(options)` on h3 returns a Fetchable; platform specifics
-      (`cdnHeaders`, `purge`, `fetch`) are options, so purging is pluggable. Built with tsdown.
-- [x] Demos, smoke-tested with `pnpm smoke` through the client: node, hono, fastify, nitro, docker
-      (local, public, and private), cloudflare-workers (live, `workers.dev`), vercel (live),
-      netlify-serverless (live draft)
-- [x] netlify-edge: verify the Fetchable export live (works in `netlify dev`; hand deploys from the
-      monorepo upload no edge function, so check via CD). The edge bundler resolves npm modules from
-      the repository root, where pnpm doesn't link workspace packages, hence the root
-      `package.json`'s dependencies on `@forges-proxy/server` and `evlog`.
-- [x] netlify-server (Early Access): smoke-tested live (draft). Its site sets a package directory,
-      not a base directory, because CLI builds skip Server bundling with a base directory (a
-      `@netlify/build` bug).
-- [x] Signed cursors on public instances with authenticated providers, so a caller-supplied
-      `nextUrl` can't reach other API paths with the instance's token
-- [ ] Publish the packages: release tooling (npm scope `@forges-proxy` is registered)
-- [ ] Rate limits, configurable per caller and per route. The server diagram already advertises
-      them. Reopens
-      [Rate limiting is the platform's job](ARCHITECTURE.md#rate-limiting-is-the-platforms-job):
-      per-caller counts need state the proxy doesn't keep, so likely a `rateLimit` option the
-      deployment backs with its platform's limiter or a store.
-- [x] Client: `rateLimits()` from a `forges-rate-limits` header on verb responses (caveats in the
-      README), `refreshCapabilities()` from `/`, which now refines capabilities by the instance's
-      version
+- [x] Cache headers per verb class (public reads only; private responses use `no-store` until
+      auth-varied caching is solved)
+- [x] Proxy access secret (`FORGES_PROXY_SECRET`) or public mode (`FORGES_PROXY_PUBLIC=1`); return
+      503 if both or neither are set
+- [x] Secret rotation: accept `FORGES_PROXY_PREVIOUS_SECRET` alongside `FORGES_PROXY_SECRET`
+- [x] Include `sources.stream` in `/openapi.json`
+- [x] `GET /`: providers, capabilities, and routed verbs
+- [x] Tests: `node:test` with `forges/fake` passed to `createServer`; unit and route tests
+- [x] `GET /status` reporting per-instance `rateLimits()`
+- [x] SSE route for `sources.stream` (verified live against Tangled's Jetstream). Note: `forges`
+      `main` renames this to `sources.subscribe`; update on the next `forges` bump.
+- [x] Forward the request `AbortSignal` into the verb's options parameter
+- [x] Cache tags on public reads; `POST /webhooks/:forge/:instance` purges affected tags via `purge`
+- [x] `handleEvents`: pass verified webhook events to a deployment callback and await it
+- [x] `logger` option: log requests at `info` and internal failures at `error` (defaults to errors
+      only via `console.error`); use evlog in the platform and Docker demos
+- [x] Weak `ETag` on public JSON reads with `304 Not Modified` on `If-None-Match` (verified live on
+      Netlify Edge)
+- [x] CORS: allow `*` origin (auth uses `Authorization` header, never cookies), cache preflights for
+      24h
+- [ ] Evaluate [`cdn-cache-control`](https://github.com/ascorbic/cdn-cache-control) for
+      `cdnHeaders`. Gotchas: `.swr()` resets the TTL (call `.ttl()` after), and it only emits the
+      vendor-specific header rather than both `CDN-Cache-Control` and the vendor header.
+- [ ] Finer-grained cache tags (per thread, per release) so busy repos don't invalidate all cached
+      reads on every webhook event
+- [x] Operations manifest from `forges/schema` → OpenAPI 3.1 (`/openapi.json`) → Scalar (`/docs`)
+- [x] Validate `args` against manifest schemas (`@cfworker/json-schema`, which avoids `eval`/codegen
+      for edge runtimes) and return 400 with the failing field path
+- [x] Test that every `date-time` input field in the manifest is decoded by `forges/wire`
+- [x] Client: use the options parameter index reported by `GET /` instead of a heuristic
+- [x] `connect()` client (`@forges-proxy/client`): returns one `ForgeProvider` per proxied forge
+- [x] pnpm workspace: `@forges-proxy/server`, `@forges-proxy/client`, `docs` placeholder, and
+      `demos/netlify-serverless`
+- [x] Replace Nitro with plain h3 + tsdown: `createServer(options)` returns a Fetchable and takes
+      platform hooks (`cdnHeaders`, `purge`, `fetch`) as options
+- [x] Demos smoke-tested via `pnpm smoke`: node, hono, fastify, nitro, docker, cloudflare-workers,
+      vercel, netlify-serverless
+- [x] `demos/netlify-edge`: verify Fetchable export live. Note: Netlify's edge bundler resolves npm
+      modules from the monorepo root where pnpm doesn't hoist workspace packages, so the root
+      `package.json` includes `@forges-proxy/server` and `evlog` in `devDependencies`.
+- [x] `demos/netlify-server` (Early Access): smoke-tested live. Configured with a package directory
+      rather than a base directory to work around a path-doubling bug in `@netlify/build` (see
+      `NETLIFY_SERVER_MONOREPO_BUG.md`).
+- [x] HMAC-signed cursors on public instances with authenticated providers so caller-supplied
+      `nextUrl` values cannot hit arbitrary upstream API paths
+- [ ] Package publishing and release tooling (`@forges-proxy` npm scope is registered)
+- [ ] Configurable per-caller and per-route rate limiting (already shown in the server diagram).
+      Reopens
+      [Rate limiting is the platform's job](ARCHITECTURE.md#rate-limiting-is-the-platforms-job),
+      likely via a `rateLimit` hook backed by the platform's rate limiter or KV store.
+- [x] Client: populate `rateLimits()` from the `forges-rate-limits` response header and support
+      `refreshCapabilities()` against `GET /`
 
 ## Parked
 
-- Purge and `handleEvents` for forges that stream events instead of sending webhooks (Tangled).
-  `sources.stream` today only relays a caller's stream, so Tangled entries expire by age. A
-  long-running deployment (Docker, Node, Netlify Server) could hold its own subscription and feed
-  events through the webhook path, resuming from a stored cursor. Serverless can't hold one open.
-  Once built, the server diagram's stream path can merge into the webhook arrow.
-- A very short CDN TTL (e.g. 5s) on public 404s, so floods of missing repos don't all reach the
-  forge.
-- An MCP server (read verbs as tools), as a workspace package.
-- The cache tag cap (`MAX_REPO_TAGS` in `tags.ts`) counts keys, not repos, and a repo with an
-  `externalId` has two, so a page of 26+ repos keeps only the instance tag, which nothing purges,
-  and expires by age. Count repos, size the cap to the CDNs' tag header limits, and drop or use the
-  instance tag.
-- A timeout on each provider's `refreshCapabilities()` in `GET /`, falling back to its static
-  capabilities. Today one unreachable self-hosted forge holds `/`, and so every `connect()`, for up
-  to `forges`' 30 s request timeout on each cold instance.
-- CDN caching for private instances, which send `no-store` because the CDN answers before auth runs.
-  Likely fix: vary on `authorization` (`Netlify-Vary: header=authorization` or the platform's
-  equivalent).
-- Multiple callers with different identities, beyond one all-access secret or anonymous public mode.
-  Two separate questions: who is calling, and whose forge credential is used.
-  - Per use case: non-JS clients can hold secrets (pass their forge token through, or per-caller
-    proxy keys). Internal tools, bots, and CI want proxy-held credentials with scoped keys per
-    caller, or CI's OIDC token mapped to a policy. Sandboxes want a short-lived scoped proxy token,
-    never a forge token. npmx-style services and agents need to act as the end user (OAuth, run by
-    the proxy or the caller; MCP's auth spec uses OAuth).
-  - Most cases generalize private mode from one secret to many scoped identities; acting as the end
-    user is the harder, stateful part (token storage, refresh, sessions).
-  - Whatever the shape: no shared cache across identities, never fall back to the operator's
-    credential, no tokens in logs.
+- **Cache purging and `handleEvents` for stream-based forges (Tangled)**: `sources.stream` currently
+  only proxies a stream to a connected client, so cached Tangled reads only expire by TTL. A
+  long-running server (Docker, Node, Netlify Server) could maintain a background subscription from a
+  persisted cursor and feed events into the webhook purge/handler pipeline.
+- **Short CDN TTL (e.g. 5s) on public 404s**: Prevents repeated requests for missing repositories
+  from burning upstream rate limits.
+- **MCP server package**: Expose read verbs as MCP tools in a new workspace package.
+- **Cache tag cap counting (`MAX_REPO_TAGS` in `tags.ts`)**: Currently counts tag strings rather
+  than repositories. Because repos with an `externalId` emit two tags (path and ID), pages with 26+
+  repos exceed the 50-tag cap and fall back to the instance tag alone, which webhooks never purge.
+  Count repos instead, align the limit with CDN header limits, and either drop or support purging
+  the instance tag.
+- **Timeout on `provider.refreshCapabilities()` in `GET /`**: An unreachable self-hosted forge
+  currently blocks `GET /` (and therefore `connect()`) for up to `forges`'s 30s request timeout on
+  each cold server instance. Add a short timeout and fall back to static capabilities.
+- **CDN caching on private instances**: Currently disabled (`private, no-store`) because the CDN
+  serves cached responses before auth middleware runs. Could be enabled on CDNs that support varying
+  on `Authorization` (e.g. `Netlify-Vary: header=authorization`).
+- **Multi-caller auth and per-caller credentials**: Supporting multiple callers beyond a single
+  shared secret or anonymous public mode involves two questions: authenticating the caller, and
+  selecting which upstream forge credential to use.
+  - Non-JS services can pass their own forge token or use scoped proxy API keys.
+  - Internal tools, bots, and CI jobs want proxy-held credentials gated by scoped proxy keys or CI
+    OIDC tokens.
+  - Sandboxes need short-lived, scoped proxy tokens without direct forge tokens.
+  - End-user apps and agents need to act on behalf of a user via OAuth (managed by either the proxy
+    or the caller).
+  - Hard invariants: never share cached responses across identities, never fall back to the
+    operator's token on auth failure, and never log tokens.
 
 ## Notes
 
-- Cloudflare Workers define `WorkerGlobalScope`, so `forges` (as of 0.4.1) takes them for a browser
-  and sends no `user-agent`; GitHub answers 403, which surfaces as `InsufficientScopeError`. Until
-  `forges` sends one on Workers, the server's default `fetch` adds it (`withUserAgent` in
-  `packages/server/src/index.ts`).
-- `DATE_FIELDS` / `reviveDates` cover output models only. Input options have `since`, `until`,
-  `createdAfter`, `before`; the proxy revives those itself (`packages/server/src/wire.ts`).
-- Error messages embed the upstream URL (e.g. `NotFoundError`), so leaving out `error.url` doesn't
-  keep it private.
-- Errors cross the wire with every field their class sets except `url` and `body`; the client
-  rebuilds the class with `Reflect.construct`.
-- Tags are per repository, by both `repoKey` forms (path and `externalId`), since request refs
-  usually lack the id that webhook refs carry and `repoKey` prefers it. Worth considering in
-  `forges`: a helper that returns every key of a ref, for caches to index by.
-- Manifest details beyond ARCHITECTURE.md: overloads (`releases.downloadAsset`) become unions,
-  `Page<T>` components are renamed `PageOfT` (OpenAPI names allow no `<>`), and every verb has
-  exactly one parameter carrying `signal`, which is how the manifest marks options.
-- OpenAPI is built at runtime, since it depends on the access mode (public leaves out writes and
-  account verbs and enumerates the configured forges and instances). Scalar doesn't render
-  `prefixItems`, so `args` also carries the signature as text (`[ref, options?]`). Valid per
+- Cloudflare Workers define `WorkerGlobalScope`, which causes `forges` (as of 0.4.1) to treat the
+  runtime as a browser and omit the `User-Agent` header. GitHub rejects requests without
+  `User-Agent` with a 403 (`InsufficientScopeError`). Until fixed upstream, the server's default
+  `fetch` injects `User-Agent: forges-proxy` (`withUserAgent` in `packages/server/src/index.ts`).
+- `forges/wire` handles tagged `$date` and `$bytes` values in both directions.
+- `ForgeError` messages often include the upstream URL (e.g. in `NotFoundError`), so stripping
+  `error.url` from the error response does not completely hide upstream URLs.
+- Errors are serialized with all subclass properties except `url`, `body`, and `grantedScopes`; the
+  client reconstructs the instance using `Reflect.construct`.
+- Responses are tagged with both forms of `repoKey` (`owner/name` and `@externalId`) because call
+  arguments usually only have `owner/name` while webhook payloads include `externalId` (which
+  `repoKey()` prefers).
+- `/openapi.json` is generated at runtime based on the access mode: public instances omit write,
+  account, and privileged verbs and populate `enum` lists for configured forges and instances.
+  Because Scalar does not render tuple `prefixItems`, the `args` parameter description also includes
+  the positional signature as text (e.g. `` `[ref, options?]` ``). Validates cleanly with
   `redocly lint --extends=spec`.

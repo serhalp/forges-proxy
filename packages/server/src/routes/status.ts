@@ -3,8 +3,7 @@ import type { EventHandler } from "h3"
 import type { Context } from "../context.ts"
 
 /**
- * Each provider's request budgets, as the latest upstream responses reported them. They're per server instance, so on
- * serverless platforms a reading reflects whichever instance answered.
+ * Returns the latest rate-limit budgets observed by each provider on the responding server instance.
  */
 export function statusRoute(context: Context): EventHandler {
   return (event) => {

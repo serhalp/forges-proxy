@@ -4,18 +4,18 @@ import type { AccessMode } from "./access.ts"
 import type { Env } from "./context.ts"
 
 /**
- * Signs the `nextUrl` of the cursors a public instance hands out and refuses unsigned ones, so callers can page through
- * the listings the forge returned but can't aim an authenticated provider at any other path of its API. Private
- * instances trust their callers, and anonymous providers have no credential to misuse.
+ * Returns true when pagination cursors must be signed. On public instances with authenticated
+ * providers, `cursor.nextUrl` is HMAC-signed so callers cannot pass an arbitrary upstream API path
+ * to be fetched with the proxy's token.
  */
 export function signsCursors(mode: AccessMode, provider: ForgeProvider): boolean {
   return mode === "public" && provider.authKind !== "anonymous"
 }
 
 /**
- * The signing key, derived from the forge credentials in the env, so that every server instance of a deployment
- * agrees on it without another secret to configure. Without any (providers passed in directly), a key of this server
- * instance's own.
+ * Derives an HMAC signing key via HKDF from the configured `FORGES_*` credential env vars so all
+ * serverless instances share the same key without extra configuration. Falls back to random bytes
+ * when providers were passed programmatically without env vars.
  */
 export async function cursorKey(env: Env): Promise<CryptoKey> {
   const material = Object.entries(env)
@@ -41,7 +41,7 @@ export async function cursorKey(env: Env): Promise<CryptoKey> {
   )
 }
 
-/** A listing's page with its cursor's `nextUrl` signed for `scope` (the forge and instance). */
+/** Attaches an HMAC signature to `page.cursor.nextUrl` scoped to `scope` (`<forge>:<instance>`). */
 export async function signPage(page: unknown, key: CryptoKey, scope: string): Promise<unknown> {
   const cursor = cursorOf(page)
   if (!isObject(page) || typeof cursor?.nextUrl !== "string") {
@@ -51,7 +51,10 @@ export async function signPage(page: unknown, key: CryptoKey, scope: string): Pr
   return { ...page, cursor: { ...cursor, signature } }
 }
 
-/** Why the options' cursor can't be used: a `nextUrl` this instance didn't sign for `scope`. */
+/**
+ * Verifies the signature on `cursor.nextUrl` if present in `args`. Returns an error message when
+ * the signature is missing or invalid.
+ */
 export async function unsignedCursor(
   verb: VerbSignature,
   args: unknown[],

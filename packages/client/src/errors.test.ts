@@ -7,7 +7,7 @@ const isErrorClass = (value: unknown): value is typeof Error =>
   typeof value === "function" && value.prototype instanceof Error
 
 describe("ERRORS", () => {
-  it("has every error class forges exports, so the client can rebuild any of them", () => {
+  it("includes every Error subclass exported by forges", () => {
     const exported = Object.values(forges)
       .filter(isErrorClass)
       .map((Class) => Class.name)

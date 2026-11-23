@@ -7,7 +7,7 @@ import { manifest } from "./manifest.ts"
 import { callVerb, routedVerb, withSignal } from "./verbs.ts"
 
 describe("manifest", () => {
-  it("leaves out verbs with no safe HTTP form", () => {
+  it("excludes non-routable verbs", () => {
     for (const verb of [
       "installations.token",
       "installations.provider",
@@ -33,7 +33,7 @@ describe("manifest", () => {
 })
 
 describe("routedVerb", () => {
-  it("routes writes and account verbs only on a private instance", () => {
+  it("routes writes and account verbs only in private mode", () => {
     assert.equal(routedVerb("repos.get", "public"), manifest.verbs["repos.get"])
     assert.equal(routedVerb("threads.createComment", "public"), undefined)
     assert.equal(routedVerb("users.me", "public"), undefined)
@@ -43,7 +43,7 @@ describe("routedVerb", () => {
     )
   })
 
-  it("knows no verb outside the manifest", () => {
+  it("returns undefined for unknown verbs and Object.prototype properties", () => {
     for (const name of ["repos.nope", "constructor", "__proto__", "toString"]) {
       assert.equal(routedVerb(name, "private"), undefined, name)
     }
@@ -51,7 +51,7 @@ describe("routedVerb", () => {
 })
 
 describe("callVerb", () => {
-  it("calls the verb on the provider with the given arguments", async () => {
+  it("invokes the verb on the provider with the given arguments", async () => {
     const forges = createForges([
       fake({ seed: { repos: [{ repo: "acme/widgets", description: "Widgets" }] } }),
     ])
@@ -63,7 +63,7 @@ describe("callVerb", () => {
     assert.equal(repo.description, "Widgets")
   })
 
-  it("reads one page of a listing", async () => {
+  it("returns a single page for listing verbs", async () => {
     const provider = fake({
       seed: {
         repos: [{ repo: "acme/widgets" }],
@@ -87,7 +87,7 @@ describe("withSignal", () => {
   const signal = new AbortController().signal
   const repo = { forge: "fake", instance: "fake.test", owner: "acme", name: "widgets" }
 
-  it("adds the signal to the options, wherever they sit", () => {
+  it("injects signal into the verb's options argument", () => {
     assert.deepEqual(withSignal(verb("repos.get"), [repo, { licence: true }], signal), [
       repo,
       { licence: true, signal },
@@ -101,7 +101,7 @@ describe("withSignal", () => {
     ])
   })
 
-  it("leaves arguments it can't add to alone", () => {
+  it("leaves arguments unchanged when the verb has no options parameter or options is not an object", () => {
     assert.deepEqual(withSignal(verb("repos.get"), [repo, "nope"], signal), [repo, "nope"])
     const noOptions = { ...verb("repos.get"), params: [verb("repos.get").params[0]] }
     assert.deepEqual(withSignal(noOptions, [repo], signal), [repo])

@@ -9,7 +9,7 @@ const unsupported = fake({ instance: "other.test", support: { "sources.stream": 
 const app = createProxy(createForges([forge, unsupported]))
 const repo = { forge: "fake", instance: "fake.test", owner: "acme", name: "widgets" }
 
-/** Opens the stream and reads it one server-sent message at a time. */
+/** Opens the SSE endpoint and yields parsed SSE messages one at a time. */
 async function open(headers: Record<string, string> = {}, path = "/fake/fake.test/sources.stream") {
   const response = await app.fetch(new Request(new URL(path, "http://proxy.test"), { headers }))
   const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader()
@@ -34,7 +34,7 @@ async function open(headers: Record<string, string> = {}, path = "/fake/fake.tes
 describe("GET /:forge/:instance/sources.stream", () => {
   env({ FORGES_PROXY_PUBLIC: "1" })
 
-  it("sends each event as it happens, with its cursor as the id", async () => {
+  it("streams live events with their cursor as the SSE event id", async () => {
     const stream = await open()
     assert.equal(stream.response.headers.get("content-type"), "text/event-stream")
     assert.match(stream.response.headers.get("cache-control") ?? "", /no-store|no-cache/)
@@ -45,7 +45,7 @@ describe("GET /:forge/:instance/sources.stream", () => {
     await stream.close()
   })
 
-  it("resumes after Last-Event-ID", async () => {
+  it("resumes from the Last-Event-ID header cursor", async () => {
     await forge.threads.create(repo, { kind: "issue", title: "First" })
     await forge.threads.create(repo, { kind: "issue", title: "Second" })
     const [first, second] = forge.store.events.slice(-2)
@@ -54,7 +54,7 @@ describe("GET /:forge/:instance/sources.stream", () => {
     await stream.close()
   })
 
-  it("ends with an error event when the forge closes the stream", async () => {
+  it("emits an error event and closes when the upstream stream fails", async () => {
     const stream = await open()
     forge.offline()
     try {
@@ -66,7 +66,7 @@ describe("GET /:forge/:instance/sources.stream", () => {
     }
   })
 
-  it("answers 501 for a provider without a stream", async () => {
+  it("returns 501 when the provider does not support sources.stream", async () => {
     const response = await app.fetch(
       new Request("http://proxy.test/fake/other.test/sources.stream"),
     )

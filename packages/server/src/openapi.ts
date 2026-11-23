@@ -12,49 +12,49 @@ const ERROR: Schema = {
       required: ["name", "message"],
       additionalProperties: true,
       description:
-        "The `ForgeError`'s class name, message, and fields, which `connect()` rebuilds it from.",
+        "Serialized `ForgeError` class name, message, and metadata used by `connect()` to reconstruct the error.",
     },
   },
   required: ["error"],
 }
 
-// Outside the manifest, since it answers with server-sent events rather than JSON.
+// `sources.stream` is defined separately from the JSON verb manifest because it returns `text/event-stream`.
 const STREAM = {
   operationId: "sources_stream",
   tags: ["sources"],
   summary: "sources.stream",
   description:
-    "The forge's events as they happen, as server-sent events: each event's `id` is its cursor and its `data` a `ForgeEvent` as JSON. A failure ends the stream with an `error` event whose `data` is an `Error`. Serverless platforms end long responses, so reconnect with the last cursor.",
+    "Streams live forge events as Server-Sent Events. Each event's `id` is its cursor and `data` is a JSON-encoded `ForgeEvent`. Upstream errors emit an `error` event before closing. Serverless platforms terminate long-lived connections at their execution timeout; reconnect using the last cursor.",
   parameters: [
     {
       name: "Last-Event-ID",
       in: "header",
-      description: "Resume after this cursor. `EventSource` sends it when it reconnects.",
+      description: "Cursor to resume from (sent automatically by `EventSource` on reconnect).",
       schema: { type: "string" },
     },
     {
       name: "cursor",
       in: "query",
-      description: "Resume after this cursor, where the header can't be set.",
+      description: "Cursor to resume from when the `Last-Event-ID` header cannot be set.",
       schema: { type: "string" },
     },
   ],
   responses: {
     200: {
-      description: "The event stream.",
+      description: "Server-Sent Events stream.",
       content: { "text/event-stream": { schema: { type: "string" } } },
     },
     default: {
       description:
-        "A `ForgeError`, such as `UnsupportedOperationError` for a forge without a stream.",
+        "Serialized `ForgeError` (e.g. `UnsupportedOperationError` when the forge does not support streaming).",
       content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
     },
   },
 }
 
 /**
- * The proxy's API as OpenAPI 3.1, from the operations manifest. A public instance leaves out what it doesn't route, and
- * names its forges and instances.
+ * Generates an OpenAPI 3.1 document for the proxy. In public mode, unrouted verbs are omitted and
+ * path parameters enumerate the configured forges and instances.
  */
 export function openApi(
   mode: AccessMode,
@@ -74,20 +74,20 @@ export function openApi(
       name: "instance",
       in: "path",
       required: true,
-      description: "The instance host, e.g. `github.com`.",
+      description: "Forge instance hostname, e.g. `github.com`.",
       schema: { type: "string", ...enumOf(providers.map((p) => p.instance)) },
     },
   ]
   return {
     openapi: "3.1.0",
-    // Relative to this document, so a proxy mounted under a path prefix describes itself correctly.
+    // Relative server URL so proxies mounted under a subpath resolve endpoints relative to `/openapi.json`.
     servers: [{ url: "." }],
     info: {
       title: "forges proxy",
       version: "0",
       "x-forges-version": manifest.forges,
       description:
-        "Calls `forges` provider verbs over HTTP. Arguments are positional, as the verb takes them: a JSON array in `args`.",
+        "Exposes `forges` provider verbs over HTTP. Positional method arguments are passed as a JSON array in `args`.",
     },
     ...(mode === "private"
       ? {
@@ -113,7 +113,7 @@ export function openApi(
   }
 }
 
-// Models with `raw` optional: responses leave it out unless asked for with `?raw=1`.
+// Responses strip `raw` unless `?raw=1` is passed, so mark `raw` optional in all response schemas.
 const SCHEMAS: Record<string, Schema> = Object.fromEntries(
   Object.entries(manifest.schemas).map(([name, schema]) => [name, withoutRequiredRaw(schema)]),
 )
@@ -169,7 +169,7 @@ function operation(name: string, verb: VerbSignature): Record<string, unknown> {
               name: "raw",
               in: "query",
               description:
-                "`1` adds each model's `raw` forge payload, which responses leave out by default.",
+                "Set to `1` to include each model's `raw` upstream forge payload (omitted by default).",
               schema: { type: "string", enum: ["1"] },
             },
           ],
@@ -178,7 +178,7 @@ function operation(name: string, verb: VerbSignature): Record<string, unknown> {
   }
 }
 
-/** The positional arguments, by name, for viewers that don't render `prefixItems`. */
+/** Formats positional parameter names as text for OpenAPI viewers (like Scalar) that do not render tuple `prefixItems`. */
 function signature(verb: VerbSignature): string {
   return `\`[${verb.params.map((param) => `${param.name}${param.optional ? "?" : ""}`).join(", ")}]\``
 }
@@ -187,7 +187,6 @@ function isSchema(value: unknown): value is Schema {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-// `undefined` results are a 204, and `void` is nothing but.
 function isEmpty(schema: Schema): boolean {
   return schema.type === "null" || JSON.stringify(schema) === '{"not":{}}'
 }
@@ -200,7 +199,7 @@ function responses(verb: VerbSignature): Record<string, unknown> {
     ...(json.length || verb.stream
       ? {
           200: {
-            description: "The verb's result.",
+            description: "Operation result.",
             content: {
               ...(json.length
                 ? { "application/json": { schema: json.length === 1 ? json[0] : { anyOf: json } } }
@@ -212,9 +211,9 @@ function responses(verb: VerbSignature): Record<string, unknown> {
           },
         }
       : {}),
-    ...(branches.some(isEmpty) ? { 204: { description: "The verb returned nothing." } } : {}),
+    ...(branches.some(isEmpty) ? { 204: { description: "No content." } } : {}),
     default: {
-      description: "A `ForgeError`, with the upstream status where there is one.",
+      description: "Serialized `ForgeError`.",
       content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
     },
   }

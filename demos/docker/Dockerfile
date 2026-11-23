@@ -1,6 +1,6 @@
 # Build from the repository root: docker build -f demos/docker/Dockerfile -t forges-proxy .
-# Dockerfile.dockerignore next to this file applies to that context.
-# Outside this monorepo, it's `npm install @forges-proxy/server srvx` and `node server.ts`.
+# Uses Dockerfile.dockerignore from this directory.
+# Outside this monorepo, install `@forges-proxy/server` and `srvx` directly and run `node server.ts`.
 FROM node:26.11.1-alpine AS build
 RUN npm install -g pnpm@12.14.0
 WORKDIR /repo

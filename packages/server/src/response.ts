@@ -7,16 +7,17 @@ import { serialize } from "./wire.ts"
 const CDN_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=600"
 
 /**
- * Only public reads go to shared caches. Private instances send `no-store` until CDN caching can vary on the proxy
- * secret.
+ * Only public read responses are stored in shared CDN caches. Private instances always send
+ * `private, no-store` because CDNs serve cached responses before auth middleware runs.
  */
 function isCacheable(verb: VerbSignature, mode: AccessMode): boolean {
   return mode === "public" && !verb.write
 }
 
 /**
- * The response for a verb's result: a stream as `application/octet-stream`, `undefined` as 204, anything else as JSON.
- * Cacheable JSON carries a weak `ETag`, and a matching `If-None-Match` gets a 304.
+ * Serializes a verb's return value into an HTTP `Response`: `ReadableStream` as
+ * `application/octet-stream`, `undefined` as `204 No Content`, and all other values as JSON with
+ * weak `ETag` revalidation on cacheable public reads.
  */
 export async function resultResponse(
   request: Request,
@@ -31,7 +32,7 @@ export async function resultResponse(
   const cacheable = isCacheable(context.verb, context.mode)
   const headers = cacheable
     ? {
-        // Browsers always revalidate; the CDN keeps a read briefly and is purged by tag.
+        // Force browsers to revalidate while allowing the CDN to cache and purge by tag.
         "cache-control": "public, max-age=0, must-revalidate",
         ...context.cdnHeaders({ cacheControl: CDN_CACHE_CONTROL, tags: context.tags }),
       }
@@ -48,7 +49,7 @@ export async function resultResponse(
   if (!cacheable) {
     return new Response(body, { headers: { "content-type": "application/json", ...headers } })
   }
-  // Weak, since the CDN may compress the body.
+  // Use a weak ETag so CDN content encoding (gzip/brotli) does not break `If-None-Match`.
   const etag = `W/"${(await sha256Hex(body)).slice(0, 32)}"`
   if (
     request.headers
@@ -61,7 +62,6 @@ export async function resultResponse(
   return new Response(body, { headers: { "content-type": "application/json", etag, ...headers } })
 }
 
-/** The standard headers, which most CDNs read. */
 export const standardCdnHeaders: CdnHeaders = ({ cacheControl, tags }) => ({
   "cdn-cache-control": cacheControl,
   "cache-tag": tags.join(","),

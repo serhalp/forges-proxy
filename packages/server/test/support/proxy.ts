@@ -3,12 +3,12 @@ import type { Forges } from "forges"
 import type { Server, ServerOptions } from "../../src/index.ts"
 import { createServer } from "../../src/index.ts"
 
-/** What the proxy under test purged, since the last reset. */
+/** Cache tags purged during the current test. */
 export const recorded = { purges: [] as string[][] }
 
 /**
- * The proxy serving `forges` instead of providers from the env, and recording purges. Reads the
- * env on every request, so suites can switch modes with `env()`.
+ * Creates a test proxy serving `forges` and recording cache tag purges in `recorded.purges`.
+ * Reads `process.env` per request so test suites can switch access modes with `env()`.
  */
 export function createProxy(forges: Forges, options: ServerOptions = {}): Server {
   beforeEach(() => {
@@ -21,7 +21,7 @@ export function createProxy(forges: Forges, options: ServerOptions = {}): Server
   })
 }
 
-/** Sets env vars around each test of the enclosing suite. */
+/** Sets environment variables before each test in the enclosing suite and restores them after. */
 export function env(vars: Record<string, string>): void {
   beforeEach(() => Object.assign(process.env, vars))
   afterEach(() => {

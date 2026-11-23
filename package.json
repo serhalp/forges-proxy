@@ -1,7 +1,7 @@
 {
   "name": "forges-proxy-monorepo",
   "private": true,
-  "description": "Monorepo for forges-proxy: a self-hostable credential broker for forges, its client, and deployment demos",
+  "description": "Self-hosted HTTP proxy and credential broker for forges, with a typed client and deployment demos",
   "license": "MIT",
   "type": "module",
   "scripts": {

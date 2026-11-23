@@ -16,7 +16,7 @@ const context = { forge: "github", instance: "github.com", url: "https://api.git
 const silent = { error: () => {} }
 
 describe("errorResponse", () => {
-  it("passes upstream 4xx through without the url or upstream body", async () => {
+  it("forwards upstream 4xx statuses while stripping url and raw upstream body", async () => {
     const response = errorResponse(
       new NotFoundError("Not found", 404, "secret body", context),
       silent,
@@ -34,7 +34,7 @@ describe("errorResponse", () => {
     })
   })
 
-  it("keeps the scopes the operator's token has to itself", async () => {
+  it("strips the operator token's grantedScopes from InsufficientScopeError", async () => {
     const response = errorResponse(
       new InsufficientScopeError("Forbidden", 403, "", {
         ...context,
@@ -51,7 +51,7 @@ describe("errorResponse", () => {
     assert.equal(error.grantedScopes, undefined)
   })
 
-  it("maps rate limits to 429 with retry-after", async (t) => {
+  it("maps RateLimitedError to 429 with a Retry-After header", async (t) => {
     t.mock.timers.enable({ apis: ["Date"], now: 0 })
     const response = errorResponse(
       new RateLimitedError("Slow down", 403, "", {
@@ -70,23 +70,23 @@ describe("errorResponse", () => {
     )
   })
 
-  it("maps unsupported operations to 501 and unknown forges to 404", () => {
+  it("maps UnsupportedOperationError to 501 and UnknownForgeError to 404", () => {
     assert.equal(errorResponse(new UnsupportedOperationError("No", context), silent).status, 501)
     assert.equal(errorResponse(new UnknownForgeError("No", context), silent).status, 404)
   })
 
-  it("maps upstream 5xx to 502", () => {
+  it("maps upstream 5xx errors to 502", () => {
     assert.equal(errorResponse(new ForgeApiError("Down", 503, "", context), silent).status, 502)
   })
 
-  it("maps an upstream 401 to 502, so it doesn't read as a wrong proxy secret", () => {
+  it("maps upstream 401 errors to 502 so they are not confused with proxy auth failures", () => {
     assert.equal(
       errorResponse(new ForgeApiError("Bad credentials", 401, "", context), silent).status,
       502,
     )
   })
 
-  it("hides anything that is not a forge error", async () => {
+  it("masks unexpected non-ForgeError exceptions as 500 InternalError", async () => {
     const consoleError = mock.method(console, "error", () => {})
     const response = errorResponse(new Error("database password is hunter2"), silent)
     consoleError.mock.restore()
@@ -98,7 +98,7 @@ describe("errorResponse", () => {
 })
 
 describe("proxyError", () => {
-  it("uses the same shape as forge errors", async () => {
+  it("formats errors using the same envelope as ForgeError responses", async () => {
     const response = proxyError(405, "Use POST", { allow: "POST" })
     assert.equal(response.status, 405)
     assert.equal(response.headers.get("allow"), "POST")

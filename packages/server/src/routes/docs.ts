@@ -1,6 +1,5 @@
 import type { EventHandler } from "h3"
 
-// Pinned; Scalar renders the document client-side.
 const SCALAR = "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.72.4"
 
 export const docsRoute: EventHandler = (event) => {

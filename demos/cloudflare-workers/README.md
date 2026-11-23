@@ -1,24 +1,26 @@
 # forges-proxy on Cloudflare Workers
 
-A public, read-only instance: <https://demo.forges-proxy.workers.dev/>.
-[`/docs`](https://demo.forges-proxy.workers.dev/docs) lists what it routes.
+Live public read-only instance: <https://demo.forges-proxy.workers.dev/>
+([`/docs`](https://demo.forges-proxy.workers.dev/docs)).
 
-The proxy as a Worker, configured in `cloudflare.config.ts` and deployed with Cloudflare's `cf` CLI.
-Cloudflare doesn't cache what a Worker returns, so every request runs it and nothing is purged. It
-logs through [evlog](https://evlog.dev), including each webhook event from `handleEvents`; swap in
-your own handling. Forges the env doesn't configure are served anonymously where they allow it.
+Runs the proxy on Cloudflare Workers, configured via `cloudflare.config.ts` and deployed with
+Cloudflare's `cf` CLI. Note that Cloudflare does not automatically cache Worker responses at the CDN
+edge on `workers.dev`, so requests execute the Worker directly unless you place a custom domain /
+cache rule in front. Requests and webhook events from `handleEvents` are logged with
+[evlog](https://evlog.dev). Unconfigured forges that support anonymous reads are enabled by default.
 
 ## Deploy your own
 
-Copy this folder, rename the Worker in `cloudflare.config.ts`, then:
+Copy this directory, change the Worker `name` in `cloudflare.config.ts`, and run:
 
 ```sh
 npm install
-echo "FORGES_GITHUB_TOKEN=<token>" > .dev.vars   # optional, for GitHub's higher rate limit
-npm run dev                                      # locally
-npx cf deploy --secrets-file .dev.vars           # to your account
+echo "FORGES_GITHUB_TOKEN=<token>" > .dev.vars   # optional, for higher GitHub rate limits
+npm run dev                                      # run locally
+npx cf deploy --secrets-file .dev.vars           # deploy to Cloudflare
 ```
 
-The config makes it public (`FORGES_PROXY_PUBLIC`). For a private instance, replace that binding
-with a `FORGES_PROXY_SECRET` secret. Other forges take `FORGES_<KIND>_*` bindings (see the
-[main README](../../README.md#configure)). For webhooks, see [Webhooks](../../README.md#webhooks).
+`cloudflare.config.ts` defaults to public mode (`FORGES_PROXY_PUBLIC = "1"`). For a private
+instance, replace that binding with a `FORGES_PROXY_SECRET` secret. Configure other forges with
+`FORGES_<KIND>_*` bindings (see [Configure](../../README.md#configure) and
+[Webhooks](../../README.md#webhooks)).

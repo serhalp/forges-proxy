@@ -1,7 +1,7 @@
 {
   "name": "@forges-proxy/client",
-  "version": "0.0.0",
-  "description": "Use a forges-proxy credential broker as forges providers",
+  "version": "0.1.0-alpha.0",
+  "description": "Drop-in forges providers backed by a forges-proxy server",
   "keywords": [
     "azure-devops",
     "bitbucket",

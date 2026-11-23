@@ -7,7 +7,7 @@ import * as v from "valibot"
 const repo = { forge: "github", instance: "github.com", owner: "o", name: "r" }
 const NEXT = "https://api.github.com/repositories/1/contributors?page=2"
 
-/** A proxy in front of a GitHub that answers every listing with one item and a next page, recording what it fetched. */
+/** Creates a proxy backed by a stubbed GitHub `fetch` that returns a single contributor and a `Link` next-page header. */
 function proxy(env: Env, headers: HeadersInit = {}) {
   const fetched: string[] = []
   const server = createServer({
@@ -35,10 +35,10 @@ function proxy(env: Env, headers: HeadersInit = {}) {
 const Page = v.object({ cursor: v.record(v.string(), v.unknown()) })
 
 describe("cursors", () => {
-  describe("on a public instance with a token", () => {
+  describe("on a public instance with an authenticated provider", () => {
     const env = { FORGES_PROXY_PUBLIC: "1", FORGES_GITHUB_TOKEN: "t" }
 
-    it("signs the next page and follows it", async () => {
+    it("signs cursor.nextUrl and accepts the signed cursor on the next request", async () => {
       const { fetched, contributors } = proxy(env)
       const { cursor } = v.parse(Page, await (await contributors()).json())
       assert.equal(cursor.nextUrl, NEXT)
@@ -47,7 +47,7 @@ describe("cursors", () => {
       assert.equal(fetched.at(-1), NEXT)
     })
 
-    it("refuses a nextUrl it didn't sign", async () => {
+    it("rejects unsigned or tampered nextUrl values", async () => {
       const { fetched, contributors } = proxy(env)
       const { cursor } = v.parse(Page, await (await contributors()).json())
       for (const forged of [
@@ -60,18 +60,16 @@ describe("cursors", () => {
       assert.equal(fetched.length, 1)
     })
 
-    it("refuses another deployment's signatures", async () => {
+    it("rejects cursors signed with different credentials", async () => {
       const { cursor } = v.parse(Page, await (await proxy(env).contributors()).json())
       const other = proxy({ ...env, FORGES_GITHUB_TOKEN: "other" })
       assert.equal((await other.contributors({ cursor })).status, 400)
     })
   })
 
-  it("leaves cursors alone where nothing needs protecting", async () => {
+  it("does not sign cursors on private instances or anonymous providers", async () => {
     for (const { contributors } of [
-      // The caller holds the secret, so it's trusted.
       proxy({ FORGES_PROXY_SECRET: "s", FORGES_GITHUB_TOKEN: "t" }, { authorization: "Bearer s" }),
-      // Anonymous: no credential to misuse.
       proxy({ FORGES_PROXY_PUBLIC: "1", FORGES_GITHUB_ENABLED: "1" }),
     ]) {
       const { cursor } = v.parse(Page, await (await contributors()).json())

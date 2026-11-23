@@ -6,7 +6,7 @@ import { purgeTags, responseTags } from "./tags.ts"
 const repo = { forge: "github", instance: "github.com", owner: "acme", name: "widgets" }
 
 describe("responseTags", () => {
-  it("tags every repository in the arguments and result, by path and by id", () => {
+  it("tags every repository in arguments and results by both path and externalId", () => {
     const thread = {
       ref: { ...repo, repo: { ...repo, externalId: "42" }, kind: "issue", number: "1" },
     }
@@ -17,22 +17,21 @@ describe("responseTags", () => {
     ])
   })
 
-  it("skips forge payloads", () => {
+  it("ignores refs inside raw forge payloads", () => {
     const tags = responseTags("github", "github.com", {
       raw: { repo: { ...repo, name: "secret" } },
     })
     assert.deepEqual(tags, ["github:github.com"])
   })
 
-  it("falls back to the instance tag past a header-sized number of repositories", () => {
+  it("falls back to only the instance tag when repository tags exceed MAX_REPO_TAGS", () => {
     const repos = Array.from({ length: 51 }, (_, index) => ({ ...repo, name: `r${index}` }))
     assert.deepEqual(responseTags("github", "github.com", repos), ["github:github.com"])
   })
 })
 
 describe("purgeTags", () => {
-  it("includes what affectedKeys names, and both keys of each repository", () => {
-    // Partial events: `purgeTags` reads only these fields.
+  it("returns affectedKeys plus both path and externalId tags for each repository", () => {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     const event = {
       kind: "comment",
@@ -46,7 +45,7 @@ describe("purgeTags", () => {
     ])
   })
 
-  it("covers both paths of a renamed repository", () => {
+  it("includes both old and new repository paths on a repo_renamed event", () => {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     const event = {
       kind: "repo",

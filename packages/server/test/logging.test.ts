@@ -15,7 +15,7 @@ describe("request logging", () => {
     requests.length = 0
   })
 
-  it("logs each request at info, without its query", async () => {
+  it("logs each request at info without query parameters", async () => {
     await app.fetch(new Request("http://proxy.test/fake/fake.test/repos.get?args=%5B%5D"))
     assert.equal(requests.length, 1)
     assert.deepEqual(
@@ -39,7 +39,7 @@ describe("unhandled errors", () => {
   }
   const brokenApp = createProxy(broken, { logger: { error: (entry) => void errors.push(entry) } })
 
-  it("go to the logger, not to h3's console.error, and leak nothing", async () => {
+  it("logs via the configured logger without leaking internal error details", async () => {
     const response = await brokenApp.fetch(
       new Request("http://proxy.test/webhooks/fake/fake.test", { method: "POST", body: "{}" }),
     )

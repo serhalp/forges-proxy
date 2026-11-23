@@ -4,7 +4,7 @@ import { createServer } from "@forges-proxy/server"
 import Fastify from "fastify"
 import { toNodeHandler } from "srvx/node"
 
-// srvx types it for HTTP/1 and HTTP/2 at once; Fastify here is HTTP/1.
+// `srvx` types the handler over both HTTP/1 and HTTP/2; narrow to HTTP/1 for Fastify.
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion
 const proxy = toNodeHandler(createServer({ anonymousForges: true }).fetch) as (
   req: IncomingMessage,
@@ -14,7 +14,7 @@ const app = Fastify()
 app.get("/", async () => "An app with a forges proxy at /forges/")
 await app.register(
   async (scope) => {
-    // The proxy reads request bodies itself, so Fastify must leave them unread.
+    // Leave the request stream unconsumed so the proxy can read request bodies directly.
     scope.removeAllContentTypeParsers()
     scope.addContentTypeParser("*", (_request, _payload, done) => done(null))
     scope.all("/*", (request, reply) => {

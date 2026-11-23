@@ -5,11 +5,11 @@ export default defineConfig({
     name: "demo",
     entrypoint: "src/index.ts",
     compatibilityDate: "2026-10-01",
-    // For `node:async_hooks`, and a `process.env` filled from the bindings below, which the server reads.
+    // Required for `node:async_hooks` and populating `process.env` from Worker bindings.
     compatibilityFlags: ["nodejs_compat"],
     env: {
       FORGES_PROXY_PUBLIC: bindings.text("1"),
-      // `cf deploy --secrets-file <file>`; locally, `.dev.vars`.
+      // Set via `cf deploy --secrets-file <file>` or `.dev.vars` locally.
       FORGES_GITHUB_TOKEN: bindings.secret(),
     },
   },

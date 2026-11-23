@@ -1,10 +1,10 @@
 /**
- * The `forges` the proxy and client are built against. `forges` exports no version of its own, so a test keeps this in
- * step with the installed one.
+ * Installed `forges` version that `@forges-proxy/client` was built against. Verified by a unit test
+ * against `forges/package.json`.
  */
 export const FORGES_VERSION = "0.4.1"
 
-/** Whether `a` and `b` share a major version, or a minor while the major is 0, where semver lets minors break. */
+/** Returns true if versions `a` and `b` are semver-compatible (matching major, or matching minor when major is `0`). */
 export function compatible(a: string, b: string): boolean {
   const [majorA, minorA] = a.split(".")
   const [majorB, minorB] = b.split(".")

@@ -3,7 +3,7 @@ import { defineHandler } from "nitro"
 
 const server = createServer({ anonymousForges: true })
 
-// The proxy answers at its own root, so it sees the path without the prefix.
+// Strip the `/forges` mount prefix before forwarding the request to the proxy.
 export default defineHandler((event) => {
   const url = new URL(event.req.url)
   url.pathname = url.pathname.slice("/forges".length) || "/"

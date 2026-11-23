@@ -9,12 +9,12 @@ import { isRouted } from "../verbs.ts"
 const RETRY_MS = 5 * 60_000
 
 /**
- * The `forges` version, the configured providers with their capabilities, and the verbs this instance routes, each
- * with the position of its options, where clients put `signal` and a listing's cursor.
+ * Returns the proxy's `forges` version, configured providers and their capabilities, and routed
+ * verbs with their options parameter index (used by clients to inject `signal` and `cursor`).
  */
 export function indexRoute(context: Context): EventHandler {
-  // `refreshCapabilities()` asks the instance for its version on every call, so it runs once per provider and server
-  // instance. A forge that doesn't answer keeps its static capabilities and is asked again later.
+  // `refreshCapabilities()` queries the upstream forge on every call, so cache the result per
+  // provider instance. If the request fails, fall back to static capabilities and retry after `RETRY_MS`.
   const refreshed = new WeakMap<
     ForgeProvider,
     { at: number; capabilities: Promise<ForgeCapabilities> }
@@ -55,7 +55,7 @@ export function indexRoute(context: Context): EventHandler {
           listing: !!verb.listing,
           options: verb.params.findIndex((param) => param.options),
         }))
-        // Not in the manifest: it answers with server-sent events rather than JSON.
+        // `sources.stream` is excluded from the JSON verb manifest because it returns an SSE stream.
         .concat({
           name: "sources.stream",
           write: false,
@@ -63,13 +63,13 @@ export function indexRoute(context: Context): EventHandler {
           listing: false,
           options: 0,
         }),
-      // Only a private instance says which env sets were skipped; it describes the operator's configuration.
+      // Only expose skipped provider diagnostics on authenticated private instances.
       ...(mode === "private" ? { skipped: skippedProviders(context) } : {}),
     }
   }
 }
 
-/** Provider sets in the environment that could not be configured, by forge and reason only. */
+/** Returns any `FORGES_*` environment variable groups that could not be initialized. */
 function skippedProviders(
   context: Context,
 ): Array<{ forge: string; suffix: string; reason: string }> {

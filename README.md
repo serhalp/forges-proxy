@@ -1,9 +1,8 @@
 # forges-proxy
 
-A self-hostable, public or single-tenant caching proxy and credential broker for
-[`forges`](https://forges.link): one API, one cache, and one set of credentials in front of every
-forge you configure. Callers authenticate to the proxy; it holds the forge tokens. Design in
-[ARCHITECTURE.md](./ARCHITECTURE.md), next steps in [PLAN.md](./PLAN.md).
+A self-hosted HTTP proxy and credential broker for [`forges`](https://forges.link). It holds your
+forge tokens, caches public reads at the CDN, and exposes a single HTTP API across all configured
+forges.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/server-dark.png">
@@ -12,47 +11,54 @@ forge you configure. Callers authenticate to the proxy; it holds the forge token
 
 ## Use cases
 
-- Non-JS clients, using `forges` over HTTP, as a sidecar or a separate gateway service.
-- Internal tools, bots, and CI across several forges: credentials in one place, rate limits pooled
-  behind one cache.
-- Public read-only services like [npmx](https://npmx.dev), where many readers to many forges share
-  one cache.
-- Browsers and sandboxes limited to known hosts (CSP, egress allowlists) reaching forges whose hosts
-  aren't known in advance: Tangled reads hit each author's server and per-repo knots, and
-  self-hosted forges and Radicle nodes can be anywhere.
-- AI agents that need forge access without holding tokens.
+- Calling `forges` from non-JS languages over HTTP, either as a sidecar or a shared gateway.
+- Sharing forge credentials and pooling rate limits behind a single cache for internal tools, bots,
+  and CI jobs.
+- Public read-only apps like [npmx](https://npmx.dev), where many readers query multiple forges
+  through a shared CDN cache.
+- Browsers and sandboxes with strict CSP or egress allowlists that need to reach arbitrary forge
+  hosts (such as Tangled user servers and knots, self-hosted instances, or Radicle nodes).
+- Giving AI agents forge access without exposing raw forge tokens.
 
 ## Packages
 
-- [`packages/server`](packages/server) (`@forges-proxy/server`): the proxy as a
-  [Fetchable](https://fetchable.org). `createServer(options)` returns `{ fetch(request) }`, and the
-  default export is one configured from `process.env`.
-- [`packages/client`](packages/client) (`@forges-proxy/client`): `connect()`, which turns a proxy
-  back into drop-in `forges` providers.
+- [`packages/server`](packages/server) (`@forges-proxy/server`): the proxy server, exported as a
+  [Fetchable](https://fetchable.org) (`{ fetch(request) }`). Use `createServer(options)` for custom
+  configuration, or the default export to configure from `process.env`.
+- [`packages/client`](packages/client) (`@forges-proxy/client`): `connect()`, which wraps a remote
+  proxy in standard `forges` provider objects.
 - [`packages/docs`](packages/docs): placeholder for the documentation site.
-- [`demos/`](demos): one deployment per platform, each a few lines:
-  [Netlify Functions](demos/netlify-serverless) (canonical),
-  [Netlify Edge Functions](demos/netlify-edge), [Netlify Server](demos/netlify-server),
-  [Cloudflare Workers](demos/cloudflare-workers), [Vercel](demos/vercel), [Node](demos/node),
-  [Docker](demos/docker), and mounted under `/forges` in [Hono](demos/hono), [Nitro](demos/nitro),
-  and [Fastify](demos/fastify). Live, as public read-only instances:
-  [Netlify Functions](https://forges-proxy-demo.netlify.app/),
-  [Netlify Edge Functions](https://forges-proxy-edge-demo.netlify.app/),
-  [Netlify Server](https://forges-proxy-server-demo.netlify.app/),
-  [Cloudflare Workers](https://demo.forges-proxy.workers.dev/),
-  [Vercel](https://forges-proxy-demo.vercel.app/),
-  [Docker on Fly.io](https://forges-proxy-demo.fly.dev/).
+- [`demos/`](demos): example deployments for supported platforms and frameworks.
+
+## Demos
+
+The framework demos mount the proxy under `/forges`. The live deployments below are public,
+read-only instances.
+
+| Demo                                           | Live                                                                                  |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------- |
+| [Netlify Functions](demos/netlify-serverless)  | [forges-proxy-demo.netlify.app](https://forges-proxy-demo.netlify.app/)               |
+| [Netlify Edge Functions](demos/netlify-edge)   | [forges-proxy-edge-demo.netlify.app](https://forges-proxy-edge-demo.netlify.app/)     |
+| [Netlify Server](demos/netlify-server)         | [forges-proxy-server-demo.netlify.app](https://forges-proxy-server-demo.netlify.app/) |
+| [Cloudflare Workers](demos/cloudflare-workers) | [demo.forges-proxy.workers.dev](https://demo.forges-proxy.workers.dev/)               |
+| [Vercel](demos/vercel)                         | [forges-proxy-demo.vercel.app](https://forges-proxy-demo.vercel.app/)                 |
+| [Docker](demos/docker)                         | [forges-proxy-demo.fly.dev](https://forges-proxy-demo.fly.dev/) (Fly.io)              |
+| [Node](demos/node)                             |                                                                                       |
+| [Hono](demos/hono)                             |                                                                                       |
+| [Nitro](demos/nitro)                           |                                                                                       |
+| [Fastify](demos/fastify)                       |                                                                                       |
 
 ## Deploy
 
-Depend on `@forges-proxy/server` and hand it to your platform. Updating is a version bump. Where the
-platform takes a Fetchable, this is the whole entry:
+Install `@forges-proxy/server` and export it from your platform entrypoint. On platforms that accept
+a Fetchable directly:
 
 ```ts
 export { default } from "@forges-proxy/server"
 ```
 
-Platform specifics are options. On Netlify (see the demo):
+Pass platform-specific hooks like CDN cache headers and tag purging to `createServer()`. For
+example, on Netlify Functions:
 
 ```ts
 import { createServer } from "@forges-proxy/server"
@@ -68,30 +74,34 @@ export default createServer({
 export const config = { path: "/*" }
 ```
 
-The proxy answers at its own root. To mount it under a path, strip the prefix first (Hono's
-`app.mount()` does). The client, docs, and OpenAPI document all work under a prefix.
+The server expects requests rooted at `/`. If you mount it under a subpath, strip the prefix before
+passing the request to `server.fetch` (Hono's `app.mount()` does this automatically). The client,
+`/docs`, and `/openapi.json` all work under a path prefix.
 
-Check a deployment end to end with `pnpm smoke <url> [secret]`.
+Run `pnpm smoke <url> [secret]` to verify a deployed instance end-to-end.
 
 ## Configure
 
-Providers come from `FORGES_<KIND>_<FIELD>[_<SUFFIX>]` variables, as `forgesFromEnv()` reads them
-(e.g. `FORGES_GITHUB_TOKEN`, `FORGES_GITLAB_ENABLED=1`). With
-`createServer({ anonymousForges: true })`, every forge the env doesn't mention that can be read
-without credentials is served too, anonymously: GitHub, GitLab, Codeberg, gitea.com, Bitbucket,
-Gitee, Cursor Origin, Pushin, GitCafe, and Upstream today. Tangled is left out: its reads go to
-hosts callers name, so it would let anyone aim the proxy at any host. The demos turn it on.
+Providers are configured with `FORGES_<KIND>_<FIELD>[_<SUFFIX>]` environment variables, using the
+same format as `forgesFromEnv()` (for example, `FORGES_GITHUB_TOKEN` or `FORGES_GITLAB_ENABLED=1`).
 
-Set exactly one of:
+If you pass `createServer({ anonymousForges: true })`, any forge not configured in the environment
+that supports unauthenticated reads at its default host is also enabled anonymously (currently
+GitHub, GitLab, Codeberg, gitea.com, Bitbucket, Gitee, Cursor Origin, Pushin, GitCafe, and
+Upstream). Tangled is excluded because its reads fetch hosts specified in caller arguments, which
+would create an SSRF risk without an egress allowlist. All demos enable `anonymousForges`.
 
-- `FORGES_PROXY_SECRET`: private instance. Callers send `Authorization: Bearer <secret>` to
-  everything but `/docs`, `/openapi.json`, and webhooks. Every verb is routed. To rotate it without
-  downtime, move the old one to `FORGES_PROXY_PREVIOUS_SECRET`, set the new one, and unset the old
-  one once every caller has moved over; both are accepted meanwhile.
-- `FORGES_PROXY_PUBLIC=1`: public instance. No auth, and only reads that need neither an account nor
-  elevated access are routed (no writes, no security alerts, collaborators, or admin settings). Its
-  forge tokens must only be able to read public data, e.g. a GitHub fine-grained token limited to
-  public repositories.
+You must set either `FORGES_PROXY_SECRET` or `FORGES_PROXY_PUBLIC=1`:
+
+- `FORGES_PROXY_SECRET`: runs a private instance. All endpoints except `/docs`, `/openapi.json`, and
+  `/webhooks/*` require `Authorization: Bearer <secret>`. All routable verbs are enabled. To rotate
+  secrets without downtime, set `FORGES_PROXY_PREVIOUS_SECRET` to the old secret and
+  `FORGES_PROXY_SECRET` to the new one; both are accepted until you unset
+  `FORGES_PROXY_PREVIOUS_SECRET`.
+- `FORGES_PROXY_PUBLIC=1`: runs a public, read-only instance with no authentication. Write verbs,
+  account verbs, and privileged reads (security alerts, collaborators, branch rules) are disabled.
+  Any forge tokens configured on a public instance must be scoped to public data only (for example,
+  a fine-grained GitHub token with public-only access).
 
 ## Use
 
@@ -100,29 +110,36 @@ pnpm install
 FORGES_PROXY_PUBLIC=1 FORGES_GITHUB_ENABLED=1 pnpm --filter @forges-proxy/server dev
 ```
 
-This serves GitHub anonymously, on a public instance. Add `FORGES_GITHUB_TOKEN` for a higher rate
-limit, or see [Configure](#configure).
+This starts a local public instance serving GitHub anonymously. Set `FORGES_GITHUB_TOKEN` for higher
+rate limits.
 
-- `GET /`: configured providers, their capabilities (refined by each instance's version, once per
-  server instance), and the routed verbs with the position of their options.
-- `GET /docs`: API reference (Scalar), from `GET /openapi.json` (OpenAPI 3.1).
-- `GET /status`: each provider's rate-limit budgets, as the server instance that answers last saw
-  them. Verb responses carry the same in a `forges-rate-limits` header.
-- `GET /:forge/:instance/:verb?args=<json array>`: a read, e.g. `repos.get`, `threads.list`.
-- `POST /:forge/:instance/:verb` with `{ "args": [...] }`: a write.
-- `GET /:forge/:instance/sources.stream`: the forge's live events (`sources.stream()`, Tangled only
-  today) as
-  [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events). Each
-  event's `id` is its cursor; resume with `Last-Event-ID`, as `EventSource` does on reconnect, or
-  `?cursor=`. A failure ends the stream with an `error` event. Serverless platforms end long
-  responses at their time limit, so expect to reconnect. Browsers' `EventSource` can't send the
-  proxy secret, so on a private instance use the client or `fetch`.
+### Endpoints
 
-Arguments are positional, as the `ForgeProvider` method takes them, and are validated against the
-verb's signature (see `/docs`). Pass `null` for a skipped optional argument. Bytes travel as
-`{ "$bytes": "<base64>" }` in both directions. A listing answers with one page; pass its `cursor`
-back, unchanged, in the options to read the next. Public instances sign a cursor's `nextUrl` and
-refuse one they didn't sign.
+- `GET /`: returns the access mode, `forges` version, configured providers and their capabilities
+  (refreshed once per server instance), and routed verbs with their options parameter index.
+- `GET /docs`: interactive Scalar API reference built from `GET /openapi.json` (OpenAPI 3.1).
+- `GET /status`: latest rate-limit budgets observed by the responding server instance. Verb
+  responses also include this data in the `forges-rate-limits` header.
+- `GET /:forge/:instance/:verb?args=<json array>`: calls a read verb (e.g. `repos.get`,
+  `threads.list`).
+- `POST /:forge/:instance/:verb` with `{ "args": [...] }`: calls a write verb.
+- `GET /:forge/:instance/sources.stream`: streams live events from `provider.sources.stream()`
+  (currently Tangled only) as
+  [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events). Each
+  event's `id` is its cursor; pass `Last-Event-ID` or `?cursor=` to resume. Errors emit an `error`
+  event before closing. Serverless platforms terminate long-lived connections at their execution
+  time limit, so clients should reconnect using the last seen cursor. Browser `EventSource` does not
+  support custom `Authorization` headers; use `@forges-proxy/client` or `fetch` against private
+  instances.
+
+`args` is a JSON array of positional arguments matching the `ForgeProvider` method signature (see
+`/docs`), validated against the operation schema. Use `null` to skip an optional positional
+argument. Binary values are encoded as `{ "$bytes": "<base64>" }` and dates as
+`{ "$date": "<ISO 8601>" }`.
+
+Listing endpoints return a single page (`{ items, cursor }`). Pass `cursor` back in the options
+argument to fetch the next page. On public instances with authenticated providers, the proxy
+HMAC-signs `cursor.nextUrl` and rejects unsigned or tampered URLs.
 
 ```sh
 curl -G localhost:3000/github/github.com/repos.get \
@@ -136,8 +153,8 @@ curl -G localhost:3000/github/github.com/repos.get \
   <img alt="@forges-proxy/client: drop-in forges providers for your proxy. Without a proxy, createForges() holds a GitHub, GitLab, and Gitea token and calls each forge directly. With the proxy, createForges(await connect({ url, secret })) sends each call with the proxy secret to @forges-proxy/server, which calls the same forges with their tokens." src="assets/client-light.png">
 </picture>
 
-`@forges-proxy/client` turns the proxy back into `forges` providers, so code written against
-`forges` works unchanged:
+`@forges-proxy/client` connects to a proxy and returns `ForgeProvider` instances that plug directly
+into `createForges()`:
 
 ```ts
 import { createForges } from "forges"
@@ -152,42 +169,47 @@ const repo = await forges.repos.get({
 })
 ```
 
-For the sync helpers (`urlFor()`, `parseUrl()`, ...), pass the factories of the forges you use, such
-as `connect({ url, secret, factories: [github] })` with `github` from `forges/github`, or every
-forge's with `allFactories` from `@forges-proxy/client/all`. Without one, a forge's helpers return
-nothing, and your bundle carries none of its code.
+Synchronous helper methods (`urlFor()`, `parseUrl()`, `referenceFor()`, etc.) run locally and
+require the underlying provider factory. Pass the factories you need via `factories` to avoid
+bundling unused forges, or pass `allFactories` from `@forges-proxy/client/all` to include all of
+them:
 
-Every verb is present. Listings read one page per request, whether iterated or through `page()`.
-`sources.stream()` follows the proxy's event stream and, as with any provider, ends with
-`StreamClosedError` and the last cursor when the connection closes, including at a serverless time
-limit; call it again with that cursor. Errors come back as the same classes. Verbs the proxy doesn't
-route reject with `UnsupportedOperationError`, and `can()` says so. `refreshCapabilities()` re-reads
-the proxy's capabilities.
+```ts
+import { github } from "forges/github"
 
-`rateLimits()` returns the budgets reported with the provider's latest response, which are the
-proxy's, not the client's. Read them with these caveats:
+const providers = await connect({ url, secret, factories: [github] })
+```
 
-- They're the budgets of the server instance that answered, as of its latest upstream response.
-  Instances of a serverless deployment each keep their own.
-- An authenticated budget is the forge account's (on GitHub, the user's or the app installation's),
-  shared with anything else using it. An anonymous budget is usually the server's IP's, which can
-  differ between instances.
-- A response the CDN served carries the budgets from when it was cached.
-- Limits the forge doesn't report in headers, such as GitHub's secondary limits, aren't in them.
+If no factory is provided for a forge, its synchronous helpers return `undefined` (or `[]` / the
+input string).
+
+Listings fetch one page per HTTP request whether you iterate with `for await` or call `.page()`.
+`sources.stream()` reads the SSE endpoint and throws `StreamClosedError` (with the last cursor
+attached) when the connection closes so you can resume. Upstream errors are reconstructed into their
+original `ForgeError` subclasses. Unrouted verbs reject with `UnsupportedOperationError` and report
+`false` from `can()`. Call `refreshCapabilities()` to re-fetch provider capabilities from `GET /`.
+
+`rateLimits()` returns the budgets attached to the provider's most recent response. Note that:
+
+- Budgets reflect the state of the server instance that handled the request, not per-client state.
+  In serverless deployments, each instance tracks budgets independently.
+- Authenticated budgets belong to the proxy's forge token/installation and are shared across all
+  callers. Anonymous budgets are typically tied to the server instance's egress IP.
+- Cached CDN responses carry the rate-limit header from when the response was originally cached.
+- Secondary rate limits that forges do not report via response headers are not included.
 
 ## Webhooks
 
-A forge's webhooks, pointed at the proxy, keep its cache fresh and hand the forge's events to your
-code.
+Pointing forge webhooks at the proxy lets it purge cached CDN responses when repositories change and
+forward normalized events to your code.
 
-Without webhooks, CDN entries expire by age: fresh for 60 seconds, then served stale for up to 10
-minutes while they refresh. With them, and a `purge` option (the Netlify Functions and Netlify
-Server demos pass Netlify's), each verified delivery purges the CDN entries of every repository it
-concerns, by cache tag.
+Without webhooks, cached public reads expire via TTL (`max-age=60, stale-while-revalidate=600`).
+When you configure `purge` in `createServer()` (as in the Netlify Functions and Netlify Server
+demos), each verified webhook delivery purges the cache tags for every repository affected by the
+delivery.
 
-With a `handleEvents` option, the proxy then calls it with the delivery's events, normalized as
-`forges` [`ForgeEvent`s](https://forges.link/concepts/events), and the forge and instance that sent
-them:
+If you also pass `handleEvents`, the proxy calls it after purging with the normalized
+[`ForgeEvent`s](https://forges.link/concepts/events) and the `{ forge, instance }` source:
 
 ```ts
 createServer({
@@ -197,49 +219,48 @@ createServer({
 })
 ```
 
-The response waits for it. If it throws, the forge gets a `500` and logs the delivery as failed;
-most forges don't retry on their own, so redeliver it from the forge's settings or with
-`webhooks.redeliver()`, which private instances route too. Forges give up after a few seconds
-(GitHub after 10), so hand slow work to a queue or to your platform's `waitUntil` (on Workers,
-`import { waitUntil } from "cloudflare:workers"`). The demos log each event.
+The webhook route awaits `handleEvents`. If it throws, the proxy logs the error and returns `500` so
+the failure is recorded in the forge's webhook delivery log. Most forges do not automatically retry
+failed deliveries, so you can redeliver from the forge UI or via `webhooks.redeliver()` on private
+instances. Because forges time out webhook deliveries after a few seconds (10s on GitHub), offload
+slow work to a queue or `waitUntil`.
 
-To set one up:
+### Webhook setup
 
-1. Pick a secret and set it as the provider's `FORGES_<KIND>_WEBHOOK_SECRET`, e.g.
-   `FORGES_GITHUB_WEBHOOK_SECRET`. The provider has to exist: on a public instance with no token,
-   also set `FORGES_<KIND>_ENABLED=1`, since setting any `FORGES_<KIND>_*` variable turns off its
-   anonymous default. Redeploy if your platform reads the env at deploy time.
-2. On the forge, add a webhook to the repository or organization with the URL
-   `https://<proxy>/webhooks/<forge>/<instance>` (e.g. `/webhooks/github/github.com`), the same
-   secret, a JSON payload, and the events you read or handle. Every event that names a repository
-   purges it, so subscribing to everything is simplest for caching. Or create it from code with
-   [`webhooks.create()`](https://forges.link/guides/webhooks#register-a-webhook).
-3. Check the forge's delivery log. A verified delivery answers `200` with the tags it purged
-   (`{ "purged": [...] }`); a bad signature answers `401`, and a forge or instance the proxy doesn't
-   serve `404`.
+1. Generate a webhook secret and set `FORGES_<KIND>_WEBHOOK_SECRET` (e.g.
+   `FORGES_GITHUB_WEBHOOK_SECRET`). Note that setting any `FORGES_<KIND>_*` variable disables the
+   `anonymousForges` fallback for that forge, so if you are not setting a token on a public
+   instance, also set `FORGES_<KIND>_ENABLED=1`.
+2. In your forge's repository or organization settings (or via
+   [`webhooks.create()`](https://forges.link/guides/webhooks#register-a-webhook)), register a
+   webhook pointing to `https://<proxy>/webhooks/<forge>/<instance>` (e.g.
+   `/webhooks/github/github.com`) with a JSON payload and the same secret. Subscribing to all events
+   ensures all repository changes purge the cache.
+3. Verify in the forge's delivery log: valid deliveries return `200` with `{ "purged": [...] }`,
+   invalid signatures return `401`, and unconfigured providers return `404`.
 
-Webhook URLs need no proxy secret; the forge's signature is what authenticates them. For what each
-forge sends and signs, and which events it can deliver, see the `forges`
-[webhooks guide](https://forges.link/guides/webhooks) and its
-[provider pages](https://forges.link/providers).
+Webhook endpoints do not use `FORGES_PROXY_SECRET`; deliveries are authenticated using the forge's
+webhook signature. See the `forges` [webhooks guide](https://forges.link/guides/webhooks) and
+[provider docs](https://forges.link/providers) for per-forge signature and event details.
 
 ## Upstream requests
 
-The CDN absorbs repeated public reads; each miss is a request upstream. To cache upstream responses
-as well, pass your own `fetch`.
+Public reads are cached at the CDN, while cache misses make upstream requests to the forge. To add
+an upstream HTTP cache beneath the provider, pass a custom `fetch` implementation to
+`createServer({ fetch })`.
 
 ## Logging
 
-By default the server logs only its own failures, such as a verb's unexpected error or a
-`handleEvents` that throws, to `console.error`. Pass a `logger` to choose where logs go, and to log
-each request at info: `{ message: "request", method, path, status, durationMs }`. Anything with
-`error()` and, optionally, `info()` methods that take an object fits, such as `console`, pino, or
-[evlog](https://evlog.dev)'s `log`; its levels decide what's kept. Pass the logger itself rather
-than its methods, so it keeps its `this`. Reads the CDN answers never reach the server, so they
-aren't logged. The platform and Docker demos use evlog.
+By default, the server only logs unhandled errors and `handleEvents` failures to `console.error`.
+Pass a `logger` object (`{ error(event), info?(event) }`) to `createServer()` to route error logs
+and emit a structured `info` log on every request
+(`{ message: "request", method, path, status, durationMs }`). `console`, pino, and
+[evlog](https://evlog.dev)'s `log` all match this interface. Pass the logger object itself rather
+than unbound methods so `this` is preserved. Requests served directly by the CDN do not reach the
+server and are not logged.
 
 ## Operations manifest
 
-`packages/server/src/manifest.ts` re-exports the routed verbs and model schemas from
-`forges/schema`. The OpenAPI document, argument validation, and signal passthrough all come from it.
-Update the `forges` dependency to pick up new verbs; there is no proxy-side generator.
+`packages/server/src/manifest.ts` re-exports the verb signatures and model schemas from
+`forges/schema`. Request validation, signal injection, and `/openapi.json` are all driven by this
+manifest. Bumping the `forges` dependency picks up new verbs automatically.

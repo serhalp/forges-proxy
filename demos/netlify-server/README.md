@@ -2,24 +2,25 @@
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/serhalp/forges-proxy&create_from_path=demos/netlify-server#FORGES_PROXY_PUBLIC=1)
 
-A public, read-only instance: <https://forges-proxy-server-demo.netlify.app/>.
-[`/docs`](https://forges-proxy-server-demo.netlify.app/docs) lists what it routes.
+Live public read-only instance: <https://forges-proxy-server-demo.netlify.app/>
+([`/docs`](https://forges-proxy-server-demo.netlify.app/docs)).
 
-The same proxy as the [Functions demo](../netlify-serverless), as a long-lived Node.js server: CDN
-caching, webhooks, logging, and anonymous forges all work the same.
-
-[Netlify Server](https://docs.netlify.com/build/server/) is in Early Access. It needs a credit-based
-plan, and Node.js 24+ to build, which `.node-version` sets.
+Runs the same setup as the [Netlify Functions demo](../netlify-serverless) (durable CDN caching,
+webhook cache-tag purging, [evlog](https://evlog.dev) logging, and anonymous forge defaults) on a
+long-lived Node.js server using [Netlify Server](https://docs.netlify.com/build/server/) (Early
+Access). Requires a credit-based Netlify plan and Node.js 24+ (configured via `.node-version`).
 
 ## Deploy your own
 
-The button copies this folder into a new repository and asks for the environment:
+Clicking **Deploy to Netlify** clones this directory into a new repository and prompts for
+environment variables:
 
-- `FORGES_PROXY_PUBLIC=1` for a public, read-only instance. For a private one, leave it empty and
-  set `FORGES_PROXY_SECRET` after deploying; callers then send it as a bearer token.
-- `FORGES_GITHUB_TOKEN` (optional) for GitHub's higher rate limit. On a public instance, give it no
-  access beyond public data.
+- `FORGES_PROXY_PUBLIC=1` for a public, read-only instance. For a private instance, leave this blank
+  and set `FORGES_PROXY_SECRET` after deploying; callers must then pass
+  `Authorization: Bearer <secret>`.
+- `FORGES_GITHUB_TOKEN` (optional) for higher GitHub rate limits. On a public instance, use a token
+  scoped only to public repositories.
 
-Other forges take `FORGES_<KIND>_*` variables (see the [main README](../../README.md#configure)). To
-purge entries when a repository changes and handle the forge's events, set up
-[webhooks](../../README.md#webhooks).
+Configure other forges with `FORGES_<KIND>_*` variables (see
+[Configure](../../README.md#configure)). To purge cached reads on repository changes and process
+webhook events, see [Webhooks](../../README.md#webhooks).

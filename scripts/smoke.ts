@@ -1,6 +1,6 @@
 /**
- * Checks a running proxy end to end, through the client: `node scripts/smoke.ts <url> [secret]`. Expects GitHub to be
- * configured, since it reads one public repository.
+ * End-to-end smoke test for a running proxy deployment (`node scripts/smoke.ts <url> [secret]`).
+ * Requires a `github:github.com` provider to be configured on the target deployment.
  */
 import assert from "node:assert/strict"
 import process from "node:process"
@@ -55,15 +55,15 @@ await check("CORS preflight", async () => {
   assert.equal(response.status, 204)
   assert.equal(response.headers.get("access-control-allow-origin"), "*")
 })
-await check("a read through the client", async () => {
+await check("client read", async () => {
   const forges = createForges(await connect({ url: base, secret }))
   const ref = { forge: "github", instance: "github.com", owner: "danielroe", name: "forges" }
   const repo = await forges.for(ref)!.repos.get(ref)
   assert.equal(repo.ref.name, "forges")
 })
 if (secret) {
-  await check("a write's body reaches the proxy", async () => {
-    // Refused before any upstream request, with a message only a parsed body can produce.
+  await check("POST request body parsing", async () => {
+    // Pass a mismatched forge ref in the body so the proxy rejects it with 400 before making an upstream call.
     const repo = { forge: "gitlab", instance: "gitlab.com", owner: "a", name: "b" }
     const thread = { ...repo, repo, kind: "issue", number: "1" }
     const response = await fetch(new URL("github/github.com/threads.createComment", base), {

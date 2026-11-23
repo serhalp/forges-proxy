@@ -26,13 +26,13 @@ describe("GET /openapi.json", () => {
   describe("on a public instance", () => {
     env({ FORGES_PROXY_PUBLIC: "1" })
 
-    it("marks `raw` optional, since responses leave it out by default", async () => {
+    it("marks `raw` optional in model schemas because responses omit it by default", async () => {
       const { doc } = await document()
       assert.ok(JSON.stringify(doc.components.schemas.Repo).includes('"raw"'))
       assert.doesNotMatch(JSON.stringify(doc.components.schemas), /"required":\[[^\]]*"raw"/)
     })
 
-    it("documents only the reads it routes, for the forges it serves", async () => {
+    it("includes only routed read verbs and enumerates configured forges and instances", async () => {
       const { response, doc } = await document()
       assert.equal(response.headers.get("cache-control"), "public, max-age=300")
       assert.ok(doc.paths["/{forge}/{instance}/repos.get"]?.get)
@@ -44,13 +44,13 @@ describe("GET /openapi.json", () => {
       assert.equal(doc.security, undefined)
     })
 
-    it("documents the event stream, which the manifest leaves out", async () => {
+    it("includes the sources.stream SSE route", async () => {
       const { doc } = await document()
       const stream = doc.paths["/{forge}/{instance}/sources.stream"]?.get
       assert.ok(stream?.responses[200].content["text/event-stream"])
     })
 
-    it("takes reads' arguments as a JSON tuple in `args`", async () => {
+    it("defines read arguments as a JSON tuple in the `args` query parameter", async () => {
       const { doc } = await document()
       const { parameters } = doc.paths["/{forge}/{instance}/repos.get"].get
       const args = parameters.find((param: { name: string }) => param.name === "args")
@@ -64,7 +64,7 @@ describe("GET /openapi.json", () => {
       assert.deepEqual([schema.minItems, schema.maxItems], [1, 2])
     })
 
-    it("documents streams, empty results, and errors", async () => {
+    it("documents binary streams, 204 responses, and default error responses", async () => {
       const { doc } = await document()
       const path = (verb: string) => doc.paths[`/{forge}/{instance}/${verb}`].get.responses
       assert.ok(path("ci.log")[200].content["application/octet-stream"])
@@ -74,7 +74,7 @@ describe("GET /openapi.json", () => {
       assert.ok(path("repos.get").default)
     })
 
-    it("resolves every reference", async () => {
+    it("resolves all component schema $refs", async () => {
       const { doc } = await document()
       for (const [, ref] of JSON.stringify(doc).matchAll(
         /"\$ref":"#\/components\/schemas\/([^"]+)"/g,
@@ -87,7 +87,7 @@ describe("GET /openapi.json", () => {
   describe("on a private instance", () => {
     env({ FORGES_PROXY_SECRET: "s3cret" })
 
-    it("documents writes as POSTs, behind the secret", async () => {
+    it("documents write verbs as POST endpoints with bearer security", async () => {
       const { response, doc } = await document()
       assert.equal(response.headers.get("cache-control"), "private, no-store")
       const comment = doc.paths["/{forge}/{instance}/threads.createComment"]
@@ -95,7 +95,6 @@ describe("GET /openapi.json", () => {
       assert.equal(comment.get, undefined)
       assert.ok(doc.components.securitySchemes)
       assert.deepEqual(doc.security, [{ secret: [] }])
-      // Writes with nothing to return answer 204 only.
       assert.deepEqual(
         Object.keys(doc.paths["/{forge}/{instance}/threads.deleteComment"].post.responses),
         ["204", "default"],

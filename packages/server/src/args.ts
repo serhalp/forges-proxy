@@ -8,8 +8,8 @@ import { argsSchema, manifest } from "./manifest.ts"
 const validators = new Map<string, Validator>()
 
 /**
- * The call's arguments, revived, from `?args=` on reads and `{ args }` on writes; or why they can't be passed to the
- * verb.
+ * Parses, validates, and wire-decodes positional arguments from `?args=` (reads) or `{ args }`
+ * (writes). Returns `{ problem }` on validation failure.
  */
 export async function readArgs(
   event: H3Event,
@@ -25,7 +25,7 @@ export async function readArgs(
   if (problem) {
     return { problem }
   }
-  // JSON has no `undefined`, so a skipped optional argument arrives as `null`.
+  // `null` represents an omitted optional positional argument in JSON.
   try {
     const args = decode(wire.map((arg) => arg ?? undefined))
     if (!Array.isArray(args)) {
@@ -41,7 +41,7 @@ function parseArgs(value: unknown): unknown {
   if (value === undefined) {
     return []
   }
-  // A repeated `?args=` arrives as an array, which is no JSON.
+  // Reject repeated `?args=` parameters, which h3 parses as an array of strings.
   if (typeof value !== "string") {
     return undefined
   }
@@ -52,7 +52,7 @@ function parseArgs(value: unknown): unknown {
   }
 }
 
-/** Why `args` don't fit the verb's signature, or `undefined` when they do. */
+/** Validates `args` against the verb's JSON Schema and returns a human-readable error message on failure. */
 function argsProblem(name: string, verb: VerbSignature, args: unknown[]): string | undefined {
   let validator = validators.get(name)
   if (!validator) {
@@ -67,7 +67,7 @@ function argsProblem(name: string, verb: VerbSignature, args: unknown[]): string
   if (valid) {
     return undefined
   }
-  // The deepest error names the field; those above it, and `$ref`s, only say that their branch failed.
+  // Report the most specific leaf error rather than parent `$ref` or container errors.
   const deepest = errors
     .filter((error) => error.keyword !== "$ref")
     .reduce((best, error) =>
@@ -79,8 +79,8 @@ function argsProblem(name: string, verb: VerbSignature, args: unknown[]): string
 }
 
 /**
- * A ref anywhere in `value` for another forge or instance. The provider would send it to its own host anyway, and the
- * response would be tagged for a forge whose webhooks never reach this one.
+ * Checks whether `value` contains a ref targeting a different forge or instance than the route's
+ * `:forge/:instance` parameters, preventing cross-provider calls and mis-tagged cache entries.
  */
 function foreignRef(
   value: unknown,
@@ -107,7 +107,6 @@ function foreignRef(
   return undefined
 }
 
-// Anything else in the body, or a missing body, is left for the `args` check to name.
 function bodyArgs(body: unknown): unknown {
   return (typeof body === "object" && body !== null && "args" in body ? body.args : undefined) ?? []
 }

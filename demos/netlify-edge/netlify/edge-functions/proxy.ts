@@ -4,7 +4,7 @@ import { initLogger, log } from "evlog"
 
 initLogger({ env: { service: "forges-proxy" } })
 
-// No `purge`: CDN entries expire by age.
+// Edge functions do not configure `purge`; cached CDN entries expire via TTL.
 export default createServer({
   env: Netlify.env.toObject(),
   anonymousForges: true,
@@ -13,12 +13,11 @@ export default createServer({
     "netlify-cache-tag": tags.join(","),
   }),
   logger: log,
-  // Each verified webhook delivery's events. Swap in your own handling.
   handleEvents: (events, { forge, instance }) => {
     for (const { kind, action, summary } of events)
       log.info({ forge, instance, kind, action, summary })
   },
 })
 
-// Edge function responses are only cached when they opt in.
+// Enable opt-in CDN response caching for this edge function.
 export const config: Config = { path: "/*", cache: "manual" }

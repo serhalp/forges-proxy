@@ -56,32 +56,32 @@ async function errorOf(response: Response): Promise<{ name: string; message: str
 }
 
 describe("configuration", () => {
-  it("refuses to serve without an access mode, in the proxy's error shape", async () => {
+  it("returns 503 ProxyError when neither access mode variable is set", async () => {
     const response = await read("repos.get", [repo])
     assert.equal(response.status, 503)
     assert.equal(response.headers.get("cache-control"), "no-store")
     assert.equal((await errorOf(response)).name, "ProxyError")
   })
 
-  describe("with a previous secret but no current one", () => {
+  describe("with FORGES_PROXY_PREVIOUS_SECRET set without FORGES_PROXY_SECRET", () => {
     env({ FORGES_PROXY_PREVIOUS_SECRET: "old", FORGES_PROXY_PUBLIC: "1" })
-    it("refuses to serve", async () => {
+    it("returns 503", async () => {
       assert.equal((await read("repos.get", [repo])).status, 503)
     })
   })
 
-  describe("with both a secret and public mode", () => {
+  describe("with both FORGES_PROXY_SECRET and FORGES_PROXY_PUBLIC set", () => {
     env({ FORGES_PROXY_SECRET: "s3cret", FORGES_PROXY_PUBLIC: "1" })
-    it("refuses to serve", async () => {
+    it("returns 503", async () => {
       assert.equal((await read("repos.get", [repo])).status, 503)
     })
   })
 })
 
-describe("rotating the secret", () => {
+describe("secret rotation", () => {
   env({ FORGES_PROXY_SECRET: "new", FORGES_PROXY_PREVIOUS_SECRET: "old" })
 
-  it("accepts the current and the previous secret, and nothing else", async () => {
+  it("accepts both the current and previous secrets and rejects other tokens", async () => {
     for (const [secret, status] of [
       ["new", 200],
       ["old", 200],
@@ -97,7 +97,7 @@ describe("private mode", () => {
   env({ FORGES_PROXY_SECRET: "s3cret" })
   const authorization = { authorization: "Bearer s3cret" }
 
-  it("rejects a missing or wrong secret", async () => {
+  it("rejects missing or invalid bearer tokens with 401", async () => {
     for (const headers of [
       {},
       { authorization: "Bearer nope" },
@@ -109,7 +109,7 @@ describe("private mode", () => {
     }
   })
 
-  it("answers preflights and lets browsers read errors", async () => {
+  it("handles CORS preflights and includes CORS headers on error responses", async () => {
     const preflight = await call("/fake/fake.test/repos.get", {
       method: "OPTIONS",
       headers: {
@@ -124,7 +124,6 @@ describe("private mode", () => {
     const denied = await call("/", { headers: { origin: "https://app.test" } })
     assert.equal(denied.status, 401)
     assert.equal(denied.headers.get("access-control-allow-origin"), "*")
-    // h3's own errors skip the CORS middleware.
     const unknown = await call("/fake/fake.test/repos.get/extra", {
       headers: { origin: "https://app.test", ...authorization },
     })
@@ -132,19 +131,18 @@ describe("private mode", () => {
     assert.equal(unknown.headers.get("access-control-allow-origin"), "*")
   })
 
-  it("guards everything but the docs and webhooks", async () => {
+  it("requires authentication on all routes except /docs, /openapi.json, and POST /webhooks/:forge/:instance", async () => {
     assert.equal((await call("/")).status, 401)
     assert.equal((await call("/status")).status, 401)
     assert.equal((await call("/nope")).status, 401)
     assert.equal((await call("/docs")).status, 200)
     assert.equal((await call("/openapi.json")).status, 200)
     assert.equal((await call("/docsx")).status, 401)
-    // Only a delivery: POST to /webhooks/:forge/:instance.
     assert.equal((await call("/webhooks/fake/fake.test")).status, 401)
     assert.equal((await call("/webhooks/fake/fake.test/x", { method: "POST" })).status, 401)
   })
 
-  it("serves reads uncached", async () => {
+  it("marks read responses as private, no-store", async () => {
     const response = await read("repos.get", [repo], authorization)
     assert.equal(response.status, 200)
     assert.equal(response.headers.get("cache-control"), "private, no-store")
@@ -156,14 +154,14 @@ describe("private mode", () => {
     )
   })
 
-  it("routes writes and account verbs", async () => {
+  it("routes write and account verbs", async () => {
     const response = await write("threads.createComment", [issue, "Thanks"], authorization)
     assert.equal(response.status, 200)
     assert.equal(v.parse(v.object({ body: v.string() }), await response.json()).body, "Thanks")
     assert.equal((await read("users.me", [], authorization)).status, 200)
   })
 
-  it("lists every verb and the skipped env sets", async (t) => {
+  it("includes all routed verbs and skipped provider configs in GET /", async (t) => {
     process.env.FORGES_GITLAB_BASE_URL = "https://git.example"
     t.after(() => delete process.env.FORGES_GITLAB_BASE_URL)
     const body = v.parse(
@@ -185,7 +183,7 @@ describe("private mode", () => {
 describe("public mode", () => {
   env({ FORGES_PROXY_PUBLIC: "1" })
 
-  it("serves reads with CDN cache headers", async () => {
+  it("sets CDN cache headers on read responses", async () => {
     const response = await read("repos.get", [repo])
     assert.equal(response.status, 200)
     assert.equal(response.headers.get("cache-control"), "public, max-age=0, must-revalidate")
@@ -196,7 +194,7 @@ describe("public mode", () => {
     assert.ok(response.headers.get("cache-tag")!.split(",").includes("fake:fake.test"))
   })
 
-  it("hands reads to the CDN with the headers it's given", async () => {
+  it("uses custom cdnHeaders when configured", async () => {
     const custom = createProxy(forges, {
       cdnHeaders: ({ cacheControl, tags }) => ({ "x-cdn": `${cacheControl}; ${tags.length}` }),
     })
@@ -206,7 +204,7 @@ describe("public mode", () => {
     assert.equal(response.headers.get("cdn-cache-control"), null)
   })
 
-  it("answers a revalidation with a 304 while the body is unchanged", async () => {
+  it("returns 304 Not Modified when If-None-Match matches the weak ETag", async () => {
     const etag = (await read("repos.get", [repo])).headers.get("etag")!
     assert.match(etag, /^W\/"[0-9a-f]{32}"$/)
     const revalidated = await read("repos.get", [repo], { "if-none-match": `"x", ${etag}` })
@@ -217,7 +215,7 @@ describe("public mode", () => {
     assert.equal(other.status, 200)
   })
 
-  it("does not route writes or account verbs", async () => {
+  it("blocks write and account verbs with 404", async () => {
     const comments = () =>
       factory.store.repos.get("acme/widgets")!.threads.get("1")!.comments.length
     const before = comments()
@@ -227,13 +225,12 @@ describe("public mode", () => {
     assert.equal(comments(), before)
   })
 
-  it("does not route reads that need more than public access", async () => {
+  it("blocks privileged read verbs with 404", async () => {
     assert.equal((await read("securityAlerts.list", [repo])).status, 404)
     assert.equal((await read("repos.collaborators", [repo])).status, 404)
   })
 
-  it("lists only public verbs and hides the skipped env sets", async () => {
-    // Loose, so the `skipped` check below sees every key.
+  it("lists only public read verbs and omits skipped provider diagnostics in GET /", async () => {
     const body = v.parse(
       v.looseObject({ verbs: v.array(v.object({ write: v.boolean(), account: v.boolean() })) }),
       await (await call("/")).json(),
@@ -248,7 +245,7 @@ describe("dispatch", () => {
   env({ FORGES_PROXY_SECRET: "s3cret" })
   const authorization = { authorization: "Bearer s3cret" }
 
-  it("404s for unknown and excluded verbs, and unknown providers", async () => {
+  it("returns 404 for unknown verbs, excluded verbs, and unconfigured providers", async () => {
     for (const name of ["repos.nope", "installations.token", "threads.listPage"]) {
       const response = await read(name, [repo], authorization)
       assert.equal(response.status, 404, name)
@@ -260,14 +257,14 @@ describe("dispatch", () => {
     )
   })
 
-  it("405s for the wrong method", async () => {
+  it("returns 405 Method Not Allowed when called with the wrong HTTP method", async () => {
     const getWrite = await read("threads.createComment", [issue, "x"], authorization)
     assert.equal(getWrite.status, 405)
     assert.equal(getWrite.headers.get("allow"), "POST")
     assert.equal((await write("repos.get", [repo], authorization)).status, 405)
   })
 
-  it("400s for args that are not a JSON array", async () => {
+  it("returns 400 when args is not a valid JSON array", async () => {
     for (const args of ["nope", '{"a":1}']) {
       const response = await call(`/fake/fake.test/repos.get?args=${encodeURIComponent(args)}`, {
         headers: authorization,
@@ -281,7 +278,7 @@ describe("dispatch", () => {
     assert.equal(response.status, 400)
   })
 
-  it("400s for args that don't fit the verb's signature, naming where", async () => {
+  it("returns 400 with the failing path when args fail schema validation", async () => {
     const cases: Array<[unknown[], string]> = [
       [[], "args: Array has too few items"],
       [[{ ...repo, owner: 3 }], "args/0/owner:"],
@@ -296,12 +293,12 @@ describe("dispatch", () => {
     assert.match((await errorOf(since)).message, /^args\/0\/since:/)
   })
 
-  it("takes null for a skipped optional argument", async () => {
+  it("accepts null for omitted optional positional arguments", async () => {
     const response = await read("contents.getFile", [repo, "README.md", null], authorization)
     assert.equal(response.status, 200)
   })
 
-  it("400s for a ref to another forge or instance, however deep", async () => {
+  it("returns 400 when arguments contain a ref for another forge or instance", async () => {
     const github = { ...repo, forge: "github", instance: "github.com" }
     const cases: Array<[string, unknown[], string]> = [
       ["repos.get", [github], "args/0 names github on github.com"],
@@ -316,7 +313,7 @@ describe("dispatch", () => {
     }
   })
 
-  it("sends file bytes tagged as base64", async () => {
+  it("encodes binary file content as base64 $bytes", async () => {
     const response = await read("contents.getFile", [repo, "README.md"], authorization)
     const file = v.parse(
       v.object({ encoding: v.string(), content: v.object({ $bytes: v.string() }) }),
@@ -326,7 +323,7 @@ describe("dispatch", () => {
     assert.equal(Buffer.from(file.content.$bytes, "base64").toString(), "hi")
   })
 
-  it("answers a listing with one page, and the next for its cursor", async () => {
+  it("returns one page per listing request and advances with cursor", async () => {
     const page = async (cursor?: unknown) => {
       const response = await read(
         "threads.list",
@@ -349,13 +346,13 @@ describe("dispatch", () => {
     assert.notDeepEqual(second.items, first.items)
   })
 
-  it("answers 204 for a verb that resolves with nothing", async () => {
+  it("returns 204 No Content when a verb resolves to undefined", async () => {
     const response = await read("releases.latest", [repo], authorization)
     assert.equal(response.status, 204)
     assert.equal(await response.text(), "")
   })
 
-  it("streams job logs", async () => {
+  it("streams binary responses as application/octet-stream", async () => {
     const provider = forges.providers[0]
     const [run] = (await provider.ci.runs(repo).page()).items
     const [job] = (await provider.ci.jobs(run.ref).page()).items
@@ -364,8 +361,7 @@ describe("dispatch", () => {
     assert.equal(await response.text(), "ok\n")
   })
 
-  it("revives dates in arguments", async () => {
-    // The fake calls `since.getTime()`, so a string left unrevived would fail the request.
+  it("decodes $date values in arguments into Date instances", async () => {
     const search = async (since: Date) => {
       const args = encode([{ repo, since }])
       assert.ok(Array.isArray(args))
@@ -377,7 +373,7 @@ describe("dispatch", () => {
     assert.equal(await search(new Date(Date.now() + 86_400_000)), 0)
   })
 
-  it("passes the request's signal to the verb", async (t) => {
+  it("forwards the request AbortSignal into the verb's options", async (t) => {
     const get = t.mock.method(forges.providers[0].repos, "get")
     const controller = new AbortController()
     const url = new URL("/fake/fake.test/repos.get", "http://proxy.test")
@@ -391,7 +387,7 @@ describe("dispatch", () => {
     assert.equal(signal.aborted, true)
   })
 
-  it("maps forge errors", async () => {
+  it("maps ForgeError instances to their corresponding HTTP status and error body", async () => {
     factory.failNext(
       "repos.get",
       new RateLimitedError("Slow down", 429, "", {

@@ -22,7 +22,7 @@ import {
   WebhookVerificationError,
 } from "forges"
 
-/** The error classes the proxy can report, by name. A test checks it against everything `forges` exports. */
+/** Map of `ForgeError` subclass names to constructors, verified by tests against all error exports in `forges`. */
 export const ERRORS: Map<string, new (...args: never[]) => Error> = new Map(
   [
     AuthenticationRequiredError,

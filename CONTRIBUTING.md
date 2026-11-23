@@ -3,50 +3,62 @@
 ## Setup
 
 ```sh
-pnpm install                              # also fetches the Node.js and pnpm in `devEngines`
+pnpm install                              # also downloads the Node.js and pnpm versions in `devEngines`
 FORGES_PROXY_PUBLIC=1 FORGES_GITHUB_ENABLED=1 pnpm --filter @forges-proxy/server dev   # http://localhost:3000
 ```
 
 ## Layout
 
-A pnpm workspace. The server is [h3](https://h3.dev/) v2, built with [tsdown](https://tsdown.dev/).
+This repo is a pnpm workspace. The server uses [h3](https://h3.dev/) v2 and builds with
+[tsdown](https://tsdown.dev/).
 
-- `packages/server`: the proxy. `src/index.ts` (`createServer()`) wires the routes (`src/routes/`)
-  and middleware. `src/manifest.ts` re-exports the verbs and model schemas from `forges/schema`.
-- `packages/client`: `connect()`.
-- `packages/docs`: placeholder.
-- `demos/*`: one deployment per platform or framework. Nothing platform-specific goes in the
-  packages; it's an option a demo passes.
+- `packages/server`: `@forges-proxy/server`. `src/index.ts` (`createServer()`) wires the middleware
+  and routes (`src/routes/`). `src/manifest.ts` re-exports verb and model schemas from
+  `forges/schema`.
+- `packages/client`: `@forges-proxy/client` (`connect()`).
+- `packages/docs`: placeholder for the documentation site.
+- `demos/*`: example deployments for each platform and framework. Keep platform-specific code in the
+  demos and pass it to `createServer()` via options.
 
-Packages resolve each other's source through the `@forges-proxy/source` export condition (tests,
-typecheck, scripts). Demos use the packages' builds, so run `pnpm build` after changing a package.
+During tests, typechecking, and scripts, workspace packages resolve each other's TypeScript source
+directly via the `@forges-proxy/source` export condition. Demos consume the built `dist/` output, so
+run `pnpm build` after modifying a package.
 
 ## Conventions
 
-- Relative imports with explicit `.ts` extensions (e.g. `./verbs.ts`).
-- Unit tests sit next to the module they test (`src/verbs.test.ts`). `test/` is for suites that span
-  modules, such as requests through the whole server.
+- Use relative imports with explicit `.ts` extensions (e.g. `./verbs.ts`).
+- Place unit tests next to the module they test (`src/verbs.test.ts`). Put multi-module integration
+  tests (like full HTTP route tests) in `test/`.
 
 ## Checks
 
-Before a PR: `pnpm typecheck`, `pnpm lint`, `pnpm knip`, `pnpm test`, `pnpm format`. After touching
-`.github/`: `pnpm zizmor`. `pnpm smoke <url> [secret]` checks a running deployment through the
-client.
+Run before opening a PR:
 
-`pnpm test` runs on the Node.js in `devEngines`; CI also runs the tests on the oldest supported
-Node.js (`engines`).
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm knip`
+- `pnpm test`
+- `pnpm format`
+- `pnpm zizmor` (after modifying `.github/`)
+
+Use `pnpm smoke <url> [secret]` to test a running deployment end-to-end through the client.
+
+`pnpm test` runs on the Node.js version specified in `devEngines`. CI also runs the test suite on
+the minimum supported Node.js version in `engines`.
 
 ## Demos
 
-The Netlify and Vercel demos have deploy buttons, which copy the demo's directory alone into a new
-repository. So their files hold no monorepo paths or commands, and their live sites set these in the
-platform's settings instead:
+The Netlify and Vercel demos include "Deploy" buttons that clone only the demo subdirectory into a
+new user repository. Because of that, files inside those demo directories cannot reference monorepo
+paths or workspace commands. Instead, our live demo sites configure the monorepo build settings in
+the platform dashboard:
 
-- Base (Netlify) or root (Vercel) directory: the demo's directory. Netlify Server sets the package
-  directory instead (no base): with a base directory, `@netlify/build` looks for `netlify/server` at
-  a doubled path and silently skips it.
-- Build command: `pnpm --filter <demo package>... build`, which first builds the workspace packages
-  the demo uses.
+- **Base directory** (Netlify) / **Root directory** (Vercel): set to the demo's directory (e.g.
+  `demos/netlify-serverless`). Exception: for `demos/netlify-server`, leave Base directory empty and
+  set **Package directory** to `demos/netlify-server` instead (setting Base directory triggers a
+  path-doubling bug in `@netlify/build` that skips bundling `netlify/server`).
+- **Build command**: `pnpm --filter <demo package>... build`, which builds workspace dependencies
+  before building the demo.
 
-Deploy them by hand from the demo's directory (e.g. `cd demos/netlify-edge && netlify deploy`), not
-with `--filter` from the root.
+When deploying a demo manually via CLI, run the command from the demo's own directory (e.g.
+`cd demos/netlify-edge && netlify deploy`) rather than using `pnpm --filter` from the repo root.

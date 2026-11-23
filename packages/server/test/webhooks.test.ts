@@ -16,7 +16,6 @@ const factory = fake({
 const app = createProxy(createForges([factory]))
 
 const repo = { forge: "fake", instance: "fake.test", owner: "acme", name: "widgets" }
-// Webhook payloads name repositories by id too, which `repoKey` prefers.
 const event = {
   kind: "comment",
   summary: "Commented",
@@ -38,14 +37,14 @@ async function deliver(
 }
 
 describe("webhooks", () => {
-  it("purges both keys of every repository a delivery concerns", async () => {
+  it("purges both externalId and path tags for affected repositories", async () => {
     const body = JSON.stringify([event])
     const response = await deliver(body, await signDelivery("fake", body, "whsec"))
     assert.equal(response.status, 200)
     assert.deepEqual(recorded.purges, [["fake:fake.test/@42", "fake:fake.test/acme/widgets"]])
   })
 
-  it("rejects a delivery with a bad signature, purging nothing", async () => {
+  it("rejects deliveries with an invalid signature with 401 without purging", async () => {
     const body = JSON.stringify([event])
     const response = await deliver(body, await signDelivery("fake", body, "wrong"))
     assert.equal(response.status, 401)
@@ -57,7 +56,7 @@ describe("webhooks", () => {
     assert.deepEqual(recorded.purges, [])
   })
 
-  it("404s for a forge the proxy doesn't serve", async () => {
+  it("returns 404 for unconfigured providers", async () => {
     const body = JSON.stringify([event])
     const headers = await signDelivery("fake", body, "whsec")
     assert.equal((await deliver(body, headers, "/webhooks/github/github.com")).status, 404)
@@ -66,7 +65,7 @@ describe("webhooks", () => {
   describe("on a private instance", () => {
     env({ FORGES_PROXY_SECRET: "s3cret" })
 
-    it("needs no proxy secret, since the forge signs deliveries", async () => {
+    it("accepts signed webhook deliveries without requiring FORGES_PROXY_SECRET", async () => {
       const body = JSON.stringify([event])
       assert.equal((await deliver(body, await signDelivery("fake", body, "whsec"))).status, 200)
     })
@@ -96,7 +95,7 @@ describe("handleEvents", () => {
     )
   }
 
-  it("gets a delivery's events and its source, after the purge", async () => {
+  it("invokes handleEvents with parsed events and source after purging cache tags", async () => {
     const body = JSON.stringify([event])
     const response = await deliverTo(body, await signDelivery("fake", body, "whsec"))
     assert.equal(response.status, 200)
@@ -106,7 +105,7 @@ describe("handleEvents", () => {
     assert.equal(calls[0].purgedBefore, 1)
   })
 
-  it("answers 500 when it throws, after the purge", async () => {
+  it("logs and returns 500 without leaking the error message when handleEvents throws", async () => {
     fail = true
     const body = JSON.stringify([event])
     const response = await deliverTo(body, await signDelivery("fake", body, "whsec"))
@@ -116,7 +115,7 @@ describe("handleEvents", () => {
     assert.doesNotMatch(await response.text(), /queue down/)
   })
 
-  it("isn't called for a delivery with a bad signature", async () => {
+  it("does not invoke handleEvents when signature verification fails", async () => {
     const body = JSON.stringify([event])
     await deliverTo(body, await signDelivery("fake", body, "wrong"))
     assert.equal(calls.length, 0)
@@ -126,7 +125,7 @@ describe("handleEvents", () => {
 describe("cache tags", () => {
   env({ FORGES_PROXY_PUBLIC: "1" })
 
-  it("tag a public read with its instance and the repositories it names", async () => {
+  it("tags public read responses with the instance and referenced repositories", async () => {
     const url = new URL("/fake/fake.test/repos.get", "http://proxy.test")
     url.searchParams.set("args", JSON.stringify([repo]))
     const response = await app.fetch(new Request(url))

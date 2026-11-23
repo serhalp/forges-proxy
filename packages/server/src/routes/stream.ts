@@ -5,13 +5,13 @@ import type { Context } from "../context.ts"
 import { errorResponse, proxyError } from "../errors.ts"
 import { serialize } from "../wire.ts"
 
-// Proxies and CDNs drop connections that go quiet for long.
+// Emit periodic SSE comments so intermediate proxies and CDNs do not drop idle connections.
 const HEARTBEAT_MS = 15_000
 
 /**
- * Follows the provider's `sources.stream()` as server-sent events. Each event's `id` is its cursor, so a client resumes
- * with `Last-Event-ID` (as `EventSource` does) or `?cursor=`. A failure ends the stream with an `error` event carrying
- * the proxy's error body.
+ * Streams `provider.sources.stream()` as Server-Sent Events. Each event's `id` is its cursor so
+ * clients can resume via `Last-Event-ID` or `?cursor=`. Upstream errors emit an `error` event
+ * containing the serialized error response before closing the stream.
  */
 export function streamRoute(context: Context): EventHandler {
   return (event) => {

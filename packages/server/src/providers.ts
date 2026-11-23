@@ -3,8 +3,8 @@ import { createForges } from "forges"
 import { providersFromEnv } from "forges/env"
 import type { Env, Logger } from "./context.ts"
 
-// Every kind `forges` knows; the `satisfies` breaks the build when it gains one. `false` keeps a kind out of the
-// anonymous defaults: Tangled reads hosts that callers name (`did:web:`), so it'd let anyone aim the proxy anywhere.
+// `satisfies` ensures a compile error when `forges` adds a new kind. Tangled is excluded (`false`) from
+// anonymous defaults because its reads fetch caller-specified hosts (`did:web:`), creating an SSRF risk.
 const KINDS = Object.entries({
   "azure-devops": true,
   bitbucket: true,
@@ -25,8 +25,8 @@ const KINDS = Object.entries({
 } satisfies Record<KnownForgeKind, boolean>).flatMap(([kind, include]) => (include ? [kind] : []))
 
 /**
- * The providers `env` configures. With `anonymous`, also every forge the env doesn't mention that `forges` can reach
- * at its default instance without credentials.
+ * Builds the `Forges` registry from `env`. When `options.anonymous` is true, any forge not
+ * configured in `env` that supports unauthenticated reads at its default instance is also enabled.
  */
 export function providers(
   env: Env,
@@ -40,7 +40,7 @@ export function providers(
     { fetch: options.fetch },
   )
   for (const { forge, suffix, skipped } of entries) {
-    // A default that needs more than `ENABLED` (a base URL, credentials) is expected to fall out.
+    // Only log skipped providers that were explicitly configured in `env`, not anonymous default probes.
     if (skipped && !(suffix === "" && defaults.includes(forge))) {
       options.logger.error({ message: "Provider skipped", forge, suffix, reason: skipped })
     }

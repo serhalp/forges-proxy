@@ -3,8 +3,7 @@ import type { AccessMode } from "./access.ts"
 import type { VerbSignature } from "./manifest.ts"
 import { manifest } from "./manifest.ts"
 
-// Reads that need more than public access (security alerts, who can push, admin settings), which a public instance's
-// tokens can't answer.
+// Read verbs that require elevated repository or organization permissions and are disabled on public instances.
 const PRIVILEGED = new Set([
   "securityAlerts.list",
   "repos.collaborators",
@@ -15,7 +14,7 @@ const PRIVILEGED = new Set([
   "orgs.teams",
 ])
 
-/** Public instances route no writes, account verbs, or privileged reads. */
+/** Returns true if `name` is routable in `mode` (public mode excludes writes, account verbs, and privileged reads). */
 export function isRouted(
   name: string,
   verb: Pick<VerbSignature, "write" | "account">,
@@ -24,13 +23,12 @@ export function isRouted(
   return mode === "private" || !(verb.write || verb.account || PRIVILEGED.has(name))
 }
 
-/** The verb, when this instance routes it. */
 export function routedVerb(name: string, mode: AccessMode): VerbSignature | undefined {
   const verb = Object.hasOwn(manifest.verbs, name) ? manifest.verbs[name] : undefined
   return verb && isRouted(name, verb, mode) ? verb : undefined
 }
 
-/** Calls `name` on `provider`; a listing answers with the page its options' cursor names. */
+/** Invokes `name` on `provider` with `args`. For listing verbs, returns the single page from `.page()`. */
 export function callVerb(
   provider: ForgeProvider,
   name: string,
@@ -53,7 +51,7 @@ export function callVerb(
   return result.page()
 }
 
-/** `args` with `signal` in the verb's options, so that a dropped request stops its upstream requests. */
+/** Injects `signal` into the verb's options argument so aborted HTTP requests cancel in-flight upstream requests. */
 export function withSignal(verb: VerbSignature, args: unknown[], signal: AbortSignal): unknown[] {
   const index = verb.params.findIndex((param) => param.options)
   const options = args[index]

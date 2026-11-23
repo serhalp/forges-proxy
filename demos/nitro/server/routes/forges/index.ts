@@ -1,2 +1,2 @@
-// The catch-all needs at least one segment; this is the proxy's root.
+// `[...path].ts` requires at least one path segment; re-export it here to handle `/forges`.
 export { default } from "./[...path].ts"

@@ -9,14 +9,13 @@ import {
 import { encode } from "forges/wire"
 import type { Logger } from "./context.ts"
 
-/** The response for an error thrown by a verb, without leaking anything that is not a forge error. */
+/** Maps an error thrown by a provider verb to an HTTP response, masking unexpected non-ForgeError exceptions. */
 export function errorResponse(error: unknown, logger: Logger): Response {
   if (!(error instanceof ForgeError)) {
     logger.error({ message: "Unexpected error", error })
     return json(500, { name: "InternalError", message: "Internal error" })
   }
-  // Every field the error class sets, so clients can rebuild it, except `url` and the upstream `body`, which can carry
-  // details of private data, and the operator token's `grantedScopes`.
+  // Preserve subclass fields for client reconstruction, but strip upstream `url`, raw `body`, and token `grantedScopes`.
   const {
     url: _url,
     body: _body,
@@ -33,7 +32,7 @@ export function errorResponse(error: unknown, logger: Logger): Response {
   if (error instanceof WebhookVerificationError) {
     return json(401, body)
   }
-  // The proxy's own forge credential failed; a 401 would read as a wrong proxy secret.
+  // Map upstream 401s to 502 Bad Gateway so callers don't confuse an invalid forge token with an invalid proxy secret.
   if (error instanceof ForgeApiError && error.status === 401) {
     return json(502, body)
   }
@@ -43,7 +42,6 @@ export function errorResponse(error: unknown, logger: Logger): Response {
   if (error instanceof UnknownForgeError) {
     return json(404, body)
   }
-  // Upstream 4xx are the caller's problem (not found, forbidden, invalid input); anything else is a bad gateway.
   return json(
     error instanceof ForgeApiError && error.status >= 400 && error.status < 500
       ? error.status
@@ -52,7 +50,7 @@ export function errorResponse(error: unknown, logger: Logger): Response {
   )
 }
 
-/** An error of the proxy itself, in the same shape as forge errors. */
+/** Formats a proxy-level error response using the same `{ error: { name, message } }` envelope as `ForgeError`. */
 export function proxyError(
   status: number,
   message: string,

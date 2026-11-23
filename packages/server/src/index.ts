@@ -20,44 +20,44 @@ export { standardCdnHeaders } from "./response.ts"
 
 export interface ServerOptions {
   /**
-   * `FORGES_*` and `FORGES_PROXY_*` variables. `FORGES_PROXY_*` are read on every request; providers are built from
-   * the rest on the first. @default process.env
+   * `FORGES_*` and `FORGES_PROXY_*` environment variables. `FORGES_PROXY_*` are read per request;
+   * providers are initialized once on the first request. @default process.env
    */
   env?: Env
   /**
-   * Also serve, anonymously, every forge `env` doesn't mention that can be read without credentials at its default
-   * instance. For public instances. @default false
+   * Enable anonymous reads for any unconfigured forge that supports unauthenticated access at its
+   * default instance. Intended for public instances. @default false
    */
   anonymousForges?: boolean
-  /** Providers to serve instead of those `env` configures. */
+  /** Custom `Forges` registry to serve instead of building providers from `env`. */
   forges?: Forges
-  /** The `fetch` behind the providers, e.g. one that caches upstream responses. @default fetch */
+  /** Custom `fetch` implementation passed to providers (e.g. for upstream caching). @default fetch */
   fetch?: FetchLike
-  /** Purges CDN entries by tag when a webhook says they changed. Without it they expire by age. */
+  /** Purges CDN cache entries by tag when a webhook delivery reports changes. */
   purge?: Purge
-  /** Called with each verified webhook delivery's events, after its purge. Awaited, so hand slow work to a queue. */
+  /** Invoked with verified webhook events after purging cache tags. Awaited before responding. */
   handleEvents?: HandleEvents
-  /** The headers that hand a cacheable read to the CDN. @default standardCdnHeaders: `CDN-Cache-Control`, `Cache-Tag` */
+  /** Formats CDN cache headers for cacheable public read responses. @default standardCdnHeaders */
   cdnHeaders?: CdnHeaders
   /**
-   * Where the server logs requests (`info`) and its own failures (`error`). Pass the logger itself, not its methods.
-   * @default errors to `console.error`, no request logs
+   * Structured logger for request (`info`) and internal error (`error`) events. Pass the logger
+   * object itself rather than unbound methods. @default errors to `console.error`, no request logs
    */
   logger?: Logger
 }
 
-/** A [Fetchable](https://fetchable.org). */
+/** A standard [Fetchable](https://fetchable.org) (`{ fetch(request) }`). */
 export interface Server {
   fetch: (request: Request) => Promise<Response>
 }
 
-// Any origin: the secret is a header, never a cookie, so no request carries credentials the page didn't add itself.
+// Auth uses the `Authorization` header (never cookies), so `*` cannot carry ambient browser credentials.
 const CORS = { origin: "*", methods: ["GET", "POST"], maxAge: "86400" } as const
 
-// A platform logs requests itself, so only a logger the deployment chose gets one line per request.
+// Hosting platforms already log incoming requests, so only emit per-request logs when the caller passes a logger.
 const errorsOnly: Logger = { error: (event) => console.error(event) }
 
-/** The proxy, answering at its own root. */
+/** Creates a `forges-proxy` server rooted at `/`. */
 export function createServer(options: ServerOptions = {}): Server {
   const env = options.env ?? globalThis.process?.env ?? {}
   let forges = options.forges
@@ -79,7 +79,7 @@ export function createServer(options: ServerOptions = {}): Server {
   }
   const started = new WeakMap<H3Event, number>()
   const app = new H3({
-    // Unhandled exceptions go to `logger` instead of h3's `console.error`.
+    // Suppress h3's default `console.error` so unhandled exceptions route only to `logger`.
     silent: true,
     onRequest: (event) => void started.set(event, performance.now()),
     onResponse: (response, event) =>
@@ -90,17 +90,15 @@ export function createServer(options: ServerOptions = {}): Server {
         status: response.status,
         durationMs: Math.round(performance.now() - (started.get(event) ?? performance.now())),
       }),
-    // h3's own errors (a misconfigured mode, an unknown route) in the proxy's error shape, never cached. They skip the
-    // CORS middleware, so they set its header themselves, or browsers can't read them.
+    // h3 errors bypass route middleware, so attach `Access-Control-Allow-Origin` explicitly for browser callers.
     onError: (error) => {
       const cors = { "access-control-allow-origin": CORS.origin }
       if (!error.unhandled) return proxyError(error.status, error.message, cors)
-      // The message could carry anything, so it stays in the logs.
       logger.error({ message: "Unhandled error", error })
       return proxyError(500, "Internal error", cors)
     },
   })
-    // Before auth, so preflights pass and auth errors stay readable.
+    // Run CORS before auth so preflights succeed and 401 responses are readable by browsers.
     .use((event) => handleCors(event, { ...CORS, methods: [...CORS.methods] }) || undefined)
     .use(auth(context))
     .get("/", indexRoute(context))
@@ -114,8 +112,9 @@ export function createServer(options: ServerOptions = {}): Server {
 }
 
 /**
- * `forges` (as of 0.4.1) takes Workers for a browser and sends no `user-agent`, which GitHub refuses; drop this once it
- * sends one there. Calls `fetch` through a closure, since some runtimes reject one detached from `globalThis`.
+ * Workaround for `forges` 0.4.1 omitting `User-Agent` on Cloudflare Workers (`WorkerGlobalScope`),
+ * which causes GitHub to reject requests with 403. Wrap `fetch` in a closure so `globalThis` binding
+ * is preserved across runtimes.
  */
 const withUserAgent: typeof fetch = (input, init) => {
   const headers = new Headers(init?.headers)
@@ -127,7 +126,7 @@ const withUserAgent: typeof fetch = (input, init) => {
 
 let server: Server | undefined
 
-/** The proxy configured from `process.env`, created on its first request. */
+/** Default server instance configured from `process.env`, initialized lazily on the first request. */
 const fromEnv: Server = {
   fetch: (request) => (server ??= createServer()).fetch(request),
 }

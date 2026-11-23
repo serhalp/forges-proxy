@@ -4,16 +4,15 @@ import type { Schema, VerbSignature } from "forges/schema"
 
 export type { Schema, VerbSignature }
 
-/** Each routed verb's signature and schemas, from `forges/schema`. */
 export interface Manifest {
-  /** The `forges` version the manifest comes from, which the proxy reports to clients. */
+  /** Version of `forges` providing the verb signatures and schemas. */
   forges: string
   verbs: Record<string, VerbSignature>
-  /** Referenced as `#/components/schemas/<Type>`. */
+  /** Model JSON Schemas referenced via `#/components/schemas/<Type>`. */
   schemas: Record<string, Schema>
 }
 
-/** Verbs with no safe or meaningful HTTP form: credentials, live providers, and webhook/push ingestion. */
+/** Verbs excluded from generic RPC routing (credential minting, in-memory provider factories, webhooks, and SSE). */
 const NON_ROUTABLE = new Set([
   "installations.token",
   "installations.provider",
@@ -30,8 +29,8 @@ export const manifest: Manifest = {
 }
 
 /**
- * The positional arguments as a tuple. Trailing optional ones may be left out, and any optional one may be `null`,
- * which is how JSON carries an `undefined` that a later argument follows.
+ * Builds a tuple JSON Schema for a verb's positional `args` array. Optional parameters also accept
+ * `null` so callers can skip an optional argument before a later positional argument.
  */
 export function argsSchema(verb: VerbSignature): Schema {
   return {

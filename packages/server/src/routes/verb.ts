@@ -14,8 +14,8 @@ import { callVerb, routedVerb, withSignal } from "../verbs.ts"
 const RATE_LIMITS_HEADER = "forges-rate-limits"
 
 /**
- * Calls one provider verb. Reads are `GET ?args=<json array>`, writes are `POST { args }`, with the arguments
- * positional, as the verb takes them.
+ * Dispatches a provider verb call: `GET ?args=<json array>` for reads and `POST { args }` for
+ * writes, where `args` are positional method arguments.
  */
 export function verbRoute(context: Context): EventHandler {
   return async (event) => {
@@ -67,8 +67,8 @@ export function verbRoute(context: Context): EventHandler {
 }
 
 /**
- * The provider's budgets as its latest upstream responses reported them, for the client's `rateLimits()`. They're this
- * server instance's view, and a CDN copy of the response carries the budgets from when it was cached.
+ * Attaches the provider's latest observed rate-limit budgets in `forges-rate-limits` so the client
+ * can update `provider.rateLimits()`.
  */
 function withRateLimits(response: Response, provider: ForgeProvider): Response {
   const budgets = provider.rateLimits()
