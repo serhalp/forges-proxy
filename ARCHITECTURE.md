@@ -31,7 +31,10 @@ client ──▶ CDN ──▶ auth middleware ──▶ verb route ──▶ fo
   `GET /`, `/openapi.json`, and `/docs`.
 - **Client** (`@forges-proxy/client`): `discoverProviders()` fetches `GET /`, verifies that the
   server's `forges` version is wire-compatible, and constructs local `ForgeProvider` proxies using
-  the verb metadata returned by `/`.
+  the verb metadata returned by `/`. `proxyProvider()` constructs a single forge's provider
+  synchronously without fetching `/`, using built-in verb metadata (with options parameter indices
+  verified against `forges/schema`) and assuming full capability support until
+  `refreshCapabilities()` is called.
 
 ## Decisions
 

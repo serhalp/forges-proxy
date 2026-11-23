@@ -8,13 +8,23 @@ import type {
   Page,
   RateLimit,
 } from "forges"
-import { can, ForgeApiError, StreamClosedError, support, UnsupportedOperationError } from "forges"
+import {
+  can,
+  ForgeApiError,
+  StreamClosedError,
+  support,
+  UnknownForgeError,
+  UnsupportedOperationError,
+} from "forges"
 import { CAPABILITY_TABLE, forgeIterable, iteratePages } from "forges/kit"
+import * as web from "forges/web"
+import type { ForgeWeb } from "forges/web"
 import { decode, encode } from "forges/wire"
 import { EventSourceParserStream } from "eventsource-parser/stream"
 import * as v from "valibot"
 import { compatible, FORGES_VERSION } from "./version.ts"
 import { ERRORS } from "./errors.ts"
+import { OPTIONS_AT } from "./options.ts"
 
 /** Connection options for a `forges-proxy` deployment. */
 export interface ProxyOptions {
@@ -35,8 +45,8 @@ export interface DiscoverOptions extends ProxyOptions {
   index?: ProxyIndex
   /**
    * `forges` provider factories (e.g. `github` from `forges/github`) used to run synchronous
-   * helper methods (`urlFor`, `parseUrl`, etc.) locally. Pass `allFactories` from
-   * `@forges-proxy/client/all` to include all forges. @default []
+   * helpers (`normaliseMarkdown`, `scopesFor`, `webhooks.events`, etc.) locally. Pass `allFactories`
+   * from `@forges-proxy/client/all` to include all forges. @default []
    */
   factories?: readonly ProviderFactory[]
 }
@@ -107,16 +117,109 @@ export async function fetchProxyIndex(options: ProxyOptions): Promise<ProxyIndex
  */
 export async function discoverProviders(options: DiscoverOptions): Promise<ForgeProvider[]> {
   const index = options.index ?? (await fetchProxyIndex(options))
-  if (index.forges && !compatible(index.forges, FORGES_VERSION)) {
-    throw new Error(
-      `forges-proxy: ${options.url} runs forges ${index.forges}, but this client was built against ${FORGES_VERSION}. Update both to the same wire format.`,
-    )
-  }
+  assertCompatible(index, options.url)
   const verbs = new Map(index.verbs.map(({ name, ...verb }) => [name, verb]))
   const transport = transportFor(options)
   return index.providers.map((info) =>
     remoteProvider(info, verbs, transport, options.factories ?? []),
   )
+}
+
+export interface ProxyProviderOptions extends ProxyOptions {
+  /** Forge kind identifier, e.g. `github`. */
+  forge: string
+  /** Upstream forge API base URL for self-hosted instances. */
+  baseUrl?: string
+  /** Forge instance hostname. @default hostname of `baseUrl`, or the forge's default public host */
+  instance?: string
+}
+
+/**
+ * Constructs a `ForgeProvider` for a single forge synchronously without fetching `GET /`. Until
+ * `refreshCapabilities()` is called, `can()` optimistically reports all verbs as supported,
+ * `baseUrl` defaults to `options.baseUrl ?? ""`, and `authKind` defaults to `"anonymous"`. Calling
+ * a verb not routed by the proxy rejects with `UnsupportedOperationError`.
+ * @example
+ * ```ts
+ * const github = proxyProvider({ url: 'https://forges.example.com', forge: 'github' })
+ * ```
+ */
+export function proxyProvider(options: ProxyProviderOptions): ForgeProvider {
+  const instance = options.instance ?? webFor(options)?.instance
+  if (!instance) {
+    throw new TypeError(`proxyProvider: pass the instance of ${options.forge}`)
+  }
+  const verbs = new Map<string, RemoteVerb>()
+  for (const entry of CAPABILITY_TABLE) {
+    for (const verb of entry.verbs ?? []) {
+      const listing = !!entry.listings?.includes(verb)
+      verbs.set(verb, { write: !!entry.write, listing, options: OPTIONS_AT[verb] ?? -1 })
+    }
+  }
+  const info = {
+    forge: options.forge,
+    instance,
+    baseUrl: options.baseUrl ?? "",
+    authKind: "anonymous" as const,
+    capabilities: OPTIMISTIC,
+  }
+  return remoteProvider(info, verbs, transportFor(options), [], { checkVersion: true })
+}
+
+/** Capability map with all verbs enabled, used by `proxyProvider()` prior to `refreshCapabilities()`. */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion
+const OPTIMISTIC = Object.fromEntries(
+  Object.entries(
+    Object.groupBy(
+      CAPABILITY_TABLE.flatMap((entry) => entry.verbs ?? []),
+      (verb) => verb.split(".")[0],
+    ),
+  ).map(([namespace, names = []]) => [
+    namespace,
+    Object.fromEntries(names.map((name) => [name.split(".")[1], true])),
+  ]),
+) as unknown as ForgeCapabilities
+
+const WEB: Record<
+  string,
+  (options: { baseUrl?: string; instance?: string }) => ForgeWeb | undefined
+> = {
+  "azure-devops": web.azureDevOps,
+  bitbucket: web.bitbucket,
+  entire: web.entire,
+  forgejo: web.forgejo,
+  // GitBucket has no default public instance, so it requires `baseUrl`.
+  gitbucket: ({ baseUrl, ...rest }) => (baseUrl ? web.gitbucket({ ...rest, baseUrl }) : undefined),
+  gitcafe: web.gitcafe,
+  gitea: web.gitea,
+  gitee: web.gitee,
+  github: web.github,
+  gitlab: web.gitlab,
+  pushin: web.pushin,
+  sourcehut: web.sourcehut,
+  tangled: web.tangled,
+  upstream: web.upstream,
+}
+
+/** Builds `forges/web` link helpers for `info.forge`, or returns `undefined` if unsupported. */
+function webFor(info: {
+  forge: string
+  baseUrl?: string
+  instance?: string
+}): ForgeWeb | undefined {
+  try {
+    return WEB[info.forge]?.({ baseUrl: info.baseUrl || undefined, instance: info.instance })
+  } catch {
+    return undefined
+  }
+}
+
+function assertCompatible(index: ProxyIndex, url: string): void {
+  if (index.forges && !compatible(index.forges, FORGES_VERSION)) {
+    throw new Error(
+      `forges-proxy: ${url} runs forges ${index.forges}, but this client was built against ${FORGES_VERSION}. Update both to the same wire format.`,
+    )
+  }
 }
 
 interface Transport {
@@ -151,11 +254,15 @@ function remoteProvider(
   verbs: Map<string, RemoteVerb>,
   options: Transport,
   factories: readonly ProviderFactory[],
+  { checkVersion = false } = {},
 ): ForgeProvider {
   const { forge, instance } = info
   const local = localProvider(info, factories)
+  const links = local ?? webFor(info)
   const origin = { forge, instance }
-  const routed = (verb: string) => verbs.has(verb)
+  let routedVerbs = new Set(verbs.keys())
+  let { baseUrl, authKind } = info
+  const routed = (verb: string) => routedVerbs.has(verb)
   const unsupported = (verb: string) =>
     new UnsupportedOperationError(`The proxy does not route ${verb}`, origin)
   let capabilities = info.capabilities
@@ -179,10 +286,20 @@ function remoteProvider(
       throw await toError(response, origin)
     }
     const index = v.parse(RemoteIndex, await response.json())
+    if (checkVersion) {
+      assertCompatible(index, options.url)
+    }
     const own = index.providers.find(
       (entry) => entry.forge === forge && entry.instance === instance,
     )
-    capabilities = own?.capabilities ?? capabilities
+    if (!own) {
+      throw new UnknownForgeError(
+        `The proxy serves no provider for ${forge} on ${instance}`,
+        origin,
+      )
+    }
+    ;({ capabilities, baseUrl, authKind } = own)
+    routedVerbs = new Set(index.verbs.map((verb) => verb.name))
     return capabilities
   }
 
@@ -314,8 +431,12 @@ function remoteProvider(
     ...namespaces,
     forge,
     instance,
-    baseUrl: info.baseUrl,
-    authKind: info.authKind,
+    get baseUrl() {
+      return baseUrl
+    },
+    get authKind() {
+      return authKind
+    },
     get capabilities() {
       return capabilities
     },
@@ -328,14 +449,14 @@ function remoteProvider(
     support: (verb: ForgeVerb, kind?: Parameters<ForgeProvider["support"]>[1]) =>
       routed(verb) ? support(capabilities, verb, kind) : false,
     normaliseMarkdown: (body: string) => local?.normaliseMarkdown(body) ?? body,
-    urlFor: (target: Parameters<ForgeProvider["urlFor"]>[0]) => local?.urlFor(target),
-    webOrigin: local?.webOrigin,
+    urlFor: (target: Parameters<ForgeProvider["urlFor"]>[0]) => links?.urlFor(target),
+    webOrigin: links?.webOrigin,
     scopesFor: (verb: ForgeVerb) => local?.scopesFor(verb) ?? {},
-    parseUrl: (url: string | URL) => local?.parseUrl(url),
+    parseUrl: (url: string | URL) => links?.parseUrl(url),
     referenceFor: (...args: Parameters<ForgeProvider["referenceFor"]>) =>
-      local?.referenceFor(...args),
+      links?.referenceFor(...args),
     parseReferences: (...args: Parameters<ForgeProvider["parseReferences"]>) =>
-      local?.parseReferences(...args) ?? [],
+      links?.parseReferences(...args) ?? [],
   }
   // Built dynamically from `CAPABILITY_TABLE` at runtime; test suites verify the full `ForgeProvider` surface.
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion

@@ -14,7 +14,7 @@ import { fake as fakeForge } from "forges/fake"
 import { github as githubFactory } from "forges/github"
 import { gitlab as gitlabFactory } from "forges/gitlab"
 import { allFactories } from "../src/all.ts"
-import { discoverProviders, fetchProxyIndex } from "../src/remote.ts"
+import { discoverProviders, fetchProxyIndex, proxyProvider } from "../src/remote.ts"
 import { FORGES_VERSION } from "../src/version.ts"
 import { serialize } from "../../server/src/wire.ts"
 import { createProxy, env } from "../../server/test/support/proxy.ts"
@@ -256,14 +256,17 @@ describe("remote provider", () => {
     assert.equal(github.webOrigin, "https://github.com")
   })
 
-  it("returns undefined from synchronous helpers for forges without a provided factory", async () => {
+  it("provides web link helpers without factories while requiring factories for other helpers", async () => {
     const only = async (factories: Parameters<typeof discoverProviders>[0]["factories"]) =>
       (await discoverProviders({ url: "http://proxy.test", secret: "s3cret", fetch, factories }))[1]
-    assert.equal((await only([githubFactory])).webOrigin, "https://github.com")
-    assert.equal((await only(undefined)).webOrigin, undefined)
+    const bare = await only(undefined)
+    assert.equal(bare.webOrigin, "https://github.com")
+    assert.equal(bare.parseUrl("https://github.com/acme/widgets")?.repo?.name, "widgets")
+    assert.deepEqual(bare.webhooks.events, [])
+    assert.ok((await only([githubFactory])).webhooks.events.length > 0)
     assert.equal(
-      (await only([gitlabFactory])).parseUrl("https://github.com/acme/widgets"),
-      undefined,
+      (await only([gitlabFactory])).parseUrl("https://github.com/acme/widgets")?.repo?.name,
+      "widgets",
     )
   })
 })
@@ -377,5 +380,58 @@ describe("remote provider against a public instance", () => {
       }
     }, UnsupportedOperationError)
     await assert.rejects(fake.notifications.list().page(), UnsupportedOperationError)
+  })
+})
+
+describe("proxyProvider", () => {
+  env({ FORGES_PROXY_PUBLIC: "1" })
+  const requested: string[] = []
+  const counting = (url: string, init?: RequestInit) => {
+    requested.push(new URL(url).pathname)
+    return fetch(url, init)
+  }
+
+  it("constructs a provider synchronously with built-in web link helpers", () => {
+    requested.length = 0
+    const github = proxyProvider({ url: "http://proxy.test", forge: "github", fetch: counting })
+    assert.deepEqual([github.forge, github.instance], ["github", "github.com"])
+    assert.equal(
+      github.urlFor({ repo: { ...repo, forge: "github", instance: "github.com" } }),
+      "https://github.com/acme/widgets",
+    )
+    assert.equal(github.can("threads.createComment", "issue"), true)
+    assert.deepEqual(requested, [])
+  })
+
+  it("executes verb and listing calls without fetching GET / first", async () => {
+    requested.length = 0
+    const fake = proxyProvider({
+      url: "http://proxy.test",
+      forge: "fake",
+      instance: "fake.test",
+      fetch: counting,
+    })
+    assert.equal((await fake.repos.get(repo)).description, "Widgets")
+    const page = await fake.threads.list(repo, { perPage: 1 }).page()
+    assert.equal(page.items.length, 1)
+    assert.deepEqual(requested, ["/fake/fake.test/repos.get", "/fake/fake.test/threads.list"])
+  })
+
+  it("rejects unrouted verbs and updates capabilities on refreshCapabilities()", async () => {
+    const fake = proxyProvider({
+      url: "http://proxy.test",
+      forge: "fake",
+      instance: "fake.test",
+      fetch,
+    })
+    await assert.rejects(fake.threads.createComment(issue, "x"), UnsupportedOperationError)
+    await fake.refreshCapabilities()
+    assert.equal(fake.can("threads.createComment", "issue"), false)
+    assert.equal(fake.can("repos.get"), true)
+    assert.equal(fake.authKind, direct.authKind)
+  })
+
+  it("throws TypeError when instance is omitted for a forge without a default host", () => {
+    assert.throws(() => proxyProvider({ url: "http://proxy.test", forge: "fake" }), TypeError)
   })
 })

@@ -25,8 +25,9 @@ forges.
 - [`packages/server`](packages/server) (`@forges-proxy/server`): the proxy server, exported as a
   [Fetchable](https://fetchable.org) (`{ fetch(request) }`). Use `createServer(options)` for custom
   configuration, or the default export to configure from `process.env`.
-- [`packages/client`](packages/client) (`@forges-proxy/client`): `discoverProviders()`, which wraps
-  a remote proxy in standard `forges` provider objects.
+- [`packages/client`](packages/client) (`@forges-proxy/client`): `discoverProviders()`,
+  `proxyProvider()`, and `fetchProxyIndex()`, which wrap a remote proxy in standard `forges`
+  provider objects.
 - [`packages/docs`](packages/docs): placeholder for the documentation site.
 - [`demos/`](demos): example deployments for supported platforms and frameworks.
 
@@ -169,8 +170,10 @@ const repo = await forges.repos.get({
 })
 ```
 
-`discoverProviders()` fetches `GET /` on startup. To avoid fetching `GET /` on every server request
-or in the browser after SSR, fetch the index once with `fetchProxyIndex()` and pass it via `index`:
+`discoverProviders()` returns a provider for every forge configured on the proxy (needed for
+cross-forge calls like `forges.search.threads()`). By default it fetches `GET /` on startup. To
+avoid fetching `GET /` on every server request or in the browser after SSR, fetch the index once
+with `fetchProxyIndex()` and pass it via `index`:
 
 ```ts
 import { discoverProviders, fetchProxyIndex } from "@forges-proxy/client"
@@ -180,22 +183,34 @@ const index = await fetchProxyIndex({ url, secret })
 const providers = await discoverProviders({ url, secret, index, fetch })
 ```
 
+If you already know which forge you want to call, `proxyProvider()` constructs its provider
+synchronously without fetching `GET /`:
+
+```ts
+import { proxyProvider } from "@forges-proxy/client"
+
+const github = proxyProvider({ url, secret, forge: "github" })
+const repo = await github.repos.get({ forge: "github", instance: "github.com", owner, name })
+```
+
+Until `refreshCapabilities()` is called to fetch `GET /`, `proxyProvider()` optimistically reports
+all verbs as supported from `can()`, and any verb not routed by the proxy rejects with
+`UnsupportedOperationError` when called. For self-hosted instances, pass `baseUrl` or `instance`.
+
 Requests to the proxy time out after `timeout` milliseconds (default `30000`); `sources.stream()`
 connections do not time out.
 
-Synchronous helper methods (`urlFor()`, `parseUrl()`, `referenceFor()`, etc.) run locally and
-require the underlying provider factory. Pass the factories you need via `factories` to avoid
-bundling unused forges, or pass `allFactories` from `@forges-proxy/client/all` to include all of
-them:
+Web link helpers (`urlFor()`, `parseUrl()`, `referenceFor()`, `parseReferences()`, `webOrigin`) are
+built in via `forges/web`. Other synchronous helpers (`normaliseMarkdown()`, `scopesFor()`,
+`webhooks.events`, and link helpers for Cloudflare Artifacts and Cursor Origin) require the forge's
+provider factory. Pass only the factories you need via `factories`, or pass `allFactories` from
+`@forges-proxy/client/all` to bundle all forges:
 
 ```ts
 import { github } from "forges/github"
 
 const providers = await discoverProviders({ url, secret, factories: [github] })
 ```
-
-If no factory is provided for a forge, its synchronous helpers return `undefined` (or `[]` / the
-input string).
 
 Listings fetch one page per HTTP request whether you iterate with `for await` or call `.page()`.
 `sources.stream()` reads the SSE endpoint and throws `StreamClosedError` (with the last cursor
