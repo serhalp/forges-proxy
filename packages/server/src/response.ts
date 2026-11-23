@@ -10,7 +10,7 @@ const CDN_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=600"
  * Only public read responses are stored in shared CDN caches. Private instances always send
  * `private, no-store` because CDNs serve cached responses before auth middleware runs.
  */
-function isCacheable(verb: VerbSignature, mode: AccessMode): boolean {
+export function isCacheable(verb: VerbSignature, mode: AccessMode): boolean {
   return mode === "public" && !verb.write
 }
 

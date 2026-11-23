@@ -59,6 +59,18 @@ describe("GET /status", () => {
   })
 })
 
+describe("forges-rate-limits on a public instance", () => {
+  env({ FORGES_PROXY_PUBLIC: "1" })
+
+  it("omits the header on cacheable public reads to avoid serving stale budgets from the CDN", async () => {
+    const response = await get(
+      `/fake/fake.test/repos.get?args=${encodeURIComponent(JSON.stringify([repo]))}`,
+    )
+    assert.ok(response.headers.get("cdn-cache-control"))
+    assert.equal(response.headers.get("forges-rate-limits"), null)
+  })
+})
+
 describe("GET /", () => {
   env({ FORGES_PROXY_SECRET: "s3cret" })
   const Index = v.object({

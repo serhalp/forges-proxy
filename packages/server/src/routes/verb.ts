@@ -7,7 +7,7 @@ import { readArgs } from "../args.ts"
 import type { Context } from "../context.ts"
 import { signPage, signsCursors, unsignedCursor } from "../cursors.ts"
 import { errorResponse, proxyError } from "../errors.ts"
-import { resultResponse } from "../response.ts"
+import { isCacheable, resultResponse } from "../response.ts"
 import { responseTags } from "../tags.ts"
 import { callVerb, routedVerb, withSignal } from "../verbs.ts"
 
@@ -59,10 +59,14 @@ export function verbRoute(context: Context): EventHandler {
       read.args,
       result instanceof ReadableStream ? undefined : result,
     )
-    return withRateLimits(
-      await resultResponse(event.req, result, { verb, mode, tags, cdnHeaders: context.cdnHeaders }),
-      provider,
-    )
+    const response = await resultResponse(event.req, result, {
+      verb,
+      mode,
+      tags,
+      cdnHeaders: context.cdnHeaders,
+    })
+    // Omit `forges-rate-limits` on cacheable public reads so CDN cache hits do not replay stale budgets.
+    return isCacheable(verb, mode) ? response : withRateLimits(response, provider)
   }
 }
 

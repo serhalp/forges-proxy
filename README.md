@@ -118,7 +118,7 @@ rate limits.
 - `GET /`: returns the access mode, `forges` version, configured providers and their capabilities
   (refreshed once per server instance), and routed verbs with their options parameter index.
 - `GET /docs`: interactive Scalar API reference built from `GET /openapi.json` (OpenAPI 3.1).
-- `GET /status`: latest rate-limit budgets observed by the responding server instance. Verb
+- `GET /status`: latest rate-limit budgets observed by the responding server instance. Uncached verb
   responses also include this data in the `forges-rate-limits` header.
 - `GET /:forge/:instance/:verb?args=<json array>`: calls a read verb (e.g. `repos.get`,
   `threads.list`).
@@ -195,7 +195,9 @@ original `ForgeError` subclasses. Unrouted verbs reject with `UnsupportedOperati
   In serverless deployments, each instance tracks budgets independently.
 - Authenticated budgets belong to the proxy's forge token/installation and are shared across all
   callers. Anonymous budgets are typically tied to the server instance's egress IP.
-- Cached CDN responses carry the rate-limit header from when the response was originally cached.
+- On public instances, cacheable read responses omit the `forges-rate-limits` header so the CDN does
+  not serve stale budgets; `rateLimits()` only updates on error responses. Query `GET /status` for
+  current budgets.
 - Secondary rate limits that forges do not report via response headers are not included.
 
 ## Webhooks
