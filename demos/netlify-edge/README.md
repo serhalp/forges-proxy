@@ -10,7 +10,9 @@ Runs the proxy in a catch-all Netlify Edge Function. Public reads are cached on 
 need tag-based cache purging on webhook deliveries, use the
 [Netlify Functions demo](../netlify-serverless) or [Netlify Server demo](../netlify-server).
 Requests and webhook events from `handleEvents` are logged with [evlog](https://evlog.dev).
-Unconfigured forges that support anonymous reads are enabled by default.
+Unconfigured forges that support anonymous reads are enabled by default. Each client (by IP) is
+limited to 600 requests a minute (`rateLimit` in the edge function's `config`); over that, Netlify
+answers `429`.
 
 ## Deploy your own
 

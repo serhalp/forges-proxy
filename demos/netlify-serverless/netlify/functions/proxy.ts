@@ -20,4 +20,8 @@ export default createServer({
   },
 })
 
-export const config: Config = { path: "/*" }
+export const config: Config = {
+  path: "/*",
+  // Per client: generous for apps and agents, but caps one caller burning the forge tokens' budget.
+  rateLimit: { windowLimit: 600, windowSize: 60, aggregateBy: ["ip", "domain"] },
+}

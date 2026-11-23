@@ -9,6 +9,8 @@ Runs the proxy in a single catch-all Netlify Function. Public reads are cached i
 CDN cache and tagged by repository, so incoming forge webhooks purge only the affected repository's
 cache entries. Requests and webhook events from `handleEvents` are logged with
 [evlog](https://evlog.dev). Unconfigured forges that support anonymous reads are enabled by default.
+Each client (by IP) is limited to 600 requests a minute (`rateLimit` in the function's `config`);
+over that, Netlify answers `429`.
 
 ## Deploy your own
 

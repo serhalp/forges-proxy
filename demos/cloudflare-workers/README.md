@@ -8,6 +8,8 @@ Cloudflare's `cf` CLI. Note that Cloudflare does not automatically cache Worker 
 edge on `workers.dev`, so requests execute the Worker directly unless you place a custom domain /
 cache rule in front. Requests and webhook events from `handleEvents` are logged with
 [evlog](https://evlog.dev). Unconfigured forges that support anonymous reads are enabled by default.
+Each client (by IP) is limited to about 600 requests a minute per Cloudflare location, through the
+`RATE_LIMITER` binding in `cloudflare.config.ts`; over that, the Worker answers `429`.
 
 ## Deploy your own
 

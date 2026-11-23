@@ -1,6 +1,6 @@
 {
   "name": "@forges-proxy/client",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.2",
   "description": "Drop-in forges providers backed by a forges-proxy server",
   "keywords": [
     "azure-devops",

@@ -20,4 +20,9 @@ export default createServer({
 })
 
 // Enable opt-in CDN response caching for this edge function.
-export const config: Config = { path: "/*", cache: "manual" }
+export const config: Config = {
+  path: "/*",
+  cache: "manual",
+  // Per client: generous for apps and agents, but caps one caller burning the forge tokens' budget.
+  rateLimit: { windowLimit: 600, windowSize: 60, aggregateBy: ["ip", "domain"] },
+}

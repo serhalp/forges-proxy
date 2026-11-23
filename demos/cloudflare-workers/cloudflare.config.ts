@@ -11,6 +11,8 @@ export default defineConfig({
       FORGES_PROXY_PUBLIC: bindings.text("1"),
       // Set via `cf deploy --secrets-file <file>` or `.dev.vars` locally.
       FORGES_GITHUB_TOKEN: bindings.secret(),
+      // Approximate and per Cloudflare location. Any account-unique integer works as the namespace.
+      RATE_LIMITER: bindings.rateLimit({ namespace: "1001", simple: { limit: 600, period: 60 } }),
     },
   },
 })

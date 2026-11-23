@@ -1,6 +1,6 @@
 {
   "name": "@forges-proxy/server",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.2",
   "description": "Self-hosted HTTP caching proxy and credential broker for forges",
   "keywords": [
     "api-gateway",
