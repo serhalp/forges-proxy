@@ -331,6 +331,7 @@ function remoteProvider(
       signal = given instanceof AbortSignal ? given : undefined
       sent = args.with(at, rest)
     }
+    sent = canonical(sent, at)
     const url = new URL(
       `${encodeURIComponent(forge)}/${encodeURIComponent(instance)}/${verb}`,
       options.url,
@@ -523,4 +524,20 @@ function errorFrom(json: unknown, status: number, origin: object): Error {
   }
   const error = Reflect.construct(Error, [message], Class)
   return Object.assign(error, decode(fields), { name })
+}
+
+/**
+ * Equivalent calls as one URL, so they share a cache entry: `[repo, {}]` and `[repo, null]` are sent
+ * as `[repo]`.
+ */
+function canonical(args: unknown[], at: number): unknown[] {
+  const sent = at >= 0 && isEmpty(args[at]) ? args.with(at, undefined) : [...args]
+  while (sent.length > 0 && sent.at(-1) == null) {
+    sent.pop()
+  }
+  return sent
+}
+
+function isEmpty(value: unknown): boolean {
+  return isObject(value) && Object.values(value).every((field) => field === undefined)
 }

@@ -256,6 +256,26 @@ describe("remote provider", () => {
     await assert.rejects(fake.repos.get(repo), { name: "ForbiddenError", reason: "sso_required" })
   })
 
+  it("sends equivalent calls as one URL, so they share a cache entry", async () => {
+    const urls: string[] = []
+    const recording = (url: string, init?: RequestInit) => {
+      urls.push(url)
+      return fetch(url, init)
+    }
+    const [fake] = await discoverProviders({
+      url: "http://proxy.test",
+      secret: "s3cret",
+      fetch: recording,
+    })
+    urls.length = 0
+    await fake.repos.get(repo)
+    await fake.repos.get(repo, {})
+    await fake.repos.get(repo, { signal: new AbortController().signal })
+    await fake.repos.get(repo, { licence: undefined })
+    assert.equal(new Set(urls).size, 1)
+    assert.equal(new URL(urls[0]).searchParams.get("args"), JSON.stringify([repo]))
+  })
+
   it("propagates caller AbortSignal to fetch", async () => {
     const { fake } = await remote("s3cret")
     await assert.rejects(fake.repos.get(repo, { signal: AbortSignal.abort() }), {
