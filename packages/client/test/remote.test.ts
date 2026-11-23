@@ -86,21 +86,31 @@ describe("discoverProviders", () => {
     assert.equal((await provider.repos.get(repo)).description, "Widgets")
   })
 
-  it("throws when the proxy reports an incompatible forges version", async () => {
+  it("warns once about an incompatible forges version, or throws when asked to", async (t) => {
     const runs = (version: string) => async (url: string, init?: RequestInit) => {
       const response = await fetch(url, init)
       return new URL(url).pathname === "/"
         ? Response.json({ ...v.parse(v.looseObject({}), await response.json()), forges: version })
         : response
     }
+    const warn = t.mock.method(console, "warn", () => {})
     const [major, minor] = FORGES_VERSION.split(".")
+    const options = { url: "http://proxy.test", secret: "s3cret" }
     for (const version of [FORGES_VERSION, `${major}.${minor}.99`]) {
-      await discoverProviders({ url: "http://proxy.test", secret: "s3cret", fetch: runs(version) })
+      await discoverProviders({ ...options, fetch: runs(version) })
     }
+    assert.equal(warn.mock.callCount(), 0)
     const next = `${major}.${Number(minor) + 1}.0`
+    const mismatch = new RegExp(
+      `runs forges ${next.replaceAll(".", "\\.")}, but this client was built against`,
+    )
+    await discoverProviders({ ...options, fetch: runs(next) })
+    await discoverProviders({ ...options, fetch: runs(next) })
+    assert.equal(warn.mock.callCount(), 1)
+    assert.match(String(warn.mock.calls[0].arguments[0]), mismatch)
     await assert.rejects(
-      discoverProviders({ url: "http://proxy.test", secret: "s3cret", fetch: runs(next) }),
-      new RegExp(`runs forges ${next.replaceAll(".", "\\.")}, but this client was built against`),
+      discoverProviders({ ...options, fetch: runs(next), versionMismatch: "throw" }),
+      mismatch,
     )
   })
 
@@ -434,6 +444,22 @@ describe("proxyProvider", () => {
     assert.equal(fake.can("threads.createComment", "issue"), false)
     assert.equal(fake.can("repos.get"), true)
     assert.equal(fake.authKind, direct.authKind)
+  })
+
+  it("checks the forges version the proxy reports on its responses", async (t) => {
+    const warn = t.mock.method(console, "warn", () => {})
+    const newer = async (url: string, init?: RequestInit) => {
+      const response = await fetch(url, init)
+      const headers = new Headers(response.headers)
+      headers.set("forges-version", "99.0.0")
+      return new Response(response.body, { status: response.status, headers })
+    }
+    const options = { url: "http://newer.test", forge: "fake", instance: "fake.test" }
+    const fake = proxyProvider({ ...options, fetch: newer })
+    await fake.repos.get(repo)
+    assert.match(String(warn.mock.calls[0]?.arguments[0]), /runs forges 99\.0\.0/)
+    const strict = proxyProvider({ ...options, fetch: newer, versionMismatch: "throw" })
+    await assert.rejects(strict.repos.get(repo), /runs forges 99\.0\.0/)
   })
 
   it("throws TypeError when instance is omitted for a forge without a default host", () => {

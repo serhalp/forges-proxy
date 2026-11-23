@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import { describe, it } from "node:test"
 import { createForges, RateLimitedError } from "forges"
 import { fake } from "forges/fake"
@@ -243,6 +244,15 @@ describe("public mode", () => {
     assert.ok(body.verbs.length > 0)
     assert.ok(body.verbs.every((verb) => !verb.write && !verb.account))
     assert.equal("skipped" in body, false)
+  })
+
+  it("reports its forges version on verb responses, errors included", async () => {
+    const { version } = v.parse(
+      v.object({ version: v.string() }),
+      JSON.parse(readFileSync(new URL(import.meta.resolve("forges/package.json")), "utf8")),
+    )
+    assert.equal((await read("repos.get", [repo])).headers.get("forges-version"), version)
+    assert.equal((await read("users.me", [])).headers.get("forges-version"), version)
   })
 
   it("sets browser and CDN cache headers with ETag revalidation on GET /", async () => {

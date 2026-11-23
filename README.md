@@ -112,6 +112,8 @@ You must set either `FORGES_PROXY_SECRET` or `FORGES_PROXY_PUBLIC=1`:
 - `GET /:forge/:instance/:verb?args=<json array>`: calls a read verb (e.g. `repos.get`,
   `threads.list`).
 - `POST /:forge/:instance/:verb` with `{ "args": [...] }`: calls a write verb.
+- Every verb response carries the server's `forges` version in `forges-version`, so clients can
+  check wire compatibility without reading `GET /`.
 - `GET /:forge/:instance/sources.stream`: streams live events from `provider.sources.stream()`
   (currently Tangled only) as
   [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events). Each

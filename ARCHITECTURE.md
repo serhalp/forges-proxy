@@ -102,9 +102,10 @@ Wire encoding:
 ### Provider RPC vs. transparent forge HTTP pass-through
 
 **Context**: Running `forges` on both the server and client (`discoverProviders()`) requires both
-sides to use a compatible `forges` version (`GET /` advertises the version and `discoverProviders()`
-throws on mismatch). An alternative is running `forges` only in the client and making the proxy a
-transparent, authenticating HTTP forwarder for upstream forge APIs.
+sides to use a compatible `forges` version (`GET /` and every verb response report the version, and
+the client warns on a mismatch, or throws with `versionMismatch: "throw"`). An alternative is
+running `forges` only in the client and making the proxy a transparent, authenticating HTTP
+forwarder for upstream forge APIs.
 
 **Pass-through shape**: The client configures `forges` providers with a custom `fetch` that rewrites
 upstream URLs onto the proxy (e.g. `https://api.github.com/repos/a/b` ->

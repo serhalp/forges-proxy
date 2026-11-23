@@ -14,12 +14,23 @@ import { manifest } from "../manifest.ts"
 import { callVerb, routedVerb, withSignal } from "../verbs.ts"
 
 const RATE_LIMITS_HEADER = "forges-rate-limits"
+const VERSION_HEADER = "forges-version"
 
 /**
  * Dispatches a provider verb call: `GET ?args=<json array>` for reads and `POST { args }` for
  * writes, where `args` are positional method arguments.
  */
 export function verbRoute(context: Context): EventHandler {
+  const dispatch = dispatcher(context)
+  // Lets clients that never read `GET /` (`proxyProvider()`) check wire compatibility.
+  return async (event) => {
+    const response = await dispatch(event)
+    response.headers.set(VERSION_HEADER, manifest.forges)
+    return response
+  }
+}
+
+function dispatcher(context: Context): (event: Parameters<EventHandler>[0]) => Promise<Response> {
   return async (event) => {
     const { forge, instance, verb: name } = getRouterParams(event, { decode: true })
     const mode = accessMode(context.env)

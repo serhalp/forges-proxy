@@ -62,5 +62,7 @@ const providers = await discoverProviders({ url, secret, factories: [github] })
 ```
 
 Listings fetch one page per HTTP request, upstream errors are reconstructed into their `ForgeError`
-subclasses, and verbs not routed by the proxy reject with `UnsupportedOperationError`.
-`discoverProviders()` throws if the proxy is running an incompatible version of `forges`.
+subclasses, and verbs not routed by the proxy reject with `UnsupportedOperationError`. When the
+proxy runs a `forges` with another wire format, the client warns once; pass
+`versionMismatch: "throw"` to fail instead. `proxyProvider()` checks the version the proxy reports
+on its first response.

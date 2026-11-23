@@ -35,6 +35,11 @@ export interface ProxyOptions {
   fetch?: FetchLike
   /** Request timeout in milliseconds (SSE streams are exempt). @default 30000 */
   timeout?: number
+  /**
+   * What to do when the proxy runs a `forges` with another wire format: warn once, or throw.
+   * Warning keeps browsers on an old bundle working while the proxy upgrades. @default "warn"
+   */
+  versionMismatch?: "warn" | "throw"
 }
 
 export interface DiscoverOptions extends ProxyOptions {
@@ -89,6 +94,7 @@ export interface ProxyDescription {
 }
 
 const RATE_LIMITS_HEADER = "forges-rate-limits"
+const VERSION_HEADER = "forges-version"
 const RateLimits = v.array(v.custom<RateLimit>(isObject))
 
 const ErrorBody = v.object({
@@ -118,7 +124,7 @@ export async function describeProxy(options: ProxyOptions): Promise<ProxyDescrip
  */
 export async function discoverProviders(options: DiscoverOptions): Promise<ForgeProvider[]> {
   const description = options.description ?? (await describeProxy(options))
-  assertCompatible(description, options.url)
+  checkVersion(description.forges, options)
   const verbs = new Map(description.verbs.map(({ name, ...verb }) => [name, verb]))
   const transport = transportFor(options)
   return description.providers.map((info) =>
@@ -164,7 +170,7 @@ export function proxyProvider(options: ProxyProviderOptions): ForgeProvider {
     authKind: "anonymous" as const,
     capabilities: OPTIMISTIC,
   }
-  return remoteProvider(info, verbs, transportFor(options), [], { checkVersion: true })
+  return remoteProvider(info, verbs, transportFor(options), [])
 }
 
 /** Capability map with all verbs enabled, used by `proxyProvider()` prior to `refreshCapabilities()`. */
@@ -215,15 +221,26 @@ function webFor(info: {
   }
 }
 
-function assertCompatible(description: ProxyDescription, url: string): void {
-  if (description.forges && !compatible(description.forges, FORGES_VERSION)) {
-    throw new Error(
-      `forges-proxy: ${url} runs forges ${description.forges}, but this client was built against ${FORGES_VERSION}. Update both to the same wire format.`,
-    )
+const warned = new Set<string>()
+
+/** Warns once per proxy and version, or throws, when the proxy's `forges` has another wire format. */
+function checkVersion(version: string | null | undefined, options: ProxyOptions): void {
+  if (!version || compatible(version, FORGES_VERSION)) {
+    return
+  }
+  const message = `forges-proxy: ${options.url} runs forges ${version}, but this client was built against ${FORGES_VERSION}. Update both to the same wire format.`
+  if (options.versionMismatch === "throw") {
+    throw new Error(message)
+  }
+  const key = `${options.url} ${version}`
+  if (!warned.has(key)) {
+    warned.add(key)
+    console.warn(message)
   }
 }
 
 interface Transport {
+  proxy: ProxyOptions
   url: string
   headers: Record<string, string>
   /** `fetch` wrapper that applies the request timeout. */
@@ -236,6 +253,7 @@ function transportFor(options: ProxyOptions): Transport {
   const stream = options.fetch ?? ((input, init) => globalThis.fetch(input, init))
   const timeout = options.timeout ?? 30_000
   return {
+    proxy: options,
     // Ensure a trailing slash so relative URL resolution works when the proxy is mounted under a subpath.
     url: options.url.endsWith("/") ? options.url : `${options.url}/`,
     headers: options.secret ? { authorization: `Bearer ${options.secret}` } : {},
@@ -255,7 +273,6 @@ function remoteProvider(
   verbs: Map<string, RemoteVerb>,
   options: Transport,
   factories: readonly ProviderFactory[],
-  { checkVersion = false } = {},
 ): ForgeProvider {
   const { forge, instance } = info
   const local = localProvider(info, factories)
@@ -263,6 +280,7 @@ function remoteProvider(
   const origin = { forge, instance }
   let routedVerbs = new Set(verbs.keys())
   let { baseUrl, authKind } = info
+  let versionChecked = false
   const routed = (verb: string) => routedVerbs.has(verb)
   const unsupported = (verb: string) =>
     new UnsupportedOperationError(`The proxy does not route ${verb}`, origin)
@@ -287,9 +305,7 @@ function remoteProvider(
       throw await toError(response, origin)
     }
     const description = v.parse(Description, await response.json())
-    if (checkVersion) {
-      assertCompatible(description, options.url)
-    }
+    checkVersion(description.forges, options.proxy)
     const own = description.providers.find(
       (entry) => entry.forge === forge && entry.instance === instance,
     )
@@ -329,6 +345,10 @@ function remoteProvider(
       signal,
     })
     remember(response)
+    if (!versionChecked) {
+      versionChecked = true
+      checkVersion(response.headers.get(VERSION_HEADER), options.proxy)
+    }
     if (!response.ok) {
       throw await toError(response, origin)
     }
