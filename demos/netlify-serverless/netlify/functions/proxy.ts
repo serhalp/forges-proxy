@@ -1,6 +1,6 @@
 import { createServer } from "@forges-proxy/server"
+import { purgeCache } from "@netlify/cache"
 import type { Config } from "@netlify/functions"
-import { purgeCache } from "@netlify/functions"
 import { initLogger, log } from "evlog"
 
 initLogger({ env: { service: "forges-proxy" } })

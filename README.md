@@ -63,7 +63,7 @@ example, on Netlify Functions:
 
 ```ts
 import { createServer } from "@forges-proxy/server"
-import { purgeCache } from "@netlify/functions"
+import { purgeCache } from "@netlify/cache"
 
 export default createServer({
   purge: (tags) => purgeCache({ tags }),
@@ -78,8 +78,6 @@ export const config = { path: "/*" }
 The server expects requests rooted at `/`. If you mount it under a subpath, strip the prefix before
 passing the request to `server.fetch` (Hono's `app.mount()` does this automatically). The client,
 `/docs`, and `/openapi.json` all work under a path prefix.
-
-Run `pnpm smoke <url> [secret]` to verify a deployed instance end-to-end.
 
 ## Configure
 
@@ -104,17 +102,7 @@ You must set either `FORGES_PROXY_SECRET` or `FORGES_PROXY_PUBLIC=1`:
   Any forge tokens configured on a public instance must be scoped to public data only (for example,
   a fine-grained GitHub token with public-only access).
 
-## Use
-
-```sh
-pnpm install
-FORGES_PROXY_PUBLIC=1 FORGES_GITHUB_ENABLED=1 pnpm --filter @forges-proxy/server dev
-```
-
-This starts a local public instance serving GitHub anonymously. Set `FORGES_GITHUB_TOKEN` for higher
-rate limits.
-
-### Endpoints
+## HTTP API
 
 - `GET /`: returns the access mode, `forges` version, configured providers and their capabilities
   (refreshed once per server instance), and routed verbs with their options parameter index.
@@ -143,7 +131,7 @@ argument to fetch the next page. On public instances with authenticated provider
 HMAC-signs `cursor.nextUrl` and rejects unsigned or tampered URLs.
 
 ```sh
-curl -G localhost:3000/github/github.com/repos.get \
+curl -G https://forges.example.com/github/github.com/repos.get \
   --data-urlencode 'args=[{"forge":"github","instance":"github.com","owner":"danielroe","name":"forges"}]'
 ```
 

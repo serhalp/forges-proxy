@@ -11,7 +11,7 @@ cache rule in front. Requests and webhook events from `handleEvents` are logged 
 
 ## Deploy your own
 
-Copy this directory, change the Worker `name` in `cloudflare.config.ts`, and run:
+Update the Worker `name` in `cloudflare.config.ts`, then:
 
 ```sh
 npm install
