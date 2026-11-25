@@ -3,7 +3,7 @@
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/serhalp/forges-proxy&create_from_path=demos/netlify-serverless#FORGES_PROXY_PUBLIC=1)
 
 Live public read-only instance: <https://forges-proxy-demo.netlify.app/>
-([`/docs`](https://forges-proxy-demo.netlify.app/docs)).
+([`/_docs`](https://forges-proxy-demo.netlify.app/_docs)).
 
 Runs the proxy in a single catch-all Netlify Function. Public reads are cached in Netlify's durable
 CDN cache and tagged by repository, so incoming forge webhooks purge only the affected repository's

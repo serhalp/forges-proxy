@@ -24,9 +24,9 @@ This project is experimental and may eventually move into the `forges` monorepo.
       503 if both or neither are set
 - [x] Secret rotation: accept `FORGES_PROXY_PREVIOUS_SECRET` alongside `FORGES_PROXY_SECRET`
 - [x] Include `sources.stream` in `/openapi.json`
-- [x] `GET /`: providers, capabilities, and routed verbs
+- [x] `GET /_meta`: providers, capabilities, and routed verbs
 - [x] Tests: `node:test` with `forges/fake` passed to `createServer`; unit and route tests
-- [x] `GET /status` reporting per-instance `rateLimits()`
+- [x] `GET /_status` reporting per-instance `rateLimits()`
 - [x] SSE route for `sources.stream` (verified live against Tangled's Jetstream). Note: `forges`
       `main` renames this to `sources.subscribe`; update on the next `forges` bump.
 - [x] Forward the request `AbortSignal` into the verb's options parameter
@@ -43,11 +43,11 @@ This project is experimental and may eventually move into the `forges` monorepo.
       vendor-specific header rather than both `CDN-Cache-Control` and the vendor header.
 - [ ] Finer-grained cache tags (per thread, per release) so busy repos don't invalidate all cached
       reads on every webhook event
-- [x] Operations manifest from `forges/schema` → OpenAPI 3.1 (`/openapi.json`) → Scalar (`/docs`)
+- [x] Operations manifest from `forges/schema` → OpenAPI 3.1 (`/openapi.json`) → Scalar (`/_docs`)
 - [x] Validate `args` against manifest schemas (`@cfworker/json-schema`, which avoids `eval`/codegen
       for edge runtimes) and return 400 with the failing field path
 - [x] Test that every `date-time` input field in the manifest is decoded by `forges/wire`
-- [x] Client: use the options parameter index reported by `GET /` instead of a heuristic
+- [x] Client: use the options parameter index reported by `GET /_meta` instead of a heuristic
 - [x] `discoverProviders()` client (`@forges-proxy/client`): returns one `ForgeProvider` per proxied
       forge
 - [x] pnpm workspace: `@forges-proxy/server`, `@forges-proxy/client`, `docs` placeholder, and
@@ -70,7 +70,7 @@ This project is experimental and may eventually move into the `forges` monorepo.
       [Rate limiting is the platform's job](ARCHITECTURE.md#rate-limiting-is-the-platforms-job),
       likely via a `rateLimit` hook backed by the platform's rate limiter or KV store.
 - [x] Client: populate `rateLimits()` from the `forges-rate-limits` response header and support
-      `refreshCapabilities()` against `GET /`
+      `refreshCapabilities()` against `GET /_meta`
 
 ## Parked
 
@@ -91,9 +91,10 @@ This project is experimental and may eventually move into the `forges` monorepo.
   repos exceed the 50-tag cap and fall back to the instance tag alone, which webhooks never purge.
   Count repos instead, align the limit with CDN header limits, and either drop or support purging
   the instance tag.
-- **Timeout on `provider.refreshCapabilities()` in `GET /`**: An unreachable self-hosted forge
-  currently blocks `GET /` (and therefore `discoverProviders()`) for up to `forges`'s 30s request
-  timeout on each cold server instance. Add a short timeout and fall back to static capabilities.
+- **Timeout on `provider.refreshCapabilities()` in `GET /_meta`**: An unreachable self-hosted forge
+  currently blocks `GET /_meta` (and therefore `discoverProviders()`) for up to `forges`'s 30s
+  request timeout on each cold server instance. Add a short timeout and fall back to static
+  capabilities.
 - **CDN caching on private instances**: Currently disabled (`private, no-store`) because the CDN
   serves cached responses before auth middleware runs. Could be enabled on CDNs that support varying
   on `Authorization` (e.g. `Netlify-Vary: header=authorization`).

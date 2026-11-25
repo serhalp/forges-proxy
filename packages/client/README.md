@@ -20,20 +20,20 @@ const forges = createForges(await discoverProviders({ url: "https://forges.examp
 ```
 
 `discoverProviders()` returns a provider for every forge configured on the proxy (needed for
-cross-forge calls like `forges.search.threads()`). By default it fetches `GET /` on startup. To
-avoid fetching `GET /` on every server request or in the browser after SSR, describe the proxy once
-with `describeProxy()` and pass the description:
+cross-forge calls like `forges.search.threads()`). By default it fetches `GET /_meta` on startup. To
+avoid fetching `GET /_meta` on every server request or in the browser after SSR, fetch the proxy's
+metadata once with `fetchProxyMeta()` and pass it in:
 
 ```ts
-import { discoverProviders, describeProxy } from "@forges-proxy/client"
+import { discoverProviders, fetchProxyMeta } from "@forges-proxy/client"
 
-const description = await describeProxy({ url, secret })
-// Reuse `description` across requests with each caller's `fetch`:
-const providers = await discoverProviders({ url, secret, description, fetch })
+const meta = await fetchProxyMeta({ url, secret })
+// Reuse `meta` across requests with each caller's `fetch`:
+const providers = await discoverProviders({ url, secret, meta, fetch })
 ```
 
 If you already know which forge you want to call, `proxyProvider()` constructs its provider
-synchronously without fetching `GET /`:
+synchronously without fetching `GET /_meta`:
 
 ```ts
 import { proxyProvider } from "@forges-proxy/client"
@@ -42,8 +42,8 @@ const github = proxyProvider({ url, secret, forge: "github" })
 const repo = await github.repos.get({ forge: "github", instance: "github.com", owner, name })
 ```
 
-Until `refreshCapabilities()` is called to fetch `GET /`, `proxyProvider()` optimistically reports
-all verbs as supported from `can()`, and any verb not routed by the proxy rejects with
+Until `refreshCapabilities()` is called to fetch `GET /_meta`, `proxyProvider()` optimistically
+reports all verbs as supported from `can()`, and any verb not routed by the proxy rejects with
 `UnsupportedOperationError` when called. For self-hosted instances, pass `baseUrl` or `instance`.
 
 Requests to the proxy time out after `timeout` milliseconds (default `30000`); `sources.stream()`

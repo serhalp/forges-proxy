@@ -3,7 +3,7 @@
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/serhalp/forges-proxy&create_from_path=demos/netlify-server#FORGES_PROXY_PUBLIC=1)
 
 Live public read-only instance: <https://forges-proxy-server-demo.netlify.app/>
-([`/docs`](https://forges-proxy-server-demo.netlify.app/docs)).
+([`/_docs`](https://forges-proxy-server-demo.netlify.app/_docs)).
 
 Runs the same setup as the [Netlify Functions demo](../netlify-serverless) (durable CDN caching,
 webhook cache-tag purging, [evlog](https://evlog.dev) logging, and anonymous forge defaults) on a

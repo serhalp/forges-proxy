@@ -43,10 +43,10 @@ export interface ProxyOptions {
 
 export interface DiscoverOptions extends ProxyOptions {
   /**
-   * The proxy's description from {@link describeProxy}, allowing providers to be constructed
-   * without fetching `GET /` again (e.g. cached per process or passed from SSR to the browser).
+   * The proxy's metadata from {@link fetchProxyMeta}, allowing providers to be constructed
+   * without fetching `GET /_meta` again (e.g. cached per process or passed from SSR to the browser).
    */
-  description?: ProxyDescription
+  meta?: ProxyMeta
   /**
    * `forges` provider factories (e.g. `github` from `forges/github`) used to run synchronous
    * helpers (`normaliseMarkdown`, `scopesFor`, `webhooks.events`, etc.) locally. Pass `allFactories`
@@ -60,7 +60,7 @@ export type ProviderFactory = (options: never) => ForgeProvider
 
 const isObject = (value: unknown): value is object => typeof value === "object" && value !== null
 
-const Description: v.GenericSchema<unknown, ProxyDescription> = v.object({
+const Meta: v.GenericSchema<unknown, ProxyMeta> = v.object({
   forges: v.optional(v.string()),
   providers: v.array(
     v.object({
@@ -79,7 +79,7 @@ const Description: v.GenericSchema<unknown, ProxyDescription> = v.object({
  * What a proxy serves: its `forges` version, providers and their capabilities, and routed verbs.
  * Serializable.
  */
-export interface ProxyDescription {
+export interface ProxyMeta {
   forges?: string
   providers: Array<{
     forge: string
@@ -100,16 +100,18 @@ const ErrorBody = v.object({
   error: v.looseObject({ name: v.optional(v.string()), message: v.optional(v.string()) }),
 })
 
-type RemoteVerb = Omit<ProxyDescription["verbs"][number], "name">
+type RemoteVerb = Omit<ProxyMeta["verbs"][number], "name">
 
-/** Fetches the proxy's description (`GET /`), for reuse with {@link discoverProviders}. */
-export async function describeProxy(options: ProxyOptions): Promise<ProxyDescription> {
+/** Fetches the proxy's metadata (`GET /_meta`), for reuse with {@link discoverProviders}. */
+export async function fetchProxyMeta(options: ProxyOptions): Promise<ProxyMeta> {
   const transport = transportFor(options)
-  const response = await transport.fetch(transport.url, { headers: transport.headers })
+  const response = await transport.fetch(new URL("_meta", transport.url).href, {
+    headers: transport.headers,
+  })
   if (!response.ok) {
     throw await toError(response, {})
   }
-  return v.parse(Description, await response.json())
+  return v.parse(Meta, await response.json())
 }
 
 /**
@@ -122,11 +124,11 @@ export async function describeProxy(options: ProxyOptions): Promise<ProxyDescrip
  * ```
  */
 export async function discoverProviders(options: DiscoverOptions): Promise<ForgeProvider[]> {
-  const description = options.description ?? (await describeProxy(options))
-  checkVersion(description.forges, options)
-  const verbs = new Map(description.verbs.map(({ name, ...verb }) => [name, verb]))
+  const meta = options.meta ?? (await fetchProxyMeta(options))
+  checkVersion(meta.forges, options)
+  const verbs = new Map(meta.verbs.map(({ name, ...verb }) => [name, verb]))
   const transport = transportFor(options)
-  return description.providers.map((info) =>
+  return meta.providers.map((info) =>
     remoteProvider(info, verbs, transport, options.factories ?? []),
   )
 }
@@ -141,7 +143,7 @@ export interface ProxyProviderOptions extends ProxyOptions {
 }
 
 /**
- * Constructs a `ForgeProvider` for a single forge synchronously without fetching `GET /`. Until
+ * Constructs a `ForgeProvider` for a single forge synchronously without fetching `GET /_meta`. Until
  * `refreshCapabilities()` is called, `can()` optimistically reports all verbs as supported,
  * `baseUrl` defaults to `options.baseUrl ?? ""`, and `authKind` defaults to `"anonymous"`. Calling
  * a verb not routed by the proxy rejects with `UnsupportedOperationError`.
@@ -268,7 +270,7 @@ function transportFor(options: ProxyOptions): Transport {
 }
 
 function remoteProvider(
-  info: ProxyDescription["providers"][number],
+  info: ProxyMeta["providers"][number],
   verbs: Map<string, RemoteVerb>,
   options: Transport,
   factories: readonly ProviderFactory[],
@@ -297,17 +299,17 @@ function remoteProvider(
     }
   }
 
-  /** Re-fetches `GET /` to update this provider's capabilities. */
+  /** Re-fetches `GET /_meta` to update this provider's capabilities. */
   async function refreshCapabilities(): Promise<ForgeCapabilities> {
-    const response = await options.fetch(options.url, { headers: options.headers })
+    const response = await options.fetch(new URL("_meta", options.url).href, {
+      headers: options.headers,
+    })
     if (!response.ok) {
       throw await toError(response, origin)
     }
-    const description = v.parse(Description, await response.json())
-    checkVersion(description.forges, options.proxy)
-    const own = description.providers.find(
-      (entry) => entry.forge === forge && entry.instance === instance,
-    )
+    const meta = v.parse(Meta, await response.json())
+    checkVersion(meta.forges, options.proxy)
+    const own = meta.providers.find((entry) => entry.forge === forge && entry.instance === instance)
     if (!own) {
       throw new UnknownForgeError(
         `The proxy serves no provider for ${forge} on ${instance}`,
@@ -315,7 +317,7 @@ function remoteProvider(
       )
     }
     ;({ capabilities, baseUrl, authKind } = own)
-    routedVerbs = new Set(description.verbs.map((verb) => verb.name))
+    routedVerbs = new Set(meta.verbs.map((verb) => verb.name))
     return capabilities
   }
 
@@ -488,7 +490,7 @@ function remoteProvider(
 
 /** Instantiates a local, unauthenticated provider from `factories` to run synchronous helper methods. */
 function localProvider(
-  info: ProxyDescription["providers"][number],
+  info: ProxyMeta["providers"][number],
   factories: readonly ProviderFactory[],
 ): ForgeProvider | undefined {
   for (const factory of factories) {
@@ -501,7 +503,7 @@ function localProvider(
         return provider as ForgeProvider
       }
     } catch {
-      // Ignore factories that require options not exposed by `GET /` (such as an organization name).
+      // Ignore factories that require options not exposed by `GET /_meta` (such as an organization name).
     }
   }
   return undefined

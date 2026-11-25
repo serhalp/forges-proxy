@@ -26,7 +26,7 @@ forges.
   [Fetchable](https://fetchable.org) (`{ fetch(request) }`). Use `createServer(options)` for custom
   configuration, or the default export to configure from `process.env`.
 - [`packages/client`](packages/client) (`@forges-proxy/client`): `discoverProviders()`,
-  `proxyProvider()`, and `describeProxy()`, which wrap a remote proxy in standard `forges` provider
+  `proxyProvider()`, and `fetchProxyMeta()`, which wrap a remote proxy in standard `forges` provider
   objects.
 - [`packages/docs`](packages/docs): placeholder for the documentation site.
 - [`demos/`](demos): example deployments for supported platforms and frameworks.
@@ -77,7 +77,7 @@ export const config = { path: "/*" }
 
 The server expects requests rooted at `/`. If you mount it under a subpath, strip the prefix before
 passing the request to `server.fetch` (Hono's `app.mount()` does this automatically). The client,
-`/docs`, and `/openapi.json` all work under a path prefix.
+`/_docs`, and `/openapi.json` all work under a path prefix.
 
 ## Configure
 
@@ -92,10 +92,10 @@ would create an SSRF risk without an egress allowlist. All demos enable `anonymo
 
 You must set either `FORGES_PROXY_SECRET` or `FORGES_PROXY_PUBLIC=1`:
 
-- `FORGES_PROXY_SECRET`: runs a private instance. All endpoints except `/docs`, `/openapi.json`, and
-  `/webhooks/*` require `Authorization: Bearer <secret>`. All routable verbs are enabled. To rotate
-  secrets without downtime, set `FORGES_PROXY_PREVIOUS_SECRET` to the old secret and
-  `FORGES_PROXY_SECRET` to the new one; both are accepted until you unset
+- `FORGES_PROXY_SECRET`: runs a private instance. All endpoints except `/` (a redirect to `/_docs`),
+  `/_docs`, `/openapi.json`, and `/webhooks/*` require `Authorization: Bearer <secret>`. All
+  routable verbs are enabled. To rotate secrets without downtime, set `FORGES_PROXY_PREVIOUS_SECRET`
+  to the old secret and `FORGES_PROXY_SECRET` to the new one; both are accepted until you unset
   `FORGES_PROXY_PREVIOUS_SECRET`.
 - `FORGES_PROXY_PUBLIC=1`: runs a public, read-only instance with no authentication. Write verbs,
   account verbs, and privileged reads (security alerts, collaborators, branch rules) are disabled.
@@ -104,16 +104,18 @@ You must set either `FORGES_PROXY_SECRET` or `FORGES_PROXY_PUBLIC=1`:
 
 ## HTTP API
 
-- `GET /`: returns the access mode, `forges` version, configured providers and their capabilities
-  (refreshed once per server instance), and routed verbs with their options parameter index.
-- `GET /docs`: interactive Scalar API reference built from `GET /openapi.json` (OpenAPI 3.1).
-- `GET /status`: latest rate-limit budgets observed by the responding server instance. Uncached verb
-  responses also include this data in the `forges-rate-limits` header.
+- `GET /`: redirects to `/_docs`.
+- `GET /_meta`: returns the access mode, `forges` version, configured providers and their
+  capabilities (refreshed once per server instance), and routed verbs with their options parameter
+  index.
+- `GET /_docs`: interactive Scalar API reference built from `GET /openapi.json` (OpenAPI 3.1).
+- `GET /_status`: latest rate-limit budgets observed by the responding server instance. Uncached
+  verb responses also include this data in the `forges-rate-limits` header.
 - `GET /:forge/:instance/:verb?args=<json array>`: calls a read verb (e.g. `repos.get`,
   `threads.list`).
 - `POST /:forge/:instance/:verb` with `{ "args": [...] }`: calls a write verb.
 - Every verb response carries the server's `forges` version in `forges-version`, so clients can
-  check wire compatibility without reading `GET /`.
+  check wire compatibility without reading `GET /_meta`.
 - `GET /:forge/:instance/sources.stream`: streams live events from `provider.sources.stream()`
   (currently Tangled only) as
   [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events). Each
@@ -124,7 +126,7 @@ You must set either `FORGES_PROXY_SECRET` or `FORGES_PROXY_PUBLIC=1`:
   instances.
 
 `args` is a JSON array of positional arguments matching the `ForgeProvider` method signature (see
-`/docs`), validated against the operation schema. Use `null` to skip an optional positional
+`/_docs`), validated against the operation schema. Use `null` to skip an optional positional
 argument. Binary values are encoded as `{ "$bytes": "<base64>" }` and dates as
 `{ "$date": "<ISO 8601>" }`.
 
@@ -161,20 +163,20 @@ const repo = await forges.repos.get({
 ```
 
 `discoverProviders()` returns a provider for every forge configured on the proxy (needed for
-cross-forge calls like `forges.search.threads()`). By default it fetches `GET /` on startup. To
-avoid fetching `GET /` on every server request or in the browser after SSR, describe the proxy once
-with `describeProxy()` and pass the description:
+cross-forge calls like `forges.search.threads()`). By default it fetches `GET /_meta` on startup. To
+avoid fetching `GET /_meta` on every server request or in the browser after SSR, fetch the proxy's
+metadata once with `fetchProxyMeta()` and pass it in:
 
 ```ts
-import { discoverProviders, describeProxy } from "@forges-proxy/client"
+import { discoverProviders, fetchProxyMeta } from "@forges-proxy/client"
 
-const description = await describeProxy({ url, secret })
-// Reuse `description` across requests with each caller's `fetch`:
-const providers = await discoverProviders({ url, secret, description, fetch })
+const meta = await fetchProxyMeta({ url, secret })
+// Reuse `meta` across requests with each caller's `fetch`:
+const providers = await discoverProviders({ url, secret, meta, fetch })
 ```
 
 If you already know which forge you want to call, `proxyProvider()` constructs its provider
-synchronously without fetching `GET /`:
+synchronously without fetching `GET /_meta`:
 
 ```ts
 import { proxyProvider } from "@forges-proxy/client"
@@ -183,8 +185,8 @@ const github = proxyProvider({ url, secret, forge: "github" })
 const repo = await github.repos.get({ forge: "github", instance: "github.com", owner, name })
 ```
 
-Until `refreshCapabilities()` is called to fetch `GET /`, `proxyProvider()` optimistically reports
-all verbs as supported from `can()`, and any verb not routed by the proxy rejects with
+Until `refreshCapabilities()` is called to fetch `GET /_meta`, `proxyProvider()` optimistically
+reports all verbs as supported from `can()`, and any verb not routed by the proxy rejects with
 `UnsupportedOperationError` when called. For self-hosted instances, pass `baseUrl` or `instance`.
 
 Requests to the proxy time out after `timeout` milliseconds (default `30000`); `sources.stream()`
@@ -206,7 +208,8 @@ Listings fetch one page per HTTP request whether you iterate with `for await` or
 `sources.stream()` reads the SSE endpoint and throws `StreamClosedError` (with the last cursor
 attached) when the connection closes so you can resume. Upstream errors are reconstructed into their
 original `ForgeError` subclasses. Unrouted verbs reject with `UnsupportedOperationError` and report
-`false` from `can()`. Call `refreshCapabilities()` to re-fetch provider capabilities from `GET /`.
+`false` from `can()`. Call `refreshCapabilities()` to re-fetch provider capabilities from
+`GET /_meta`.
 
 `rateLimits()` returns the budgets attached to the provider's most recent response. Note that:
 
@@ -215,7 +218,7 @@ original `ForgeError` subclasses. Unrouted verbs reject with `UnsupportedOperati
 - Authenticated budgets belong to the proxy's forge token/installation and are shared across all
   callers. Anonymous budgets are typically tied to the server instance's egress IP.
 - On public instances, cacheable read responses omit the `forges-rate-limits` header so the CDN does
-  not serve stale budgets; `rateLimits()` only updates on error responses. Query `GET /status` for
+  not serve stale budgets; `rateLimits()` only updates on error responses. Query `GET /_status` for
   current budgets.
 - Secondary rate limits that forges do not report via response headers are not included.
 

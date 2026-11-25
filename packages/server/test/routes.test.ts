@@ -122,7 +122,7 @@ describe("private mode", () => {
     assert.equal(preflight.status, 204)
     assert.equal(preflight.headers.get("access-control-allow-origin"), "*")
     assert.equal(preflight.headers.get("access-control-allow-headers"), "authorization")
-    const denied = await call("/", { headers: { origin: "https://app.test" } })
+    const denied = await call("/_meta", { headers: { origin: "https://app.test" } })
     assert.equal(denied.status, 401)
     assert.equal(denied.headers.get("access-control-allow-origin"), "*")
     const unknown = await call("/fake/fake.test/repos.get/extra", {
@@ -132,13 +132,16 @@ describe("private mode", () => {
     assert.equal(unknown.headers.get("access-control-allow-origin"), "*")
   })
 
-  it("requires authentication on all routes except /docs, /openapi.json, and POST /webhooks/:forge/:instance", async () => {
-    assert.equal((await call("/")).status, 401)
-    assert.equal((await call("/status")).status, 401)
+  it("requires authentication on all routes except /, /_docs, /openapi.json, and POST /webhooks/:forge/:instance", async () => {
+    const root = await call("/")
+    assert.equal(root.status, 302)
+    assert.equal(root.headers.get("location"), "_docs")
+    assert.equal((await call("/_meta")).status, 401)
+    assert.equal((await call("/_status")).status, 401)
     assert.equal((await call("/nope")).status, 401)
-    assert.equal((await call("/docs")).status, 200)
+    assert.equal((await call("/_docs")).status, 200)
     assert.equal((await call("/openapi.json")).status, 200)
-    assert.equal((await call("/docsx")).status, 401)
+    assert.equal((await call("/_docsx")).status, 401)
     assert.equal((await call("/webhooks/fake/fake.test")).status, 401)
     assert.equal((await call("/webhooks/fake/fake.test/x", { method: "POST" })).status, 401)
   })
@@ -162,7 +165,7 @@ describe("private mode", () => {
     assert.equal((await read("users.me", [], authorization)).status, 200)
   })
 
-  it("includes all routed verbs and skipped provider configs in GET /", async (t) => {
+  it("includes all routed verbs and skipped provider configs in GET /_meta", async (t) => {
     process.env.FORGES_GITLAB_BASE_URL = "https://git.example"
     t.after(() => delete process.env.FORGES_GITLAB_BASE_URL)
     const body = v.parse(
@@ -171,11 +174,11 @@ describe("private mode", () => {
         verbs: v.array(v.object({ name: v.string() })),
         skipped: v.array(v.unknown()),
       }),
-      await (await call("/", { headers: authorization })).json(),
+      await (await call("/_meta", { headers: authorization })).json(),
     )
     assert.equal(body.mode, "private")
     assert.ok(body.verbs.some((verb) => verb.name === "threads.createComment"))
-    const response = await call("/", { headers: authorization })
+    const response = await call("/_meta", { headers: authorization })
     assert.equal(response.headers.get("cache-control"), "private, no-store")
     assert.equal(response.headers.get("etag"), null)
     assert.deepEqual(body.skipped, [
@@ -236,10 +239,10 @@ describe("public mode", () => {
     assert.equal((await read("repos.collaborators", [repo])).status, 501)
   })
 
-  it("lists only public read verbs and omits skipped provider diagnostics in GET /", async () => {
+  it("lists only public read verbs and omits skipped provider diagnostics in GET /_meta", async () => {
     const body = v.parse(
       v.looseObject({ verbs: v.array(v.object({ write: v.boolean(), account: v.boolean() })) }),
-      await (await call("/")).json(),
+      await (await call("/_meta")).json(),
     )
     assert.ok(body.verbs.length > 0)
     assert.ok(body.verbs.every((verb) => !verb.write && !verb.account))
@@ -255,8 +258,8 @@ describe("public mode", () => {
     assert.equal((await read("users.me", [])).headers.get("forges-version"), version)
   })
 
-  it("sets browser and CDN cache headers with ETag revalidation on GET /", async () => {
-    const response = await call("/")
+  it("sets browser and CDN cache headers with ETag revalidation on GET /_meta", async () => {
+    const response = await call("/_meta")
     assert.equal(response.headers.get("cache-control"), "public, max-age=60")
     assert.equal(
       response.headers.get("cdn-cache-control"),
@@ -265,7 +268,7 @@ describe("public mode", () => {
     assert.equal(response.headers.get("cache-tag"), "fake:fake.test")
     const etag = response.headers.get("etag")!
     assert.match(etag, /^W\/"[0-9a-f]{32}"$/)
-    const revalidated = await call("/", { headers: { "if-none-match": etag } })
+    const revalidated = await call("/_meta", { headers: { "if-none-match": etag } })
     assert.equal(revalidated.status, 304)
   })
 })

@@ -22,7 +22,7 @@ const VERSION_HEADER = "forges-version"
  */
 export function verbRoute(context: Context): EventHandler {
   const dispatch = dispatcher(context)
-  // Lets clients that never read `GET /` (`proxyProvider()`) check wire compatibility.
+  // Lets clients that never read `GET /_meta` (`proxyProvider()`) check wire compatibility.
   return async (event) => {
     const response = await dispatch(event)
     response.headers.set(VERSION_HEADER, manifest.forges)

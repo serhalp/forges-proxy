@@ -13,7 +13,7 @@ const RETRY_MS = 5 * 60_000
  * Returns the proxy's `forges` version, configured providers and their capabilities, and routed
  * verbs with their options parameter index (used by clients to inject `signal` and `cursor`).
  */
-export function indexRoute(context: Context): EventHandler {
+export function metaRoute(context: Context): EventHandler {
   // `refreshCapabilities()` queries the upstream forge on every call, so cache the result per
   // provider instance. If the request fails, fall back to static capabilities and retry after `RETRY_MS`.
   const refreshed = new WeakMap<
@@ -67,7 +67,7 @@ export function indexRoute(context: Context): EventHandler {
       // Only expose skipped provider diagnostics on authenticated private instances.
       ...(mode === "private" ? { skipped: skippedProviders(context) } : {}),
     }
-    // Cache `GET /` on public instances since `discoverProviders()` fetches it on startup.
+    // Cache `GET /_meta` on public instances since `discoverProviders()` fetches it on startup.
     return cachedJsonResponse(event.req, JSON.stringify(body), {
       mode,
       tags: providers.map((provider) => `${provider.forge}:${provider.instance}`),

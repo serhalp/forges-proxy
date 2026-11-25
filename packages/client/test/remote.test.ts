@@ -14,7 +14,7 @@ import { fake as fakeForge } from "forges/fake"
 import { github as githubFactory } from "forges/github"
 import { gitlab as gitlabFactory } from "forges/gitlab"
 import { allFactories } from "../src/all.ts"
-import { discoverProviders, describeProxy, proxyProvider } from "../src/remote.ts"
+import { discoverProviders, fetchProxyMeta, proxyProvider } from "../src/remote.ts"
 import { FORGES_VERSION } from "../src/version.ts"
 import { serialize } from "../../server/src/wire.ts"
 import { createProxy, env } from "../../server/test/support/proxy.ts"
@@ -89,7 +89,7 @@ describe("discoverProviders", () => {
   it("warns once about an incompatible forges version, or throws when asked to", async (t) => {
     const runs = (version: string) => async (url: string, init?: RequestInit) => {
       const response = await fetch(url, init)
-      return new URL(url).pathname === "/"
+      return new URL(url).pathname === "/_meta"
         ? Response.json({ ...v.parse(v.looseObject({}), await response.json()), forges: version })
         : response
     }
@@ -118,8 +118,8 @@ describe("discoverProviders", () => {
     await assert.rejects(remote("nope"), { status: 401 })
   })
 
-  it("uses a description it was given without requesting GET /", async () => {
-    const description = await describeProxy({ url: "http://proxy.test", secret: "s3cret", fetch })
+  it("uses metadata it was given without requesting GET /_meta", async () => {
+    const meta = await fetchProxyMeta({ url: "http://proxy.test", secret: "s3cret", fetch })
     const requested: string[] = []
     const counting = (url: string, init?: RequestInit) => {
       requested.push(new URL(url).pathname)
@@ -128,7 +128,7 @@ describe("discoverProviders", () => {
     const options = { url: "http://proxy.test", secret: "s3cret", fetch: counting }
     const [provider] = await discoverProviders({
       ...options,
-      description: structuredClone(description),
+      meta: structuredClone(meta),
     })
     assert.equal((await provider.repos.get(repo)).description, "Widgets")
     assert.deepEqual(requested, ["/fake/fake.test/repos.get"])
@@ -325,7 +325,7 @@ describe("remote provider state", () => {
     let reads = 0
     const refining = async (url: string, init?: RequestInit) => {
       const response = await fetch(url, init)
-      if (new URL(url).pathname !== "/" || ++reads === 1) return response
+      if (new URL(url).pathname !== "/_meta" || ++reads === 1) return response
       const body = v.parse(
         v.looseObject({ providers: v.array(v.looseObject({ capabilities: v.looseObject({}) })) }),
         await response.json(),

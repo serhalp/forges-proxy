@@ -28,8 +28,8 @@ client ──▶ CDN ──▶ auth middleware ──▶ verb route ──▶ fo
   `500` so the failure is visible in the forge's webhook delivery log.
 - **Operations manifest** (`packages/server/src/manifest.ts`): Re-exports routable verbs and model
   schemas from `forges/schema`. Drives routing, argument validation, `AbortSignal` injection,
-  `GET /`, `/openapi.json`, and `/docs`.
-- **Client** (`@forges-proxy/client`): `discoverProviders()` fetches `GET /`, verifies that the
+  `GET /_meta`, `/openapi.json`, and `/_docs`.
+- **Client** (`@forges-proxy/client`): `discoverProviders()` fetches `GET /_meta`, verifies that the
   server's `forges` version is wire-compatible, and constructs local `ForgeProvider` proxies using
   the verb metadata returned by `/`. `proxyProvider()` constructs a single forge's provider
   synchronously without fetching `/`, using built-in verb metadata (with options parameter indices
@@ -102,8 +102,8 @@ Wire encoding:
 ### Provider RPC vs. transparent forge HTTP pass-through
 
 **Context**: Running `forges` on both the server and client (`discoverProviders()`) requires both
-sides to use a compatible `forges` version (`GET /` and every verb response report the version, and
-the client warns on a mismatch, or throws with `versionMismatch: "throw"`). An alternative is
+sides to use a compatible `forges` version (`GET /_meta` and every verb response report the version,
+and the client warns on a mismatch, or throws with `versionMismatch: "throw"`). An alternative is
 running `forges` only in the client and making the proxy a transparent, authenticating HTTP
 forwarder for upstream forge APIs.
 
@@ -127,7 +127,7 @@ injects the token, and sets CDN cache headers.
     `RepoRef` objects.
   - Multi-request verbs would require multiple client round-trips instead of one call.
   - We would lose normalized responses (increasing payload sizes), input schema validation, and the
-    unified OpenAPI spec / `/docs`.
+    unified OpenAPI spec / `/_docs`.
 
 **Decision**: Keep the RPC design. Public read-only instances, CDN caching for GraphQL-backed reads,
 single-round-trip fan-out, and a unified HTTP API for non-JS callers all depend on verb-level
@@ -137,8 +137,8 @@ routing.
 
 Routes are mounted at `/:forge/:instance/:verb` without a `/v1` prefix. Because the HTTP surface
 mirrors `forges` directly, its contract is tied to the `forges` package version rather than an
-independent HTTP API version. Auth middleware protects all routes by default except `/docs`,
-`/openapi.json`, and `POST /webhooks/:forge/:instance`.
+independent HTTP API version. Auth middleware protects all routes by default except `/` (a redirect
+to `/_docs`), `/_docs`, `/openapi.json`, and `POST /webhooks/:forge/:instance`.
 
 ### Stateless CDN caching
 

@@ -3,7 +3,7 @@
 Mounts `@forges-proxy/server` under `/forges` inside a [Nitro](https://nitro.build) app.
 `server/routes/forges/[...path].ts` (and `index.ts` for `/forges`) strips the `/forges` prefix and
 forwards the Web `Request` to `server.fetch`. The client
-(`discoverProviders({ url: "http://localhost:3000/forges" })`), `/forges/docs`, and
+(`discoverProviders({ url: "http://localhost:3000/forges" })`), `/forges/_docs`, and
 `/forges/openapi.json` all resolve relative to the mount path.
 
 ## Run

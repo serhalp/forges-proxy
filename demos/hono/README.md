@@ -2,7 +2,7 @@
 
 Mounts `@forges-proxy/server` under `/forges` inside an existing [Hono](https://hono.dev) app.
 `app.mount("/forges", server.fetch)` strips the `/forges` prefix before passing requests to the
-proxy. The client (`discoverProviders({ url: "http://localhost:3000/forges" })`), `/forges/docs`,
+proxy. The client (`discoverProviders({ url: "http://localhost:3000/forges" })`), `/forges/_docs`,
 and `/forges/openapi.json` all resolve relative to the mount path.
 
 ## Run

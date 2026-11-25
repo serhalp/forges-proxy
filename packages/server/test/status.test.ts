@@ -15,12 +15,12 @@ const repo = { forge: "fake", instance: "fake.test", owner: "acme", name: "widge
 const get = (path: string, headers?: HeadersInit) =>
   Promise.resolve(app.fetch(new Request(new URL(path, "http://proxy.test"), { headers })))
 
-describe("GET /status", () => {
+describe("GET /_status", () => {
   env({ FORGES_PROXY_SECRET: "s3cret" })
   const authorization = { authorization: "Bearer s3cret" }
 
   it("requires authentication on a private instance", async () => {
-    assert.equal((await get("/status")).status, 401)
+    assert.equal((await get("/_status")).status, 401)
   })
 
   it("returns the latest rate-limit budgets recorded by each provider", async () => {
@@ -28,7 +28,7 @@ describe("GET /status", () => {
       `/fake/fake.test/repos.get?args=${encodeURIComponent(JSON.stringify([repo]))}`,
       authorization,
     )
-    const response = await get("/status", authorization)
+    const response = await get("/_status", authorization)
     assert.equal(response.headers.get("cache-control"), "no-store")
     const { providers } = v.parse(
       v.object({
@@ -71,7 +71,7 @@ describe("forges-rate-limits on a public instance", () => {
   })
 })
 
-describe("GET /", () => {
+describe("GET /_meta", () => {
   env({ FORGES_PROXY_SECRET: "s3cret" })
   const Index = v.object({
     providers: v.array(
@@ -81,7 +81,7 @@ describe("GET /", () => {
   const readerOf = (provider: ReturnType<typeof fake>) => {
     const server = createServer({ forges: createForges([provider]) })
     return async () => {
-      const request = new Request("http://proxy.test/", {
+      const request = new Request("http://proxy.test/_meta", {
         headers: { authorization: "Bearer s3cret" },
       })
       return v.parse(Index, await (await server.fetch(request)).json()).providers[0].capabilities

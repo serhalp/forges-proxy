@@ -1,7 +1,7 @@
 # forges-proxy on Cloudflare Workers
 
 Live public read-only instance: <https://demo.forges-proxy.workers.dev/>
-([`/docs`](https://demo.forges-proxy.workers.dev/docs)).
+([`/_docs`](https://demo.forges-proxy.workers.dev/_docs)).
 
 Runs the proxy on Cloudflare Workers, configured via `cloudflare.config.ts` and deployed with
 Cloudflare's `cf` CLI. Note that Cloudflare does not automatically cache Worker responses at the CDN

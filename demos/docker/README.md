@@ -1,7 +1,7 @@
 # forges-proxy on Docker
 
 Live public read-only instance on [Fly.io](https://fly.io): <https://forges-proxy-demo.fly.dev/>
-([`/docs`](https://forges-proxy-demo.fly.dev/docs)).
+([`/_docs`](https://forges-proxy-demo.fly.dev/_docs)).
 
 Runs the proxy on Node.js via [srvx](https://srvx.h3.dev) inside an Alpine container. Responses
 include standard `CDN-Cache-Control` and `Cache-Tag` headers if you place a CDN in front of the

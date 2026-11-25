@@ -3,7 +3,7 @@
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/serhalp/forges-proxy&create_from_path=demos/netlify-edge#FORGES_PROXY_PUBLIC=1)
 
 Live public read-only instance: <https://forges-proxy-edge-demo.netlify.app/>
-([`/docs`](https://forges-proxy-edge-demo.netlify.app/docs)).
+([`/_docs`](https://forges-proxy-edge-demo.netlify.app/_docs)).
 
 Runs the proxy in a catch-all Netlify Edge Function. Public reads are cached on Netlify's CDN with a
 60-second TTL and 10-minute `stale-while-revalidate` window, without webhook cache purging. If you
