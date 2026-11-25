@@ -6,7 +6,7 @@ forges.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/server-dark.png">
-  <img alt="@forges-proxy/server: self-hosted API gateway for code forges. Web apps (even under a strict CSP or for forge APIs without CORS), CI and bots, AI agents, and any language call your deployment. Behind a cache, it holds the forge tokens, caches responses, rate-limits per caller and per route, and serves one typed API for 14 forges, whose webhooks purge affected cache entries and run your own handler." src="assets/server-light.png">
+  <img alt="@forges-proxy/server: self-hosted API gateway for code forges. Web apps (even under a strict CSP or for forge APIs without CORS), CI and bots, AI agents, and any language call your deployment. Behind a cache, it holds the forge tokens, caches responses, rate-limits per caller and per route, and serves one typed API for 16 forges, whose webhooks purge affected cache entries and run your own handler." src="assets/server-light.png">
 </picture>
 
 ## Use cases
