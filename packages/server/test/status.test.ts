@@ -35,7 +35,13 @@ describe("GET /_status", () => {
         providers: v.array(
           v.object({
             forge: v.string(),
-            rateLimits: v.array(v.object({ limit: v.number(), remaining: v.number() })),
+            rateLimits: v.array(
+              v.looseObject({
+                limit: v.number(),
+                remaining: v.number(),
+                resetAt: v.optional(v.pipe(v.string(), v.isoTimestamp())),
+              }),
+            ),
           }),
         ),
       }),
