@@ -28,7 +28,6 @@ forges.
 - [`packages/client`](packages/client) (`@forges-proxy/client`): `discoverProviders()`,
   `proxyProvider()`, and `fetchProxyMeta()`, which wrap a remote proxy in standard `forges` provider
   objects.
-- [`packages/docs`](packages/docs): placeholder for the documentation site.
 - [`demos/`](demos): example deployments for supported platforms and frameworks.
 
 ## Demos

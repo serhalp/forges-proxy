@@ -337,8 +337,6 @@ importers:
         specifier: 0.23.7
         version: 0.23.7(oxc-resolver@11.24.2)(typescript@7.0.2)
 
-  packages/docs: {}
-
   packages/server:
     dependencies:
       '@cfworker/json-schema':

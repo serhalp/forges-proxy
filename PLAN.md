@@ -50,8 +50,7 @@ This project is experimental and may eventually move into the `forges` monorepo.
 - [x] Client: use the options parameter index reported by `GET /_meta` instead of a heuristic
 - [x] `discoverProviders()` client (`@forges-proxy/client`): returns one `ForgeProvider` per proxied
       forge
-- [x] pnpm workspace: `@forges-proxy/server`, `@forges-proxy/client`, `docs` placeholder, and
-      `demos/netlify-serverless`
+- [x] pnpm workspace: `@forges-proxy/server`, `@forges-proxy/client`, and `demos/netlify-serverless`
 - [x] Replace Nitro with plain h3 + tsdown: `createServer(options)` returns a Fetchable and takes
       platform hooks (`cdnHeaders`, `purge`, `fetch`) as options
 - [x] Demos smoke-tested via `pnpm smoke`: node, hono, fastify, nitro, docker, cloudflare-workers,
