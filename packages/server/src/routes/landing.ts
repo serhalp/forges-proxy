@@ -3,26 +3,8 @@ import { accessMode } from "../access.ts"
 import type { Context } from "../context.ts"
 import { manifest } from "../manifest.ts"
 import { cachedResponse } from "../response.ts"
+import { CLIENT_URL, FORGE_NAMES, SOURCE_URL } from "../copy.ts"
 import serverPackage from "../../package.json" with { type: "json" }
-
-const NAMES: Record<string, string> = {
-  "azure-devops": "Azure DevOps",
-  bitbucket: "Bitbucket",
-  "cloudflare-artifacts": "Cloudflare Artifacts",
-  "cursor-origin": "Cursor Origin",
-  entire: "Entire",
-  forgejo: "Forgejo",
-  gitbucket: "GitBucket",
-  gitcafe: "GitCafe",
-  gitea: "Gitea",
-  gitee: "Gitee",
-  github: "GitHub",
-  gitlab: "GitLab",
-  pushin: "Pushin",
-  sourcehut: "SourceHut",
-  tangled: "Tangled",
-  upstream: "Upstream",
-}
 
 /** What a person opening the proxy in a browser sees: what it is, what it serves, where to go next. */
 export function landingRoute(context: Context): EventHandler {
@@ -32,7 +14,7 @@ export function landingRoute(context: Context): EventHandler {
     const providers = mode === "public" ? context.forges().providers : []
     const forges = providers
       .map((provider) => {
-        const name = escape(NAMES[provider.forge] ?? provider.forge)
+        const name = escape(FORGE_NAMES[provider.forge] ?? provider.forge)
         const instance = escape(provider.instance)
         const origin = provider.webOrigin
         return `<li><span>${name}</span>${
@@ -169,11 +151,11 @@ function page(access: string, forges: string): string {
         <li><a href="openapi.json">OpenAPI document</a><span>For generated clients</span></li>
         <li><a href="_meta">Metadata</a><span>Providers, capabilities, and verbs, as JSON</span></li>
         <li>
-          <a href="https://npmx.dev/package/@forges-proxy/client">@forges-proxy/client</a
+          <a href="${CLIENT_URL}">@forges-proxy/client</a
           ><span>The proxy as <code>forges</code> providers, in TypeScript</span>
         </li>
         <li>
-          <a href="https://github.com/serhalp/forges-proxy">Source on GitHub</a><span>Deploy your own</span>
+          <a href="${SOURCE_URL}">Source on GitHub</a><span>Deploy your own</span>
         </li>
       </ul>
     </main>

@@ -2,6 +2,7 @@ import type { AccessMode } from "./access.ts"
 import type { VerbSignature, Schema } from "./manifest.ts"
 import { argsSchema, manifest } from "./manifest.ts"
 import { isRouted } from "./verbs.ts"
+import { accessNote, CALLING, CLIENT_URL, SOURCE_URL, SUMMARY } from "./copy.ts"
 import serverPackage from "../package.json" with { type: "json" }
 
 const ERROR: Schema = {
@@ -220,23 +221,17 @@ function responses(verb: VerbSignature): Record<string, unknown> {
 }
 
 function intro(mode: AccessMode): string {
-  const access =
-    mode === "public"
-      ? "This is a public, read-only instance: it routes no write or account verbs, nor reads that need elevated access."
-      : "Send the proxy secret as `Authorization: Bearer <secret>`."
-  return `A self-hosted HTTP proxy and credential broker for [\`forges\`](https://forges.link). It holds your forge tokens, caches public reads at the CDN, and exposes a single HTTP API across all configured forges.
+  return `${SUMMARY}
 
-${access}
+${accessNote(mode)}
 
 ## Calling a verb
 
-\`GET /{forge}/{instance}/{verb}?args=<json array>\` calls a read verb, and \`POST\` with \`{ "args": [...] }\` calls a write verb. \`args\` is a JSON array of positional arguments matching the \`ForgeProvider\` method signature, validated against the operation schema. Use \`null\` to skip an optional positional argument. Binary values are encoded as \`{ "$bytes": "<base64>" }\` and dates as \`{ "$date": "<ISO 8601>" }\`.
-
-Listing endpoints return a single page (\`{ items, cursor }\`). Pass \`cursor\` back in the options argument to fetch the next page.
+${CALLING}
 
 ## From TypeScript
 
-[\`@forges-proxy/client\`](https://npmx.dev/package/@forges-proxy/client) turns this proxy back into \`forges\` providers, so code written against \`forges\` works unchanged.
+[\`@forges-proxy/client\`](${CLIENT_URL}) turns this proxy back into \`forges\` providers, so code written against \`forges\` works unchanged.
 
-[Source and documentation](https://github.com/serhalp/forges-proxy)`
+[Source and documentation](${SOURCE_URL})`
 }

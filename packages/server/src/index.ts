@@ -9,6 +9,7 @@ import { providers } from "./providers.ts"
 import { standardCdnHeaders } from "./response.ts"
 import { docsRoute } from "./routes/docs.ts"
 import { landingRoute } from "./routes/landing.ts"
+import { llmsRoute } from "./routes/llms.ts"
 import { metaRoute } from "./routes/meta.ts"
 import { openapiRoute } from "./routes/openapi.ts"
 import { statusRoute } from "./routes/status.ts"
@@ -103,6 +104,7 @@ export function createServer(options: ServerOptions = {}): Server {
     .use((event) => handleCors(event, { ...CORS, methods: [...CORS.methods] }) || undefined)
     .use(auth(context))
     .get("/", landingRoute(context))
+    .get("/llms.txt", llmsRoute(context))
     .get("/_meta", metaRoute(context))
     .get("/_status", statusRoute(context))
     .get("/_docs", docsRoute)

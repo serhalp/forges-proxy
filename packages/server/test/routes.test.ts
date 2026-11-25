@@ -132,7 +132,10 @@ describe("private mode", () => {
     assert.equal(unknown.headers.get("access-control-allow-origin"), "*")
   })
 
-  it("requires authentication on all routes except /, /_docs, /openapi.json, and POST /webhooks/:forge/:instance", async () => {
+  it("requires authentication on all routes except /, /llms.txt, /_docs, /openapi.json, and POST /webhooks/:forge/:instance", async () => {
+    const llms = await call("/llms.txt")
+    assert.equal(llms.status, 200)
+    assert.doesNotMatch(await llms.text(), /fake\.test/)
     const root = await call("/")
     assert.equal(root.status, 200)
     assert.match(root.headers.get("content-type") ?? "", /^text\/html/)
@@ -257,6 +260,16 @@ describe("public mode", () => {
     )
     assert.equal((await read("repos.get", [repo])).headers.get("forges-version"), version)
     assert.equal((await read("users.me", [])).headers.get("forges-version"), version)
+  })
+
+  it("describes the instance for agents in /llms.txt", async () => {
+    const response = await call("/llms.txt")
+    assert.match(response.headers.get("content-type") ?? "", /^text\/markdown/)
+    const text = await response.text()
+    assert.match(text, /^# forges-proxy\n\n> /)
+    assert.match(text, /\[OpenAPI document\]\(openapi\.json\)/)
+    assert.match(text, /instance: "fake\.test"/)
+    assert.match(text, /curl -G http:\/\/proxy\.test\/github\/github\.com\/repos\.get/)
   })
 
   it("lists the instance's forges on the landing page", async () => {

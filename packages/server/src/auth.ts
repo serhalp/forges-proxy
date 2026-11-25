@@ -4,7 +4,7 @@ import { accessMode } from "./access.ts"
 import type { Context } from "./context.ts"
 import { proxyError } from "./errors.ts"
 
-const OPEN = /^\/(?:_docs|openapi\.json)?$/
+const OPEN = /^\/(?:_docs|openapi\.json|llms\.txt)?$/
 // Webhook deliveries authenticate using the forge's webhook signature instead of the proxy secret.
 const WEBHOOK = /^\/webhooks\/[^/]+\/[^/]+$/
 
