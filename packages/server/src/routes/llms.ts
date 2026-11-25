@@ -1,7 +1,7 @@
 import type { EventHandler } from "h3"
 import { accessMode } from "../access.ts"
 import type { Context } from "../context.ts"
-import { accessNote, CALLING, CLIENT_URL, FORGE_NAMES, SOURCE_URL, SUMMARY } from "../copy.ts"
+import { accessNote, CALLING, CLIENT_URL, forgeName, SOURCE_URL, SUMMARY } from "../copy.ts"
 import { cachedResponse } from "../response.ts"
 
 /** The proxy in the llms.txt format (https://llmstxt.org), for agents. */
@@ -12,7 +12,7 @@ export function llmsRoute(context: Context): EventHandler {
     const providers = mode === "public" ? context.forges().providers : []
     const forges = providers.map(
       ({ forge, instance }) =>
-        `- ${FORGE_NAMES[forge] ?? forge}: \`forge: "${forge}"\`, \`instance: "${instance}"\``,
+        `- ${forgeName(forge)}: \`forge: "${forge}"\`, \`instance: "${instance}"\``,
     )
     const body = [
       "# forges-proxy",
