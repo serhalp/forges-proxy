@@ -8,9 +8,13 @@
 Connects to a [`@forges-proxy/server`](https://github.com/serhalp/forges-proxy) deployment and
 returns drop-in [`forges`](https://forges.link) providers.
 
+## Install
+
 ```sh
 pnpm add @forges-proxy/client forges
 ```
+
+## Every forge: `discoverProviders()`
 
 ```ts
 import { createForges } from "forges"
@@ -32,6 +36,8 @@ const meta = await fetchProxyMeta({ url, secret })
 const providers = await discoverProviders({ url, secret, meta, fetch })
 ```
 
+## One forge: `proxyProvider()`
+
 If you already know which forge you want to call, `proxyProvider()` constructs its provider
 synchronously without fetching `GET /_meta`:
 
@@ -46,8 +52,12 @@ Until `refreshCapabilities()` is called to fetch `GET /_meta`, `proxyProvider()`
 reports all verbs as supported from `can()`, and any verb not routed by the proxy rejects with
 `UnsupportedOperationError` when called. For self-hosted instances, pass `baseUrl` or `instance`.
 
+## Timeouts
+
 Requests to the proxy time out after `timeout` milliseconds (default `30000`); `sources.stream()`
 connections do not time out.
+
+## Synchronous helpers
 
 Web link helpers (`urlFor()`, `parseUrl()`, `referenceFor()`, `parseReferences()`, `webOrigin`) are
 built in via `forges/web`. Other synchronous helpers (`normaliseMarkdown()`, `scopesFor()`,
@@ -60,6 +70,8 @@ import { github } from "forges/github"
 
 const providers = await discoverProviders({ url, secret, factories: [github] })
 ```
+
+## Listings, errors, and versions
 
 Listings fetch one page per HTTP request, upstream errors are reconstructed into their `ForgeError`
 subclasses, and verbs not routed by the proxy reject with `UnsupportedOperationError`. When the
