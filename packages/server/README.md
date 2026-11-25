@@ -28,6 +28,25 @@ Configure providers and access mode with `FORGES_*` environment variables, and p
 (custom CDN cache headers, tag purging, or a custom upstream `fetch`) to `createServer()`. See the
 [main README](https://github.com/serhalp/forges-proxy#readme) for configuration and API details.
 
+## Options
+
+`createServer(options)` returns a Fetchable. The default export is `createServer()` with no options,
+configured from `process.env` on its first request.
+
+| Option            | Default                                                 | Description                                                                                                                                              |
+| ----------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `env`             | `process.env`                                           | `FORGES_*` and `FORGES_PROXY_*` variables. `FORGES_PROXY_*` are read per request; providers are built once, on the first request.                        |
+| `anonymousForges` | `false`                                                 | Also serve, anonymously, every forge `env` doesn't configure that supports unauthenticated reads at its default instance. Intended for public instances. |
+| `forges`          | built from `env`                                        | A `Forges` registry to serve instead of building providers from `env`.                                                                                   |
+| `fetch`           | `fetch`                                                 | The `fetch` providers use, e.g. one that caches upstream responses.                                                                                      |
+| `purge`           | none; cached entries expire by age                      | `(tags) => Promise<void>`. Purges CDN cache entries by tag when a webhook delivery reports changes.                                                      |
+| `handleEvents`    | none                                                    | `(events, { forge, instance }) => void \| Promise<void>`. Called with verified webhook events after purging, and awaited; throwing answers `500`.        |
+| `cdnHeaders`      | `standardCdnHeaders` (`CDN-Cache-Control`, `Cache-Tag`) | `({ cacheControl, tags }) => headers`. Formats the CDN cache headers of cacheable public reads, e.g. for a CDN's own header names.                       |
+| `logger`          | errors to `console.error`, no request logs              | `{ error(event), info?(event) }`, such as `console`, pino, or evlog's `log`. Pass the object itself, not unbound methods.                                |
+
+The package also exports `standardCdnHeaders` and the types `ServerOptions`, `Server`, `Env`,
+`Purge`, `HandleEvents`, `CdnHeaders`, and `Logger`.
+
 ## Deploy
 
 See [`demos/`](https://github.com/serhalp/forges-proxy/tree/main/demos) for deployments on Netlify,
