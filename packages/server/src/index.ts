@@ -8,6 +8,7 @@ import type { CdnHeaders, Env, HandleEvents, Logger, Purge } from "./context.ts"
 import { providers } from "./providers.ts"
 import { standardCdnHeaders } from "./response.ts"
 import { docsRoute } from "./routes/docs.ts"
+import { landingRoute } from "./routes/landing.ts"
 import { metaRoute } from "./routes/meta.ts"
 import { openapiRoute } from "./routes/openapi.ts"
 import { statusRoute } from "./routes/status.ts"
@@ -101,8 +102,7 @@ export function createServer(options: ServerOptions = {}): Server {
     // Run CORS before auth so preflights succeed and 401 responses are readable by browsers.
     .use((event) => handleCors(event, { ...CORS, methods: [...CORS.methods] }) || undefined)
     .use(auth(context))
-    // Relative, so it resolves under a path prefix too.
-    .get("/", () => new Response(null, { status: 302, headers: { location: "_docs" } }))
+    .get("/", landingRoute(context))
     .get("/_meta", metaRoute(context))
     .get("/_status", statusRoute(context))
     .get("/_docs", docsRoute)

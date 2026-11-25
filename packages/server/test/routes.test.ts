@@ -134,8 +134,9 @@ describe("private mode", () => {
 
   it("requires authentication on all routes except /, /_docs, /openapi.json, and POST /webhooks/:forge/:instance", async () => {
     const root = await call("/")
-    assert.equal(root.status, 302)
-    assert.equal(root.headers.get("location"), "_docs")
+    assert.equal(root.status, 200)
+    assert.match(root.headers.get("content-type") ?? "", /^text\/html/)
+    assert.doesNotMatch(await root.text(), /fake\.test/)
     assert.equal((await call("/_meta")).status, 401)
     assert.equal((await call("/_status")).status, 401)
     assert.equal((await call("/nope")).status, 401)
@@ -256,6 +257,12 @@ describe("public mode", () => {
     )
     assert.equal((await read("repos.get", [repo])).headers.get("forges-version"), version)
     assert.equal((await read("users.me", [])).headers.get("forges-version"), version)
+  })
+
+  it("lists the instance's forges on the landing page", async () => {
+    const page = await (await call("/")).text()
+    assert.match(page, /fake\.test/)
+    assert.match(page, /href="_docs"/)
   })
 
   it("sets browser and CDN cache headers with ETag revalidation on GET /_meta", async () => {

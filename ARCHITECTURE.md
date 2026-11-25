@@ -137,8 +137,8 @@ routing.
 
 Routes are mounted at `/:forge/:instance/:verb` without a `/v1` prefix. Because the HTTP surface
 mirrors `forges` directly, its contract is tied to the `forges` package version rather than an
-independent HTTP API version. Auth middleware protects all routes by default except `/` (a redirect
-to `/_docs`), `/_docs`, `/openapi.json`, and `POST /webhooks/:forge/:instance`.
+independent HTTP API version. Auth middleware protects all routes by default except `/` (the landing
+page), `/_docs`, `/openapi.json`, and `POST /webhooks/:forge/:instance`.
 
 ### Stateless CDN caching
 

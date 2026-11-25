@@ -4,7 +4,7 @@ import type { EventHandler } from "h3"
 import { accessMode } from "../access.ts"
 import type { Context } from "../context.ts"
 import { manifest } from "../manifest.ts"
-import { cachedJsonResponse } from "../response.ts"
+import { cachedResponse } from "../response.ts"
 import { isRouted } from "../verbs.ts"
 
 const RETRY_MS = 5 * 60_000
@@ -68,7 +68,7 @@ export function metaRoute(context: Context): EventHandler {
       ...(mode === "private" ? { skipped: skippedProviders(context) } : {}),
     }
     // Cache `GET /_meta` on public instances since `discoverProviders()` fetches it on startup.
-    return cachedJsonResponse(event.req, JSON.stringify(body), {
+    return cachedResponse(event.req, JSON.stringify(body), {
       mode,
       tags: providers.map((provider) => `${provider.forge}:${provider.instance}`),
       cdnHeaders: context.cdnHeaders,

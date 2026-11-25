@@ -40,24 +40,24 @@ export async function resultResponse(
     return new Response(null, { status: 204, headers })
   }
   const body = serialize(result, { raw: new URL(request.url).searchParams.get("raw") === "1" })
-  return jsonResponse(request, body, headers, cacheable)
+  return bodyResponse(request, body, headers, cacheable)
 }
 
 /**
  * Builds a JSON `Response` that is cached by both browsers (`max-age=60`) and the CDN on public
  * instances, with weak `ETag` revalidation.
  */
-export async function cachedJsonResponse(
+export async function cachedResponse(
   request: Request,
   body: string,
-  context: { mode: AccessMode; tags: string[]; cdnHeaders: CdnHeaders },
+  context: { mode: AccessMode; tags: string[]; cdnHeaders: CdnHeaders; contentType?: string },
 ): Promise<Response> {
   const cacheable = context.mode === "public"
   const headers = cacheHeaders(cacheable, context)
   if (cacheable) {
     headers["cache-control"] = "public, max-age=60"
   }
-  return jsonResponse(request, body, headers, cacheable)
+  return bodyResponse(request, body, headers, cacheable, context.contentType)
 }
 
 function cacheHeaders(
@@ -73,14 +73,15 @@ function cacheHeaders(
     : { "cache-control": "private, no-store" }
 }
 
-async function jsonResponse(
+async function bodyResponse(
   request: Request,
   body: string,
   headers: Record<string, string>,
   cacheable: boolean,
+  contentType = "application/json",
 ): Promise<Response> {
   if (!cacheable) {
-    return new Response(body, { headers: { "content-type": "application/json", ...headers } })
+    return new Response(body, { headers: { "content-type": contentType, ...headers } })
   }
   // Use a weak ETag so CDN content encoding (gzip/brotli) does not break `If-None-Match`.
   const etag = `W/"${(await sha256Hex(body)).slice(0, 32)}"`
@@ -92,7 +93,7 @@ async function jsonResponse(
   ) {
     return new Response(null, { status: 304, headers: { etag, ...headers } })
   }
-  return new Response(body, { headers: { "content-type": "application/json", etag, ...headers } })
+  return new Response(body, { headers: { "content-type": contentType, etag, ...headers } })
 }
 
 export const standardCdnHeaders: CdnHeaders = ({ cacheControl, tags }) => ({

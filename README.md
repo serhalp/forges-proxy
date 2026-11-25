@@ -92,7 +92,7 @@ would create an SSRF risk without an egress allowlist. All demos enable `anonymo
 
 You must set either `FORGES_PROXY_SECRET` or `FORGES_PROXY_PUBLIC=1`:
 
-- `FORGES_PROXY_SECRET`: runs a private instance. All endpoints except `/` (a redirect to `/_docs`),
+- `FORGES_PROXY_SECRET`: runs a private instance. All endpoints except `/` (the landing page),
   `/_docs`, `/openapi.json`, and `/webhooks/*` require `Authorization: Bearer <secret>`. All
   routable verbs are enabled. To rotate secrets without downtime, set `FORGES_PROXY_PREVIOUS_SECRET`
   to the old secret and `FORGES_PROXY_SECRET` to the new one; both are accepted until you unset
@@ -104,7 +104,8 @@ You must set either `FORGES_PROXY_SECRET` or `FORGES_PROXY_PUBLIC=1`:
 
 ## HTTP API
 
-- `GET /`: redirects to `/_docs`.
+- `GET /`: a landing page for people: what the instance is, the forges it serves (on public
+  instances), and links to the API reference, OpenAPI document, metadata, and client.
 - `GET /_meta`: returns the access mode, `forges` version, configured providers and their
   capabilities (refreshed once per server instance), and routed verbs with their options parameter
   index.
