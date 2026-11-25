@@ -2,6 +2,7 @@ import type { AccessMode } from "./access.ts"
 import type { VerbSignature, Schema } from "./manifest.ts"
 import { argsSchema, manifest } from "./manifest.ts"
 import { isRouted } from "./verbs.ts"
+import serverPackage from "../package.json" with { type: "json" }
 
 const ERROR: Schema = {
   type: "object",
@@ -83,11 +84,10 @@ export function openApi(
     // Relative server URL so proxies mounted under a subpath resolve endpoints relative to `/openapi.json`.
     servers: [{ url: "." }],
     info: {
-      title: "forges proxy",
-      version: "0",
+      title: "forges-proxy",
+      version: serverPackage.version,
       "x-forges-version": manifest.forges,
-      description:
-        "Exposes `forges` provider verbs over HTTP. Positional method arguments are passed as a JSON array in `args`.",
+      description: intro(mode),
     },
     ...(mode === "private"
       ? {
@@ -217,4 +217,26 @@ function responses(verb: VerbSignature): Record<string, unknown> {
       content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
     },
   }
+}
+
+function intro(mode: AccessMode): string {
+  const access =
+    mode === "public"
+      ? "This is a public, read-only instance: it routes no write or account verbs, nor reads that need elevated access."
+      : "Send the proxy secret as `Authorization: Bearer <secret>`."
+  return `A self-hosted HTTP proxy and credential broker for [\`forges\`](https://forges.link). It holds your forge tokens, caches public reads at the CDN, and exposes a single HTTP API across all configured forges.
+
+${access}
+
+## Calling a verb
+
+\`GET /{forge}/{instance}/{verb}?args=<json array>\` calls a read verb, and \`POST\` with \`{ "args": [...] }\` calls a write verb. \`args\` is a JSON array of positional arguments matching the \`ForgeProvider\` method signature, validated against the operation schema. Use \`null\` to skip an optional positional argument. Binary values are encoded as \`{ "$bytes": "<base64>" }\` and dates as \`{ "$date": "<ISO 8601>" }\`.
+
+Listing endpoints return a single page (\`{ items, cursor }\`). Pass \`cursor\` back in the options argument to fetch the next page.
+
+## From TypeScript
+
+[\`@forges-proxy/client\`](https://npmx.dev/package/@forges-proxy/client) turns this proxy back into \`forges\` providers, so code written against \`forges\` works unchanged.
+
+[Source and documentation](https://github.com/serhalp/forges-proxy)`
 }

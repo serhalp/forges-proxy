@@ -9,7 +9,7 @@ export const docsRoute: EventHandler = (event) => {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>forges proxy</title>
+    <title>forges-proxy</title>
   </head>
   <body>
     <script id="api-reference" data-url="openapi.json"></script>
