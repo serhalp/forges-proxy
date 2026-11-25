@@ -189,7 +189,7 @@ function page(mode: AccessMode, forges: string): string {
         font-size: 0.8125rem;
         font-weight: 400;
         color: var(--muted);
-        padding-bottom: 0.4rem;
+        padding: 0 0.5rem 0.4rem;
       }
       tr {
         border-bottom: 1px solid var(--line);
@@ -198,7 +198,7 @@ function page(mode: AccessMode, forges: string): string {
         border-bottom-color: var(--line);
       }
       td {
-        padding: 0.6rem 0;
+        padding: 0.6rem 0.5rem;
         vertical-align: top;
       }
       td:first-child {
@@ -250,7 +250,7 @@ function page(mode: AccessMode, forges: string): string {
       <h1>forges-proxy</h1>
       <p class="lede">
         This is a <strong class="mode ${mode}">${LOCKS[mode]}${mode} instance</strong> of <a class="nowrap" href="${SOURCE_URL}">forges-proxy</a>, a self-hosted HTTP
-        proxy and credential broker for <a href="https://forges.link"><code>forges</code></a>. It holds
+        caching proxy and credential broker for <a href="https://forges.link"><code>forges</code></a>. It holds
         forge tokens, caches public reads at the CDN, and exposes a single HTTP API across all
         configured forges.
       </p>
